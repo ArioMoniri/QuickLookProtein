@@ -6,6 +6,16 @@
     <description>Auto-update feed for QuickLookProtein (Ariorad Moniri's signed fork).</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein 1.7.6</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.6</link>
+      <pubDate>Wed, 13 May 2026 15:57:12 +0000</pubDate>
+      <sparkle:version>1.7.6</sparkle:version>
+      <sparkle:shortVersionString>1.7.6</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;p&gt;See &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.6"&gt;the GitHub release&lt;/a&gt; for full notes and the binary download.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.6/QuickLookProtein-1.7.6.zip" sparkle:edSignature="xiXOfCQi1MfU2jA26hXOLh2WR/TGnxJALfVioylxZwimfCjtAfO2dIiiQnLEFhf3kJ7jaEjZV+mAJ8f29EDVDQ==" length="3844726" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein 1.7.5</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.5</link>
       <pubDate>Wed, 13 May 2026 15:50:05 +0000</pubDate>
