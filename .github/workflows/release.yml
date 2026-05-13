@@ -102,18 +102,28 @@ jobs:
       # The source tree ships a zero-key placeholder so dev builds don't
       # crash on launch with "Fatal updater error (1)"; release builds need
       # the real key so installed clients can verify update signatures.
-      - name: Inject Sparkle public key
+      #
+      # Allowed to be missing for the *first* release builds — Sparkle
+      # auto-update simply won't work until the secret is added, but the
+      # build still produces a signed/notarised .zip the user can grab
+      # manually from GitHub Releases. The downstream "Sign update with
+      # Sparkle EdDSA key" and "Update appcast.xml" steps are gated on
+      # the same condition and skipped when the key isn't set.
+      - name: Inject Sparkle public key (optional)
+        id: sparkle_inject
         env:
           SPARKLE_ED_PUBLIC_KEY: ${{ secrets.SPARKLE_ED_PUBLIC_KEY }}
         run: |
           if [[ -z "$SPARKLE_ED_PUBLIC_KEY" ]]; then
-              echo "::error::SPARKLE_ED_PUBLIC_KEY secret is not set. Released builds would ship without a verifiable public key and Sparkle clients would refuse every update."
-              exit 1
+              echo "::warning::SPARKLE_ED_PUBLIC_KEY not set — releasing without Sparkle in-place updates. Manual download from GitHub Releases will still work."
+              echo "configured=false" >> $GITHUB_OUTPUT
+              exit 0
           fi
           /usr/libexec/PlistBuddy \
               -c "Set :SUPublicEDKey ${SPARKLE_ED_PUBLIC_KEY}" \
               Xcode/QuickLookProtein/Info.plist
           echo "Injected SUPublicEDKey into Info.plist."
+          echo "configured=true" >> $GITHUB_OUTPUT
 
       # ----------------------------------------------------------------
       # Build, archive, export. We embed the developer team and signing
@@ -209,6 +219,7 @@ jobs:
       # form `sparkle:edSignature="…" length="…"` which slots directly into
       # the appcast enclosure.
       - name: Install Sparkle tools
+        if: steps.sparkle_inject.outputs.configured == 'true'
         env:
           SPARKLE_VERSION: '2.6.4'
         run: |
@@ -219,6 +230,7 @@ jobs:
           test -x sparkle/bin/sign_update
 
       - name: Sign update with Sparkle EdDSA key
+        if: steps.sparkle_inject.outputs.configured == 'true'
         id: sparkle
         env:
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
@@ -251,12 +263,43 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           TAG="v${VERSION}"
 
+          # Build release notes from commit log since the previous tag.
+          # `gh release create --generate-notes` does this automatically,
+          # but we prepend a clear install section so non-technical users
+          # see "download → drag into /Applications" at the top, ahead of
+          # the auto-extracted change list.
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^$TAG\$" | head -1 || echo "")
+          if [[ -n "$PREV_TAG" ]]; then
+              COMMITS=$(git log --no-merges --pretty=format:'- %s' "$PREV_TAG..HEAD")
+          else
+              COMMITS=$(git log --no-merges --pretty=format:'- %s' --max-count=30)
+          fi
+
+          ZIPNAME=$(basename "${{ steps.zip.outputs.zip }}")
+          NOTES_FILE="$RUNNER_TEMP/notes.md"
+          cat > "$NOTES_FILE" <<EOF
+          ## Install
+
+          1. Download **${ZIPNAME}** from the Assets below.
+          2. Unzip and drag **QuickLookProtein.app** into your **Applications** folder.
+          3. The first time you open a \`.pdb\` / \`.cif\` / \`.mol2\` / \`.xyz\` / etc. file, hit **Space** in Finder for the 3D preview, or switch to icon view to see molecular thumbnails.
+
+          The app is signed with Developer ID and notarised by Apple, so Gatekeeper will let it run without warning.
+
+          ## Changes since ${PREV_TAG:-the previous version}
+
+          ${COMMITS}
+
+          ---
+          *Built from \`${GITHUB_SHA::7}\` by the [release workflow](https://github.com/${GITHUB_REPOSITORY}/actions/workflows/release.yml).*
+          EOF
+
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-              # Create release with auto-generated notes if available; fall
-              # back to a generic note if CHANGELOG isn't parsed cleanly.
               gh release create "$TAG" \
                   --title "QuickLookProtein $VERSION" \
-                  --generate-notes
+                  --notes-file "$NOTES_FILE"
+          else
+              gh release edit "$TAG" --notes-file "$NOTES_FILE"
           fi
 
           gh release upload "$TAG" "${{ steps.zip.outputs.zip }}" --clobber
@@ -267,6 +310,7 @@ jobs:
       # within a minute, and any installed Sparkle client will see the new
       # release at the next check.
       - name: Update appcast.xml
+        if: steps.sparkle_inject.outputs.configured == 'true'
         env:
           APPCAST: docs/appcast.xml
           VERSION: ${{ steps.version.outputs.version }}
@@ -282,6 +326,7 @@ jobs:
               --release-url "https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
 
       - name: Commit appcast back to the branch
+        if: steps.sparkle_inject.outputs.configured == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

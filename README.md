@@ -8,6 +8,12 @@
 [![Rendered by 3Dmol.js](https://img.shields.io/badge/rendered%20by-3Dmol.js-purple)](https://3dmol.csb.pitt.edu)
 [![Latest release](https://img.shields.io/github/v/release/ArioMoniri/QuickLookProtein?display_name=tag)](https://github.com/ArioMoniri/QuickLookProtein/releases)
 
+### 📥 Download
+
+<a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest"><img src="https://img.shields.io/badge/Download%20for%20macOS-Apple%20Silicon%20%2B%20Intel-blue?logo=apple&logoColor=white&style=for-the-badge" alt="Download for macOS"></a>
+
+**[⬇ Download the latest signed release](https://github.com/ArioMoniri/QuickLookProtein/releases/latest)** — universal binary, Developer-ID-signed and Apple-notarised. After downloading, unzip and drag **QuickLookProtein.app** into your **Applications** folder; Quick Look picks up the extension automatically. The first <kbd>Space</kbd>-bar preview on a `.pdb` / `.cif` / `.mol2` / etc. file shows the 3D molecule rendered with 3Dmol.js.
+
 > 🔱 This is **[Ariorad Moniri](https://github.com/ArioMoniri)'s signed fork** of the original [QuickLookProtein by Jethro Hemmann](https://github.com/JethroHemmann/QuickLookProtein), distributed via [releases on this fork](https://github.com/ArioMoniri/QuickLookProtein/releases) and notarised under Apple Developer team `FF68N39FU5`. Looking for the upstream pull request? See [the PR branch](https://github.com/ArioMoniri/QuickLookProtein/tree/feature/3dmol-upgrade).
 
 QuickLookProtein integrates with macOS Quick Look so you can preview protein and small-molecule structures the same way you preview PDFs and images — just select a file in Finder and tap <kbd>Space</kbd>. Rendering is performed by [3Dmol.js](https://3dmol.csb.pitt.edu) inside a `WKWebView`, so previews are interactive (drag to rotate, scroll to zoom, click an atom to label it).
