@@ -711,82 +711,104 @@ jobs:
           "path=build/$qlpName"       | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       # ----------------------------------------------------------------
-      # Build the one-click installer .exe.
+      # Build the one-click installer .exe with Inno Setup.
       #
-      # Why a self-extracting .exe rather than the zip-of-files bundle:
-      # the zip works, but it's two clicks (unzip → run .bat) and
-      # Windows users have learned that "real" installers are single
-      # .exe files. 7-Zip's SFX module turns our bundle into exactly
-      # that — a single double-clickable Setup.exe that, after a
-      # standard "Do you want to install?" prompt, extracts to %TEMP%
-      # and auto-runs install.bat. Same logic as the manual flow,
-      # zero extra steps for the user.
+      # Why a single .exe rather than the zip-of-files bundle: the zip
+      # works, but it's two clicks (unzip → run .bat). Windows users
+      # expect a single double-clickable Setup.exe — same shape as the
+      # macOS DMG download. Inno Setup is preinstalled on the
+      # `windows-latest` runner image (it ships as `ISCC.exe`) so we
+      # don't need to fetch any extra tooling.
       #
-      # 7-Zip is preinstalled on `windows-latest`. We use the 7zSD.sfx
-      # module (the GUI variant with the prompt + progress bar); the
-      # silent 7zS.sfx variant would also work but the explicit prompt
-      # gives the user a chance to cancel and matches what they'd
-      # expect from a third-party installer.
-      - name: Build self-extracting Setup.exe
+      # The .iss script below stages our three payload files into the
+      # installer's temp directory and runs install.bat at the end of
+      # extraction. install.bat → install.ps1 → drops the plugin into
+      # %LocalAppData%\QuickLook\plugins\ exactly the same way the
+      # manual / one-liner paths do — the .exe just removes the
+      # download-and-unzip dance.
+      - name: Build Inno Setup installer
         id: setupexe
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
-          $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-          $sfxModule = "C:\Program Files\7-Zip\7zSD.sfx"
-          if (-not (Test-Path $sevenZip)) {
-            throw "7-Zip not found on runner — can't build SFX installer."
-          }
-          if (-not (Test-Path $sfxModule)) {
-            # Fall back to the non-GUI sfx if the GUI one is missing on
-            # a future runner image. Both ship in the standard 7-Zip
-            # install.
-            $sfxModule = "C:\Program Files\7-Zip\7zS.sfx"
-            if (-not (Test-Path $sfxModule)) {
-              throw "Neither 7zSD.sfx nor 7zS.sfx found on runner."
-            }
-          }
 
-          # Stage the payload files. Use the SAME files the zip bundle
-          # ships so the offline-bundle path stays a single source of
-          # truth.
+          # Locate ISCC. Inno Setup 6 lives at the 32-bit Program Files
+          # path on github-hosted Windows runners; fall back to PATH for
+          # any future runner image that puts it elsewhere.
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $cmd = Get-Command ISCC -ErrorAction SilentlyContinue
+            if ($cmd) { $iscc = $cmd.Source }
+          }
+          if (-not (Test-Path $iscc)) {
+            throw "Inno Setup (ISCC.exe) not found on runner."
+          }
+          Write-Host "Using ISCC: $iscc"
+
+          # Stage the payload files. Same trio that the offline-bundle
+          # zip ships — install.bat → install.ps1 → .qlplugin — so the
+          # behaviour is identical no matter which path the user takes.
           $stage = "build/setup-stage"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item "${{ steps.pkg.outputs.path }}" "$stage/QuickLookProtein.qlplugin" -Force
           Copy-Item "Windows/install.ps1"           "$stage/install.ps1"               -Force
           Copy-Item "Windows/install.bat"           "$stage/install.bat"               -Force
 
-          # Compress with 7z's solid LZMA. -m switches give us a small
-          # output (~1.3x base size); we don't need to tune further.
-          $payload = "build/setup-payload.7z"
-          & $sevenZip a -t7z -mx=9 $payload "$stage\*" | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "7z archive failed ($LASTEXITCODE)" }
+          # Inno Setup script. WizardStyle=modern gives the rounded
+          # Windows 11 look; DisableReadyPage skips the redundant
+          # "ready to install" page since there's nothing to configure.
+          # We don't write an uninstaller because the actual install
+          # (drop into %LocalAppData%\QuickLook\plugins) is reversible
+          # by deleting that folder — adding an Inno-managed uninstall
+          # entry would falsely imply Inno itself owns the install.
+          $iss = @"
+          ; Auto-generated by .github/workflows/release.yml
+          [Setup]
+          AppName=QuickLookProtein
+          AppVersion=$version
+          AppPublisher=Ariorad Moniri
+          AppPublisherURL=https://github.com/${{ github.repository }}
+          AppSupportURL=https://github.com/${{ github.repository }}/issues
+          DefaultDirName={tmp}\QuickLookProtein-Setup
+          DisableDirPage=yes
+          DisableProgramGroupPage=yes
+          DisableReadyPage=yes
+          DisableFinishedPage=no
+          UsePreviousAppDir=no
+          PrivilegesRequired=lowest
+          OutputDir=build
+          OutputBaseFilename=QuickLookProtein-Setup
+          WizardStyle=modern
+          Compression=lzma2/max
+          SolidCompression=yes
+          Uninstallable=no
 
-          # SFX config block. UTF-8 BOM is REQUIRED by 7zSD.sfx — write
-          # with [System.IO.File]::WriteAllText so the BOM is preserved.
-          $config = @"
-          ;!@Install@!UTF-8!
-          Title="QuickLookProtein $version Setup"
-          BeginPrompt="Install QuickLookProtein 3D molecule preview for Windows Explorer?\n\nThis will also install QuickLook (https://github.com/QL-Win/QuickLook) if it isn't already on your machine."
-          RunProgram="install.bat"
-          ;!@InstallEnd@!
+          [Files]
+          Source: "setup-stage\QuickLookProtein.qlplugin"; DestDir: "{app}"; Flags: ignoreversion
+          Source: "setup-stage\install.ps1";               DestDir: "{app}"; Flags: ignoreversion
+          Source: "setup-stage\install.bat";               DestDir: "{app}"; Flags: ignoreversion
+
+          [Run]
+          Filename: "{app}\install.bat"; Description: "Install QuickLookProtein"; Flags: shellexec runascurrentuser waituntilterminated
           "@
-          $configPath = "build/sfx-config.txt"
+          $issPath = "build/setup.iss"
           [System.IO.File]::WriteAllText(
-            (Resolve-Path -LiteralPath (Split-Path $configPath -Parent)).Path + "\" + (Split-Path $configPath -Leaf),
-            $config,
-            (New-Object System.Text.UTF8Encoding $true))
+            (Join-Path (Resolve-Path build).Path "setup.iss"),
+            $iss,
+            [System.Text.UTF8Encoding]::new($true))
 
-          # Concatenate sfx-module + config + archive into Setup.exe.
+          # Compile. Run from the build/ dir so the relative Source:
+          # paths in the .iss resolve against setup-stage/.
+          Push-Location build
+          & $iscc "/Qp" "setup.iss"
+          $rc = $LASTEXITCODE
+          Pop-Location
+          if ($rc -ne 0) { throw "Inno Setup compilation failed ($rc)" }
+
           $setupExe = "build/QuickLookProtein-Setup.exe"
-          $out = [System.IO.File]::Create($setupExe)
-          foreach ($part in @($sfxModule, $configPath, $payload)) {
-            $in = [System.IO.File]::OpenRead($part)
-            $in.CopyTo($out)
-            $in.Close()
+          if (-not (Test-Path $setupExe)) {
+            throw "Inno Setup didn't produce $setupExe."
           }
-          $out.Close()
-
           Get-Item $setupExe | Format-List FullName, Length
           "name=QuickLookProtein-Setup.exe"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "path=$setupExe"                    | Out-File -FilePath $env:GITHUB_OUTPUT -Append
