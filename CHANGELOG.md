@@ -4,6 +4,30 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.10] — 2026-05-14
+
+### 🐛 Fixed
+
+- **Installer aborted with "Access is denied" when QuickLook was
+  already running elevated.** If the user had previously launched
+  QL-Win via an elevated path (UAC-prompted Setup.exe, or running it
+  As Administrator from a previous session) and then ran our
+  installer unelevated, `Stop-Process -Force` against the higher-
+  integrity QuickLook process surfaced `CouldNotStopProcess: Access
+  is denied` and bubbled out as install exit code 1 — even though
+  the plugin was already on disk.
+
+  `Restart-QuickLookHost` now walks three strategies in order:
+  graceful `CloseMainWindow()` (no elevation needed), then
+  `Stop-Process -Force`, then `taskkill /F /IM`. If all three fail
+  the script prints clear recovery instructions ("right-click the
+  QuickLook tray icon → Exit, then re-launch from Start Menu") and
+  returns success — the plugin is in place, QL-Win will pick it up
+  on its next start.
+
+  Top-level invocation also wraps the restart step in try/catch so
+  an unexpected exception there can't fail the install either.
+
 ## [1.7.9] — 2026-05-14
 
 ### 🐛 Fixed

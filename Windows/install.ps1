@@ -212,21 +212,71 @@ function Find-QuickLookExePath {
     return $null
 }
 
+function Try-StopQuickLook {
+    # Returns $true if QuickLook is no longer running after this call.
+    # Walks through three increasingly forceful strategies, swallows
+    # the access-denied / not-found exceptions each one can throw, and
+    # caller treats failure as "can't kill, ask user to restart".
+    param([System.Diagnostics.Process[]]$Processes)
+
+    # 1. Graceful WM_CLOSE. QL-Win handles this cleanly and writes its
+    #    settings to disk on the way out. Doesn't need elevation.
+    foreach ($p in $Processes) {
+        try { [void]$p.CloseMainWindow() } catch { }
+    }
+    Start-Sleep -Milliseconds 800
+    if (-not (Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue)) {
+        return $true
+    }
+
+    # 2. Stop-Process -Force. Works if QuickLook is at the same
+    #    integrity level as our PowerShell. Fails with Access Denied
+    #    when QL-Win was originally launched elevated and we're running
+    #    unelevated (the user's screenshot was this case).
+    try {
+        $Processes | Stop-Process -Force -ErrorAction Stop
+        Start-Sleep -Milliseconds 500
+        if (-not (Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue)) {
+            return $true
+        }
+    } catch { }
+
+    # 3. taskkill /F /IM. Same permission model as Stop-Process, but
+    #    occasionally succeeds where Stop-Process fails because it
+    #    uses the Win32 OpenProcess+TerminateProcess pair differently.
+    try {
+        & taskkill.exe /F /IM "QuickLook.exe" /T 2>$null | Out-Null
+        Start-Sleep -Milliseconds 500
+        if (-not (Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue)) {
+            return $true
+        }
+    } catch { }
+
+    return $false
+}
+
 function Restart-QuickLookHost {
-    # Active goal: QuickLook MUST be running by the time this function
-    # returns, regardless of whether it was running before. Previous
-    # version only acted if QuickLook was already alive; on a first-
-    # time install (Setup.exe -> QL-Win installer with /VERYSILENT)
-    # QuickLook is installed but never launched, so the dropped plugin
-    # had no daemon to pick it up and the user's double-click on a
-    # .qlplugin / structure file did nothing.
+    # Active goal: have QuickLook running (with our plugin loaded) by
+    # the time this function returns. NEVER fail the install if we
+    # can't restart - the plugin is already on disk, and QL-Win will
+    # load it on its next manual restart. We just print clear
+    # instructions in that case.
 
     $exePath = $null
     $proc = Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue
     if ($proc) {
         Write-Step "Restarting QuickLook to pick up the new plugin..."
         $exePath = $proc[0].Path
-        $proc | Stop-Process -Force
+        if (-not (Try-StopQuickLook -Processes $proc)) {
+            Write-Host "  Could not stop the running QuickLook process (Access Denied -"
+            Write-Host "  usually means QL-Win was launched elevated and this installer"
+            Write-Host "  is running unelevated)."
+            Write-Host ""
+            Write-Host "  PLUGIN IS INSTALLED. To load it, right-click the QuickLook"
+            Write-Host "  tray icon -> 'Exit', then re-launch QuickLook from the Start"
+            Write-Host "  Menu. Or sign out + back in. Or reboot."
+            return
+        }
         # cfprefsd-style: give the OS a beat to release the executable
         # lock before relaunching, otherwise the new process can race
         # the old one and fail.
@@ -237,13 +287,19 @@ function Restart-QuickLookHost {
     }
 
     if ($exePath -and (Test-Path $exePath)) {
-        Start-Process -FilePath $exePath
+        try {
+            Start-Process -FilePath $exePath
+        } catch {
+            Write-Host "  Could not launch ${exePath}: $($_.Exception.Message)"
+            Write-Host "  The plugin is in place - launch QuickLook from the Start Menu."
+            return
+        }
         Start-Sleep -Seconds 2
         if (Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue) {
             Write-Host "  QuickLook is running. Press SPACE on a supported file in Explorer."
         } else {
-            Write-Host "  WARNING: launched $exePath but QuickLook isn't showing up in the process list."
-            Write-Host "  You can start it manually from the Start Menu."
+            Write-Host "  WARNING: launched $exePath but QuickLook isn't showing up in the process list yet."
+            Write-Host "  Give it a moment, or start it manually from the Start Menu."
         }
     } else {
         Write-Host "  WARNING: could not find QuickLook.exe under %LocalAppData%\Programs\QuickLook\,"
@@ -266,7 +322,22 @@ if (-not (Test-QuickLookInstalled)) {
 }
 
 Install-Plugin
-Restart-QuickLookHost
+
+# The plugin is now on disk - that's the install. Restarting
+# QuickLook is just the convenience step that picks it up
+# immediately. If it fails (Access Denied from an elevated daemon,
+# QuickLook.exe not where we expect, AV blocking Start-Process,
+# etc.) we surface a warning but DO NOT fail the install: the user
+# can restart QuickLook themselves and the plugin will load fine.
+try {
+    Restart-QuickLookHost
+} catch {
+    Write-Host ""
+    Write-Host "  Plugin install succeeded, but the QuickLook restart step hit an error:"
+    Write-Host "  $($_.Exception.Message)"
+    Write-Host "  Restart QuickLook manually (tray icon -> Exit, then re-launch from"
+    Write-Host "  the Start Menu) - the plugin is already in place and will load."
+}
 
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green
