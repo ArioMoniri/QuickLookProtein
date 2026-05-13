@@ -8,12 +8,12 @@
     <item>
       <title>QuickLookProtein 1.7.0</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.0</link>
-      <pubDate>Wed, 13 May 2026 14:35:46 +0000</pubDate>
+      <pubDate>Wed, 13 May 2026 14:45:38 +0000</pubDate>
       <sparkle:version>1.7.0</sparkle:version>
       <sparkle:shortVersionString>1.7.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
       <description>&lt;p&gt;See &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.0"&gt;the GitHub release&lt;/a&gt; for full notes and the binary download.&lt;/p&gt;</description>
-      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.0/QuickLookProtein-1.7.0.zip" sparkle:edSignature="o0wlcw7MorSH0pSRcdHUTymNOhYa/zl0U0WlIRN9gi6/svUxi1QH1zClzqvTWjpy+lq42n9Fwojc3ia0lZqhCg==" length="3698742" type="application/octet-stream" />
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.0/QuickLookProtein-1.7.0.zip" sparkle:edSignature="WgIqJA6x87wr4CAOYbI52dpnBo163aFecD7jnqhYioLaixrxJ7RW5cVEwH5NTXbo30HqJ1WS6nZw91SOKr0RDg==" length="3698768" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
