@@ -88,6 +88,10 @@ struct ContentView: View {
                             Picker("Rotation:", selection: $userSettings.rotationSpeed) {
                                 ForEach(Settings.RotationSpeed.allCases) { Text($0.rawValue).tag($0) }
                             }
+                            Picker("Default zoom:", selection: $userSettings.defaultZoom) {
+                                ForEach(Settings.DefaultZoom.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                            .help("Applied to every preview after 3Dmol's auto-fit. Also affects the Quick Look extension.")
                             HStack {
                                 ColorPicker("Background:", selection: $userSettings.bgColor, supportsOpacity: true)
                                     .help("#" + convertColorToRGB(color: userSettings.bgColor).rgbHex

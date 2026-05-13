@@ -230,6 +230,13 @@
                     }
 
                     viewer.zoomTo();
+                    // User-configurable default zoom: 3Dmol's zoomTo() picks a
+                    // distance that fits the bounding sphere; a multiplicative
+                    // viewer.zoom() afterwards tightens (>1) or loosens (<1)
+                    // that framing. Skipped when the user picks "Auto-fit".
+                    if (!({ZOOM_IS_AUTO})) {
+                        try { viewer.zoom({ZOOM_FACTOR}); } catch (e) {}
+                    }
                     if ({SHOW_UNIT_CELL}) {
                         try { viewer.addUnitCell(); } catch (e) {}
                     }
