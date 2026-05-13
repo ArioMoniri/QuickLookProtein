@@ -558,22 +558,32 @@ jobs:
 
       - name: Fetch QuickLook.Common.dll from QL-Win release
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         # Plugin compiles against QL-Win's public API surface. We don't
         # ship this dll in our .qlplugin — the host process supplies it
-        # at load time. Pull a recent QL-Win release zip just to extract
-        # the reference dll.
+        # at load time. We resolve the latest non-prerelease QL-Win
+        # version dynamically via the GitHub API so this step doesn't
+        # break when QL-Win cuts a new release.
         run: |
-          $qlWinVersion = "5.1.6"
-          $url = "https://github.com/QL-Win/QuickLook/releases/download/$qlWinVersion/QuickLook-$qlWinVersion.zip"
+          $latest = gh release list --repo QL-Win/QuickLook --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName'
+          if (-not $latest) { throw "Could not resolve QL-Win latest release tag" }
+          Write-Host "Using QL-Win $latest"
+
+          # Each QL-Win release ships a .zip whose name is QuickLook-<tag>.zip
+          # The .zip contains the host binaries; QuickLook.Common.dll lives
+          # somewhere inside (path varies between minor versions).
+          $zipName = "QuickLook-$latest.zip"
+          $url = "https://github.com/QL-Win/QuickLook/releases/download/$latest/$zipName"
           Write-Host "Downloading $url"
           Invoke-WebRequest -Uri $url -OutFile QuickLook.zip
           Expand-Archive QuickLook.zip -DestinationPath QuickLook-extracted
           New-Item -ItemType Directory -Path Windows/QuickLookProtein.Plugin/libs -Force | Out-Null
-          # Recent QL-Win releases nest the dlls one level deep; find by name.
+
           $commonDll = Get-ChildItem -Path QuickLook-extracted -Recurse -Filter QuickLook.Common.dll | Select-Object -First 1
           if (-not $commonDll) { throw "QuickLook.Common.dll not found in QL-Win release zip" }
           Copy-Item $commonDll.FullName Windows/QuickLookProtein.Plugin/libs/QuickLook.Common.dll
-          Write-Host "Reference dll staged at:"
+          Write-Host "Reference dll staged from $($commonDll.FullName)"
           Get-Item Windows/QuickLookProtein.Plugin/libs/QuickLook.Common.dll | Format-List FullName, Length
 
       - name: Build plugin
