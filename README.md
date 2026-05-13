@@ -10,9 +10,9 @@
 
 ### 📥 Download
 
-<a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest"><img src="https://img.shields.io/badge/Download%20for%20macOS-Apple%20Silicon%20%2B%20Intel-blue?logo=apple&logoColor=white&style=for-the-badge" alt="Download for macOS"></a>
+<a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest"><img src="docs/download-macos.svg" alt="Download for macOS" height="64"></a>
 
-**[⬇ Download the latest signed release](https://github.com/ArioMoniri/QuickLookProtein/releases/latest)** — universal binary, Developer-ID-signed and Apple-notarised. After downloading, unzip and drag **QuickLookProtein.app** into your **Applications** folder; Quick Look picks up the extension automatically. The first <kbd>Space</kbd>-bar preview on a `.pdb` / `.cif` / `.mol2` / etc. file shows the 3D molecule rendered with 3Dmol.js.
+Universal binary, Developer-ID-signed and Apple-notarised. After downloading, unzip and drag **QuickLookProtein.app** into your **Applications** folder; Quick Look picks up the extension automatically. The first <kbd>Space</kbd>-bar preview on a `.pdb` / `.cif` / `.mol2` / etc. file shows the 3D molecule rendered with 3Dmol.js.
 
 > 🔱 This is **[Ariorad Moniri](https://github.com/ArioMoniri)'s signed fork** of the original [QuickLookProtein by Jethro Hemmann](https://github.com/JethroHemmann/QuickLookProtein), distributed via [releases on this fork](https://github.com/ArioMoniri/QuickLookProtein/releases) and notarised under Apple Developer team `FF68N39FU5`. Looking for the upstream pull request? See [the PR branch](https://github.com/ArioMoniri/QuickLookProtein/tree/feature/3dmol-upgrade).
 
