@@ -2,11 +2,25 @@
 //  ThumbnailProvider.swift
 //  QLThumbnail
 //
-//  Renders a still PNG thumbnail of a molecular file for Finder icons, Cover Flow,
-//  and Gallery view. Uses the shared 3Dmol viewer template but with rotation off,
-//  info overlay off, and a small handshake: when 3Dmol has finished its first frame
-//  it calls `window.qlThumbnailReady(viewer.pngURI())` which is bridged back here
-//  via a WKScriptMessageHandler.
+//  Generates per-file Finder thumbnails for molecular structure files.
+//
+//  Why this file is fully self-contained (no `import` of shared types,
+//  no `Settings` / `ViewerOptions` / `prepare3DmolHTML` references):
+//
+//      Xcode's QLThumbnail target was added via the wizard with a
+//      `PBXFileSystemSynchronizedRootGroup`, which auto-includes
+//      everything inside `QLThumbnail/` but nothing outside. Adding the
+//      Shared/ Swift files to the target's membership requires four
+//      click-throughs in Xcode's UI per file — a friction point we
+//      avoid by inlining the small amount of logic we need.
+//
+//      We do NOT duplicate `3Dmol.js` or `3Dmol_viewer.html` though —
+//      those live in the host app's Resources directory (already added
+//      as resources of the main app target). At runtime we compute the
+//      host bundle URL from our `.appex` location (great-grandparent of
+//      `Bundle.main.bundleURL`) and pass it as the WKWebView's baseURL.
+//      Apple's sandbox grants app extensions read access to the host
+//      app's bundle resources, so this works in shipped + signed builds.
 //
 
 import Cocoa
@@ -15,11 +29,17 @@ import WebKit
 
 final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScriptMessageHandler {
 
-    /// Hard cap so a 100 MB PDB never gets parsed inside the thumbnail process.
+    // MARK: Tunables -----------------------------------------------------------
+
+    /// Skip files larger than this — a 100 MB PDB would jetsam the
+    /// thumbnail extension before we got anywhere near rendering it.
     private let maxBytes = 25 * 1024 * 1024
-    /// Apple kills the thumbnail extension after ~8s. Stop earlier to leave time to
-    /// return a reply.
+
+    /// macOS kills thumbnail extensions after ~8 s. Stop earlier so we have
+    /// time to package a snapshot reply on the way out.
     private let renderTimeout: TimeInterval = 5.5
+
+    // MARK: Per-request state --------------------------------------------------
 
     private var window: NSWindow?
     private var webView: WKWebView?
@@ -28,64 +48,77 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
     private var size: CGSize = .zero
     private var didReply = false
 
+    // MARK: QLThumbnailProvider -----------------------------------------------
+
     override func provideThumbnail(for request: QLFileThumbnailRequest,
                                    _ handler: @escaping (QLThumbnailReply?, Error?) -> Void) {
 
         let ext = request.fileURL.pathExtension.lowercased()
-        guard let htmlPath = Bundle.main.path(forResource: "3Dmol_viewer", ofType: "html"),
-              let dataFormat = Settings.dataFormat(forExtension: ext) else {
-            handler(nil, NSError(domain: "QuickLookProtein.Thumbnail", code: 1,
-                                 userInfo: [NSLocalizedDescriptionKey: "Unsupported file type"]))
-            return
-        }
-        // CUBE files are volumetric — without isosurface rendering they're just a sparse
-        // dust of nuclei, making for misleading thumbnails. Fall back to the system icon.
+
+        // CUBE files are volumetric — without an isosurface they'd render as
+        // a sparse dust of nuclei, which makes a misleading icon. Decline and
+        // let Finder use the system default.
         if ext == "cube" || ext == "cub" {
             handler(nil, nil)
             return
         }
 
-        // Size-cap early; large files are useless as thumbnails anyway.
-        if let size = (try? FileManager.default.attributesOfItem(atPath: request.fileURL.path))?[.size] as? Int,
-           size > maxBytes {
-            handler(nil, NSError(domain: "QuickLookProtein.Thumbnail", code: 2,
-                                 userInfo: [NSLocalizedDescriptionKey: "File too large for thumbnail"]))
+        guard let dataFormat = self.formatToken(for: ext) else {
+            handler(nil, self.error(code: 1, message: "Unsupported file type: .\(ext)"))
             return
         }
 
-        var options = ViewerOptions.from(SettingsStorage(),
-                                         fileExtension: ext,
-                                         fileName: request.fileURL.lastPathComponent)
-        // Thumbnails: no rotation, no overlay, no surface, transparent background.
-        options.rotationSpeed   = .noRotation
-        options.showInfoOverlay = false
-        options.showSurface     = false
-        options.showUnitCell    = false
+        // Size cap — checked before reading the file.
+        if let attrSize = (try? FileManager.default.attributesOfItem(atPath: request.fileURL.path))?[.size] as? Int,
+           attrSize > self.maxBytes {
+            handler(nil, self.error(code: 2, message: "File too large for thumbnail (\(attrSize / 1_048_576) MB)"))
+            return
+        }
 
-        let html = prepare3DmolHTML(
-            htmlPath: htmlPath,
-            pdbPath: request.fileURL.path,
-            dataFormat: dataFormat,
-            options: options,
-            thumbnailMode: true
-        )
+        // Read the file. Latin-1 fallback covers CIFs with non-ASCII author
+        // names; without it we'd reject files an ASCII-only UTF-8 parser
+        // wouldn't have rejected either.
+        let data: String
+        do {
+            data = try Self.readText(at: request.fileURL)
+        } catch {
+            handler(nil, error)
+            return
+        }
 
+        // Look up the bundled viewer template in the host app's Resources.
+        // We deliberately do NOT keep a private copy of 3Dmol.js inside the
+        // extension — it lives in the main app's bundle and is reachable
+        // from here via the relative path of the .appex.
+        guard let hostResourcesURL = self.hostResourcesURL(),
+              let templateURL = self.urlIfExists(hostResourcesURL.appendingPathComponent("3Dmol_viewer.html")),
+              let template = try? String(contentsOf: templateURL, encoding: .utf8) else {
+            handler(nil, self.error(code: 3, message: "Viewer template not found in host bundle"))
+            return
+        }
+
+        // Hand the resolved values off to the renderer.
         self.handler = handler
         self.size = request.maximumSize
         self.didReply = false
 
-        // WKWebView must be on the main thread; the snapshot route requires the view
-        // be in a window (off-screen is fine).
+        let html = self.renderTemplate(template,
+                                       moleculeData: data,
+                                       dataFormat: dataFormat,
+                                       fileName: request.fileURL.lastPathComponent)
+
         DispatchQueue.main.async { [weak self] in
-            self?.startRender(html: html, baseURL: URL(fileURLWithPath: htmlPath))
+            self?.startRender(html: html, baseURL: templateURL)
         }
     }
 
+    // MARK: Render ------------------------------------------------------------
+
     private func startRender(html: String, baseURL: URL) {
-        // The window must be visible to the window server for WebGL contexts inside
-        // WKWebView to actually render. A fully transparent (alphaValue = 0) window
-        // can be skipped by the compositor; offscreen + alpha 0.01 + makeKeyAndOrderFront
-        // is the documented workaround for headless snapshots.
+        // Off-screen NSWindow with `alphaValue: 0.01` is the load-bearing
+        // trick for headless WebGL — a fully transparent (0.0) window is
+        // skipped by the compositor and `WKWebView` then renders a blank
+        // canvas; 0.01 keeps it in the scene graph.
         let frame = NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height)
         let window = NSWindow(contentRect: frame, styleMask: .borderless,
                               backing: .buffered, defer: false)
@@ -107,8 +140,8 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
         self.window = window
         self.webView = webView
 
-        // Fail-safe timeout — if the JS never signals ready (broken file, WebGL not
-        // available, etc.) we still return *something* to Quick Look.
+        // Fail-safe — if the JS never signals ready (broken file, WebGL
+        // disabled, parse error) we still return *something* to Finder.
         let timeout = DispatchWorkItem { [weak self] in
             self?.replyWithCurrentSnapshot()
         }
@@ -118,7 +151,7 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
         webView.loadHTMLString(html, baseURL: baseURL)
     }
 
-    // MARK: - WKScriptMessageHandler
+    // MARK: Bridge & reply paths ----------------------------------------------
 
     func userContentController(_ controller: WKUserContentController,
                                didReceive message: WKScriptMessage) {
@@ -126,8 +159,6 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
               let dataURI = message.body as? String else { return }
         replyWithDataURI(dataURI)
     }
-
-    // MARK: - WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         replyWithError(error)
@@ -137,27 +168,23 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
         replyWithError(error)
     }
 
-    // MARK: - Reply paths
-
     private func replyWithDataURI(_ uri: String) {
         guard !didReply else { return }
         didReply = true
         timeoutWorkItem?.cancel()
 
-        // Data URI format: "data:image/png;base64,XXXX..."
+        // `data:image/png;base64,XXXX`. We don't try to be clever about
+        // decoding malformed URIs — if it's not a clean PNG, fall back.
         guard let comma = uri.firstIndex(of: ","),
-              let data = Data(base64Encoded: String(uri[uri.index(after: comma)...]),
-                              options: .ignoreUnknownCharacters),
-              let image = NSImage(data: data) else {
-            replyWithError(NSError(domain: "QuickLookProtein.Thumbnail", code: 3,
-                                   userInfo: [NSLocalizedDescriptionKey: "Could not decode rendered image"]))
+              let pngData = Data(base64Encoded: String(uri[uri.index(after: comma)...]),
+                                 options: .ignoreUnknownCharacters),
+              let image = NSImage(data: pngData) else {
+            replyWithError(self.error(code: 4, message: "Could not decode rendered image"))
             return
         }
         finishWith(image: image)
     }
 
-    /// Fallback when the JS hand-shake never fires: capture whatever the WKWebView has
-    /// drawn so far. May return an empty image — we accept that over hanging.
     private func replyWithCurrentSnapshot() {
         guard !didReply else { return }
         didReply = true
@@ -181,8 +208,8 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
 
     private func finishWith(image: NSImage) {
         let size = self.size
-        let reply = QLThumbnailReply(contextSize: size) { ctx -> Bool in
-            // Center the image in the requested context, preserving aspect ratio.
+        let reply = QLThumbnailReply(contextSize: size) { _ -> Bool in
+            // Aspect-preserving fit so the rendered protein never stretches.
             let imgSize = image.size
             let scale = min(size.width / imgSize.width, size.height / imgSize.height)
             let drawW = imgSize.width * scale
@@ -206,5 +233,138 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
         window?.close()
         window = nil
         handler = nil
+    }
+
+    // MARK: Helpers — locating the host bundle --------------------------------
+
+    /// The .appex lives at:
+    ///     <hostApp>.app/Contents/PlugIns/<extension>.appex
+    /// so its great-grandparent is the host .app, and its Resources URL is
+    /// the standard `Contents/Resources` next to PlugIns.
+    private func hostResourcesURL() -> URL? {
+        let appex = Bundle.main.bundleURL
+        let host = appex.deletingLastPathComponent()         // PlugIns
+                        .deletingLastPathComponent()         // Contents
+                        .deletingLastPathComponent()         // .app
+        return Bundle(url: host)?.resourceURL
+    }
+
+    private func urlIfExists(_ url: URL) -> URL? {
+        FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    // MARK: Helpers — file I/O & format ---------------------------------------
+
+    private static func readText(at url: URL) throws -> String {
+        let data = try Data(contentsOf: url)
+        if let s = String(data: data, encoding: .utf8)     { return s }
+        if let s = String(data: data, encoding: .isoLatin1) { return s }
+        throw NSError(domain: "QuickLookProtein.Thumbnail", code: 5,
+                      userInfo: [NSLocalizedDescriptionKey:
+                                    "File is not text in a recognised encoding"])
+    }
+
+    /// Map a file extension to the 3Dmol.js `addModel` format token. Mirrors
+    /// `Settings.dataFormat(forExtension:)` in the shared code — kept here so
+    /// this extension doesn't depend on Shared/.
+    private func formatToken(for ext: String) -> String? {
+        switch ext {
+        case "pdb", "ent":    return "pdb"
+        case "pdbqt":         return "pdbqt"
+        case "cif", "mmcif":  return "cif"
+        case "sdf":           return "sdf"
+        case "mol":           return "sdf"   // 3Dmol parses single MOL via the SDF parser
+        case "mol2":          return "mol2"
+        case "xyz":           return "xyz"
+        case "gro":           return "gro"
+        case "cube", "cub":   return "cube"  // declined above; included for completeness
+        default:              return nil
+        }
+    }
+
+    // MARK: Helpers — viewer-template substitution ----------------------------
+
+    /// Hand-rolled minimal version of the shared `prepare3DmolHTML` — fills in
+    /// every placeholder the bundled `3Dmol_viewer.html` recognises, using
+    /// thumbnail-appropriate defaults (rotation off, info overlay off,
+    /// thumbnail mode on so the JS posts a PNG back via the message bridge).
+    private func renderTemplate(_ template: String,
+                                moleculeData: String,
+                                dataFormat: String,
+                                fileName: String) -> String {
+        let safeData = self.sanitizeForScriptBlock(moleculeData)
+        let safeName = self.escapeForHTMLAttribute(fileName)
+
+        // For PDB / CIF / mmCIF the default style is cartoon (the viewer
+        // template's smart-styling auto-promotes to surface in thumbnail mode
+        // for proteins). For small-molecule formats stick is the only
+        // sensible default at icon size.
+        let atomStyle = (dataFormat == "pdb" || dataFormat == "cif") ? "cartoon" : "stick"
+
+        var html = template
+        let pairs: [(String, String)] = [
+            ("{ATOM_STYLE}",        atomStyle),
+            ("{COLOR_SCHEME}",      "spectrum"),
+            ("{BG_COLOR}",          "000000"),
+            ("{BG_ALPHA}",          "0.0"),
+            ("{ROTATION_SPEED}",    "0"),
+            ("{DATA_FORMAT}",       dataFormat),
+            ("{AUTO_STYLE_HETERO}", "true"),
+            ("{SHOW_SURFACE}",      "false"),  // viewer auto-forces surface for proteins in thumbnail mode
+            ("{HIDE_H}",            "false"),
+            ("{SHOW_UNIT_CELL}",    "false"),
+            ("{SHOW_INFO}",         "false"),
+            ("{FILE_NAME}",         safeName),
+            ("{ZOOM_FACTOR}",       "1.0"),
+            ("{ZOOM_IS_AUTO}",      "true"),
+            ("{THUMBNAIL_MODE}",    "true"),
+            // Data block must be substituted *last* so an `{ATOM_STYLE}`
+            // appearing inside the molecule file (unlikely but possible)
+            // can't get replaced a second time.
+            ("{MOL_DATA}",          safeData),
+        ]
+        for (placeholder, value) in pairs {
+            html = html.replacingOccurrences(of: placeholder, with: value)
+        }
+        return html
+    }
+
+    /// Neutralise the only sequence that can break out of a
+    /// `<script type="text/plain">` element. Also strips NULs and a leading
+    /// UTF-8 BOM because 3Dmol's text parsers don't tolerate either.
+    private func sanitizeForScriptBlock(_ s: String) -> String {
+        var out = s
+        if out.hasPrefix("\u{FEFF}") { out.removeFirst() }
+        out = out.replacingOccurrences(of: "\u{0000}", with: "")
+        out = out.replacingOccurrences(of: "</script",
+                                       with: "<\\/script",
+                                       options: .caseInsensitive)
+        out = out.replacingOccurrences(of: "<!--", with: "<\\!--")
+        out = out.replacingOccurrences(of: "-->",  with: "--\\>")
+        return out
+    }
+
+    /// Filename ends up inside a JS string literal in the template; strip
+    /// characters that could break out (and curly braces to prevent any
+    /// stray `{TOKEN}` in the filename from colliding with our substitutions).
+    private func escapeForHTMLAttribute(_ s: String) -> String {
+        var out = s
+        out = out.replacingOccurrences(of: "\\", with: "\\\\")
+        out = out.replacingOccurrences(of: "\"", with: "\\\"")
+        out = out.replacingOccurrences(of: "'",  with: "\\'")
+        out = out.replacingOccurrences(of: "<",  with: "&lt;")
+        out = out.replacingOccurrences(of: ">",  with: "&gt;")
+        out = out.replacingOccurrences(of: "{",  with: "&#123;")
+        out = out.replacingOccurrences(of: "}",  with: "&#125;")
+        out = out.replacingOccurrences(of: "\n", with: " ")
+        out = out.replacingOccurrences(of: "\r", with: " ")
+        return out
+    }
+
+    // MARK: Helpers — misc -----------------------------------------------------
+
+    private func error(code: Int, message: String) -> NSError {
+        NSError(domain: "QuickLookProtein.Thumbnail", code: code,
+                userInfo: [NSLocalizedDescriptionKey: message])
     }
 }
