@@ -510,8 +510,18 @@ jobs:
           # we use a fallback. Adjust the branch name if you ever rename it.
           if [[ "$BRANCH" == v* ]]; then BRANCH="feature/ario-signed"; fi
 
+          # The "Update appcast.xml" step just modified docs/appcast.xml
+          # in the tag's worktree. Switching to the branch will refuse
+          # because of those local changes. Stash, switch, pop, retry.
+          # If the upstream branch already advanced (e.g. a previous
+          # release commit), rebase the stashed pop on top.
+          git stash push --include-untracked -m "appcast-update-${{ steps.version.outputs.version }}" -- docs/appcast.xml || true
           git fetch origin "$BRANCH"
           git checkout "$BRANCH"
+          git pull --rebase origin "$BRANCH" || true
+          # Re-apply the stashed appcast.xml on top of the branch.
+          git stash pop || true
+
           git add docs/appcast.xml
           if git diff --cached --quiet; then
               echo "appcast.xml unchanged; nothing to commit."
