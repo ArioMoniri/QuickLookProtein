@@ -11,31 +11,17 @@
 //      rendering. That worked on macOS 11–13, but macOS 14+ sandboxed
 //      thumbnail extensions are blocked from talking to
 //      `com.apple.dock.fullscreen` and `com.apple.windowmanager.server`,
-//      WebKit refuses to paint a layer tree against an occluded window,
-//      3Dmol never finishes initialising, the 5.5 s timeout fires, and
-//      Finder gets back error 102.
+//      so WebKit refuses to paint a layer tree against an occluded window
+//      and the 5.5 s timeout always fires.
 //
-//  How this works instead:
-//
-//      Parse the file in Swift (PDB / ENT / PDBQT / PQR / MMTF use a
-//      single PDB-style parser; XYZ, MOL/SDF, MOL2, GRO get dedicated
-//      ones), extract every atom's (x, y, z, element), depth-sort, and
-//      paint shaded CPK-coloured spheres back-to-front into the
-//      QLThumbnailReply context. For very large structures (>800 atoms,
-//      typical proteins) we down-sample so the painter's algorithm stays
-//      fast. The result is a real space-filling-model thumbnail that
-//      matches the file's actual shape, generated in well under macOS's
-//      8-second thumbnail deadline.
-//
-//      For formats we don't parse yet (CIF/mmCIF — non-trivial loop_
-//      syntax, VASP — fractional coords + lattice math, CDJSON — JSON
-//      schema, CUBE — volumetric) we fall back to a stylised atom glyph
-//      with a format label.
-//
-//      The actual 3D rendering with 3Dmol.js is still used for Quick
-//      Look *previews* (Space-bar / right pane) — that code path uses
-//      QLPreviewingController where the system provides a visible host
-//      window and the sandbox lets WebKit paint normally.
+//      Instead, parse the file in Swift, decide whether it's a protein
+//      (worth a cartoon-style backbone trace) or a small molecule (CPK
+//      space-filling spheres), and paint into the QLThumbnailReply
+//      context with Core Graphics. The protein cartoon path connects
+//      Cα atoms per-chain with a thick rounded stroke coloured by a
+//      rainbow gradient along the sequence (N-terminus blue → C-terminus
+//      red), which matches the visual convention 3Dmol's cartoon style
+//      uses in the Quick Look *preview*.
 //
 
 import Cocoa
@@ -48,15 +34,9 @@ private let thumbLog = OSLog(subsystem: "com.jethrohemmann.QuickLookProtein.QLTh
 @objc(QLThumbnailThumbnailProvider)
 final class ThumbnailProvider: QLThumbnailProvider {
 
-    /// Don't even try to read files larger than this — the thumbnail
-    /// extension's memory budget is small and we'd be jetsam'd long
-    /// before we finished parsing. Falls back to the static glyph.
     private static let maxFileBytes = 25 * 1024 * 1024
-
-    /// Beyond this atom count we down-sample uniformly to keep render time
-    /// bounded. Tuned to give a recognisable shape for any protein while
-    /// the painter's algorithm still finishes in <500 ms at 512×512.
-    private static let maxDrawnAtoms = 800
+    private static let maxDrawnAtomsCPK = 800
+    private static let proteinCAThreshold = 25
 
     override func provideThumbnail(for request: QLFileThumbnailRequest,
                                    _ handler: @escaping (QLThumbnailReply?, Error?) -> Void) {
@@ -66,11 +46,9 @@ final class ThumbnailProvider: QLThumbnailProvider {
         os_log("provideThumbnail called for %{public}@ (ext=%{public}@, size=%{public}.0fx%{public}.0f)",
                log: thumbLog, type: .info, request.fileURL.path, ext, size.width, size.height)
 
-        // Try to parse the actual molecule first. On success the thumbnail
-        // shows the real shape; on failure we fall back to the glyph.
         let atoms = Self.parseAtoms(from: request.fileURL, ext: ext)
         if let atoms = atoms, !atoms.isEmpty {
-            os_log("parsed %{public}d atoms — rendering real molecule",
+            os_log("parsed %{public}d atoms — rendering molecule",
                    log: thumbLog, type: .info, atoms.count)
             let reply = QLThumbnailReply(contextSize: size) { cgCtx -> Bool in
                 Self.withNSGraphicsContext(cgCtx) {
@@ -93,14 +71,6 @@ final class ThumbnailProvider: QLThumbnailProvider {
         handler(reply, nil)
     }
 
-    /// QLThumbnailReply's drawing block receives a raw CGContext — it does
-    /// NOT push it into NSGraphicsContext.current the way -[NSImage
-    /// lockFocus] would. Our drawing routines use NSGradient / NSBezierPath
-    /// / NSAttributedString, all of which paint into the *current*
-    /// NSGraphicsContext; if that isn't set, the calls silently no-op and
-    /// the thumbnail ships as a 4–5 KB blank PNG (exactly what we saw).
-    /// Wrap the passed CGContext in an NSGraphicsContext, make it current
-    /// for the duration of the draw, then restore.
     private static func withNSGraphicsContext(_ cgCtx: CGContext, _ body: () -> Void) {
         let nsCtx = NSGraphicsContext(cgContext: cgCtx, flipped: false)
         NSGraphicsContext.saveGraphicsState()
@@ -115,47 +85,34 @@ final class ThumbnailProvider: QLThumbnailProvider {
         var x: Double
         var y: Double
         var z: Double
-        var element: String  // uppercase, 1–2 chars
+        var element: String
+        var name: String
+        var chain: String
+        var residueSeq: Int
     }
 
     // MARK: - File parsing entry point
 
     private static func parseAtoms(from url: URL, ext: String) -> [Atom]? {
-        // Bail early on oversized files — we'd OOM long before drawing.
         if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int,
            size > maxFileBytes {
             os_log("file too large (%{public}d bytes) — using glyph fallback",
                    log: thumbLog, type: .info, size)
             return nil
         }
-
         let text: String
-        do {
-            text = try readMolecularText(at: url)
-        } catch {
-            os_log("read failed: %{public}@", log: thumbLog, type: .error,
-                   error.localizedDescription)
+        do { text = try readMolecularText(at: url) }
+        catch {
+            os_log("read failed: %{public}@", log: thumbLog, type: .error, error.localizedDescription)
             return nil
         }
-
         switch ext {
-        case "pdb", "ent", "pdbqt", "pqr", "mmtf":
-            // MMTF is binary in spec; in practice .mmtf files we see in
-            // the wild are usually pre-decompressed PDB text. If parsing
-            // fails the glyph fallback kicks in cleanly.
-            return parsePDB(text)
-        case "xyz":
-            return parseXYZ(text)
-        case "mol", "sdf":
-            return parseMOLV2000(text)
-        case "mol2":
-            return parseMOL2(text)
-        case "gro":
-            return parseGRO(text)
-        default:
-            // CIF/mmCIF/VASP/CDJSON/CUBE — not yet supported in the pure
-            // Swift parser. Glyph fallback.
-            return nil
+        case "pdb", "ent", "pdbqt", "pqr", "mmtf": return parsePDB(text)
+        case "xyz":            return parseXYZ(text)
+        case "mol", "sdf":     return parseMOLV2000(text)
+        case "mol2":           return parseMOL2(text)
+        case "gro":            return parseGRO(text)
+        default:               return nil
         }
     }
 
@@ -170,13 +127,6 @@ final class ThumbnailProvider: QLThumbnailProvider {
 
     // MARK: - PDB / ENT / PDBQT / PQR / MMTF
 
-    /// PDB ATOM/HETATM records are fixed-width per the spec:
-    ///   columns 31-38: x (8.3)
-    ///   columns 39-46: y (8.3)
-    ///   columns 47-54: z (8.3)
-    ///   columns 77-78: element symbol (right-justified)
-    /// PQR diverges slightly (charge/radius take the temperature-factor
-    /// columns), but the coordinate columns are the same.
     private static func parsePDB(_ text: String) -> [Atom]? {
         var out: [Atom] = []
         out.reserveCapacity(2048)
@@ -190,17 +140,30 @@ final class ThumbnailProvider: QLThumbnailProvider {
                   let y = parseField(bytes, 38, 46),
                   let z = parseField(bytes, 46, 54) else { continue }
 
+            let atomName = bytes.count >= 16
+                ? String(decoding: bytes[12..<16], as: UTF8.self)
+                    .trimmingCharacters(in: .whitespaces)
+                : ""
+
             var elem = ""
             if bytes.count >= 78 {
                 elem = String(decoding: bytes[76..<78], as: UTF8.self)
                     .trimmingCharacters(in: .whitespaces).uppercased()
             }
-            if elem.isEmpty, bytes.count >= 14 {
-                let name = String(decoding: bytes[12..<14], as: UTF8.self)
-                    .trimmingCharacters(in: .whitespaces)
-                elem = firstLetters(name).uppercased()
+            if elem.isEmpty {
+                elem = firstLetters(atomName).uppercased()
             }
-            out.append(Atom(x: x, y: y, z: z, element: elem.isEmpty ? "C" : elem))
+            let chain = bytes.count >= 22
+                ? String(decoding: bytes[21..<22], as: UTF8.self)
+                : ""
+            let resSeq: Int = {
+                guard bytes.count >= 26 else { return 0 }
+                return Int(String(decoding: bytes[22..<26], as: UTF8.self)
+                    .trimmingCharacters(in: .whitespaces)) ?? 0
+            }()
+            out.append(Atom(x: x, y: y, z: z,
+                            element: elem.isEmpty ? "C" : elem,
+                            name: atomName, chain: chain, residueSeq: resSeq))
         }
         return out.isEmpty ? nil : out
     }
@@ -216,75 +179,56 @@ final class ThumbnailProvider: QLThumbnailProvider {
         for line in lines.dropFirst(2).prefix(count) {
             let parts = line.split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count >= 4,
-                  let x = Double(parts[1]),
-                  let y = Double(parts[2]),
-                  let z = Double(parts[3]) else { continue }
+                  let x = Double(parts[1]), let y = Double(parts[2]), let z = Double(parts[3]) else { continue }
             out.append(Atom(x: x, y: y, z: z,
-                            element: String(parts[0]).uppercased()))
+                            element: String(parts[0]).uppercased(),
+                            name: "", chain: "", residueSeq: 0))
         }
         return out.isEmpty ? nil : out
     }
 
     // MARK: - MOL / SDF (V2000)
 
-    /// V2000 counts line at row 3 (0-indexed) has atom count in cols 1-3.
-    /// Atom block follows, each row: x y z element ...
     private static func parseMOLV2000(_ text: String) -> [Atom]? {
         let lines = text.components(separatedBy: "\n")
         guard lines.count > 4 else { return nil }
-        let counts = lines[3]
-        let countStr = counts.prefix(3).trimmingCharacters(in: .whitespaces)
+        let countStr = lines[3].prefix(3).trimmingCharacters(in: .whitespaces)
         guard let count = Int(countStr) else { return nil }
         var out: [Atom] = []
         out.reserveCapacity(count)
         for i in 4..<min(4 + count, lines.count) {
             let parts = lines[i].split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count >= 4,
-                  let x = Double(parts[0]),
-                  let y = Double(parts[1]),
-                  let z = Double(parts[2]) else { continue }
+                  let x = Double(parts[0]), let y = Double(parts[1]), let z = Double(parts[2]) else { continue }
             out.append(Atom(x: x, y: y, z: z,
-                            element: String(parts[3]).uppercased()))
+                            element: String(parts[3]).uppercased(),
+                            name: "", chain: "", residueSeq: 0))
         }
         return out.isEmpty ? nil : out
     }
 
     // MARK: - MOL2 (Tripos)
 
-    /// MOL2 atoms live in the `@<TRIPOS>ATOM` section. Each row is
-    /// "id name x y z atom_type ...". Section ends at the next `@<TRIPOS>`.
     private static func parseMOL2(_ text: String) -> [Atom]? {
         var inAtoms = false
         var out: [Atom] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            if line.hasPrefix("@<TRIPOS>ATOM") {
-                inAtoms = true
-                continue
-            }
-            if line.hasPrefix("@<TRIPOS>") {
-                if inAtoms { break }
-                continue
-            }
+            if line.hasPrefix("@<TRIPOS>ATOM") { inAtoms = true; continue }
+            if line.hasPrefix("@<TRIPOS>") { if inAtoms { break }; continue }
             guard inAtoms else { continue }
             let parts = line.split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count >= 6,
-                  let x = Double(parts[2]),
-                  let y = Double(parts[3]),
-                  let z = Double(parts[4]) else { continue }
+                  let x = Double(parts[2]), let y = Double(parts[3]), let z = Double(parts[4]) else { continue }
             let typeStr = String(parts[5])
             let elem = String(typeStr.split(separator: ".").first ?? "C").uppercased()
-            out.append(Atom(x: x, y: y, z: z, element: elem))
+            out.append(Atom(x: x, y: y, z: z, element: elem,
+                            name: "", chain: "", residueSeq: 0))
         }
         return out.isEmpty ? nil : out
     }
 
     // MARK: - GRO (GROMACS)
 
-    /// GRO header line 2 has atom count, then each atom row is
-    ///   "%5d%-5s%5s%5d%8.3f%8.3f%8.3f" (residue#, resname, atomname, atom#, x, y, z)
-    /// Coordinates are in nm — multiply by 10 to get the same Ångström
-    /// scale every other parser produces, so the rendering pipeline
-    /// doesn't need to know which format produced its input.
     private static func parseGRO(_ text: String) -> [Atom]? {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         guard lines.count >= 3 else { return nil }
@@ -292,8 +236,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
         var out: [Atom] = []
         out.reserveCapacity(count)
         for i in 2..<min(2 + count, lines.count) {
-            let line = lines[i]
-            let bytes = Array(line.utf8)
+            let bytes = Array(lines[i].utf8)
             guard bytes.count >= 44 else { continue }
             let atomName = String(decoding: bytes[10..<15], as: UTF8.self)
                 .trimmingCharacters(in: .whitespaces)
@@ -301,7 +244,8 @@ final class ThumbnailProvider: QLThumbnailProvider {
                   let y = parseField(bytes, 28, 36),
                   let z = parseField(bytes, 36, 44) else { continue }
             out.append(Atom(x: x * 10, y: y * 10, z: z * 10,
-                            element: firstLetters(atomName).uppercased()))
+                            element: firstLetters(atomName).uppercased(),
+                            name: atomName, chain: "", residueSeq: 0))
         }
         return out.isEmpty ? nil : out
     }
@@ -310,9 +254,8 @@ final class ThumbnailProvider: QLThumbnailProvider {
 
     private static func parseField(_ bytes: [UInt8], _ lo: Int, _ hi: Int) -> Double? {
         guard hi <= bytes.count else { return nil }
-        let str = String(decoding: bytes[lo..<hi], as: UTF8.self)
-                   .trimmingCharacters(in: .whitespaces)
-        return Double(str)
+        return Double(String(decoding: bytes[lo..<hi], as: UTF8.self)
+                        .trimmingCharacters(in: .whitespaces))
     }
 
     private static func firstLetters(_ s: String) -> String {
@@ -355,58 +298,141 @@ final class ThumbnailProvider: QLThumbnailProvider {
         return elementColors[first] ?? NSColor.systemPink
     }
 
-    // MARK: - Render the actual molecule
+    private static func rainbow(_ t: Double) -> NSColor {
+        let clamped = max(0.0, min(1.0, t))
+        let hue = (1.0 - clamped) * (240.0 / 360.0)
+        return NSColor(hue: CGFloat(hue), saturation: 0.85, brightness: 1.0, alpha: 1.0)
+    }
+
+    // MARK: - Top-level renderer
 
     private static func drawMolecule(atoms: [Atom], ext: String, in rect: NSRect) {
+        NSGradient(starting: NSColor(white: 0.13, alpha: 1.0),
+                   ending:   NSColor(white: 0.06, alpha: 1.0))?.draw(in: rect, angle: -90)
+
+        let caAtoms = atoms.filter { $0.name == "CA" && ($0.element == "C" || $0.element == "") }
+        if caAtoms.count >= proteinCAThreshold {
+            drawCartoonTrace(caAtoms: caAtoms, allAtoms: atoms, ext: ext, in: rect)
+        } else {
+            drawCPKSpheres(atoms: atoms, ext: ext, in: rect)
+        }
+        drawFormatLabel(ext: ext, in: rect)
+    }
+
+    // MARK: - Cartoon-style ribbon trace
+
+    private static func drawCartoonTrace(caAtoms: [Atom], allAtoms: [Atom],
+                                         ext: String, in rect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        ctx.saveGState()
-        defer { ctx.restoreGState() }
 
-        let bg = NSGradient(starting: NSColor(white: 0.13, alpha: 1.0),
-                            ending:   NSColor(white: 0.06, alpha: 1.0))
-        bg?.draw(in: rect, angle: -90)
+        var byChain: [String: [Atom]] = [:]
+        for a in caAtoms { byChain[a.chain, default: []].append(a) }
+        for k in byChain.keys {
+            byChain[k]?.sort { $0.residueSeq < $1.residueSeq }
+        }
 
+        let bbox = boundingBox(allAtoms)
+        let s = min(rect.width, rect.height)
+        let labelPad = s >= 64 ? s * 0.14 : 0
+        let drawRect = NSRect(x: rect.minX, y: rect.minY + labelPad,
+                              width: rect.width, height: rect.height - labelPad)
+        let scale = Double(min(drawRect.width, drawRect.height)) * 0.85 / max(bbox.span, 1e-6)
+
+        func project(_ a: Atom) -> (px: Double, py: Double, depth: Double) {
+            let px = (a.x - bbox.cx) * scale + Double(drawRect.midX)
+            let py = (a.y - bbox.cy) * scale + Double(drawRect.midY)
+            return (px, py, a.z)
+        }
+
+        struct Segment {
+            let a: (px: Double, py: Double, depth: Double)
+            let b: (px: Double, py: Double, depth: Double)
+            let t: Double
+        }
+        var segments: [Segment] = []
+        for chainAtoms in byChain.values {
+            guard chainAtoms.count >= 2 else { continue }
+            let n = chainAtoms.count
+            for i in 0..<(n - 1) {
+                let ta = Double(i) / Double(n - 1)
+                let tb = Double(i + 1) / Double(n - 1)
+                segments.append(Segment(
+                    a: project(chainAtoms[i]),
+                    b: project(chainAtoms[i + 1]),
+                    t: (ta + tb) / 2))
+            }
+        }
+        segments.sort { ($0.a.depth + $0.b.depth) < ($1.a.depth + $1.b.depth) }
+
+        let ribbonWidth = max(CGFloat(s) * 0.045, 1.5)
+
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
+        ctx.setLineWidth(ribbonWidth)
+        for seg in segments {
+            ctx.setStrokeColor(rainbow(seg.t).cgColor)
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: seg.a.px, y: seg.a.py))
+            ctx.addLine(to: CGPoint(x: seg.b.px, y: seg.b.py))
+            ctx.strokePath()
+        }
+
+        let hetSet: Set<String> = ["HOH", "WAT", "DOD", "H2O"]
+        let ligands = allAtoms.filter { atom in
+            guard !atom.name.isEmpty else { return false }
+            if atom.name == "CA" || atom.name == "N" || atom.name == "C" || atom.name == "O" {
+                return false
+            }
+            return !hetSet.contains(atom.name)
+        }
+        let maxLigands = 200
+        let ligandAtoms = ligands.count > maxLigands
+            ? Array(ligands.prefix(maxLigands))
+            : ligands
+
+        if !ligandAtoms.isEmpty {
+            let ligandR = max(ribbonWidth * 0.6, 1.0)
+            let projected = ligandAtoms.map { a -> (CGPoint, Double, Atom) in
+                let p = project(a)
+                return (CGPoint(x: p.px, y: p.py), p.depth, a)
+            }.sorted { $0.1 < $1.1 }
+            for (point, _, atom) in projected {
+                drawShadedSphere(ctx: ctx, center: point, radius: ligandR,
+                                 color: colorFor(element: atom.element))
+            }
+        }
+    }
+
+    // MARK: - CPK space-filling
+
+    private static func drawCPKSpheres(atoms: [Atom], ext: String, in rect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let working: [Atom]
-        if atoms.count > maxDrawnAtoms {
-            let stride = max(1, atoms.count / maxDrawnAtoms)
+        if atoms.count > maxDrawnAtomsCPK {
+            let stride = max(1, atoms.count / maxDrawnAtomsCPK)
             working = atoms.enumerated().compactMap { idx, a in
                 idx % stride == 0 ? a : nil
             }
         } else {
             working = atoms
         }
-
+        let bbox = boundingBox(working)
         let s = min(rect.width, rect.height)
         let labelPad = s >= 64 ? s * 0.14 : 0
-        let drawSize = NSSize(width: rect.width,
-                              height: rect.height - labelPad)
         let drawRect = NSRect(x: rect.minX, y: rect.minY + labelPad,
-                              width: drawSize.width, height: drawSize.height)
-
-        var minX = Double.infinity, maxX = -Double.infinity
-        var minY = Double.infinity, maxY = -Double.infinity
-        var minZ = Double.infinity, maxZ = -Double.infinity
-        for a in working {
-            if a.x < minX { minX = a.x };  if a.x > maxX { maxX = a.x }
-            if a.y < minY { minY = a.y };  if a.y > maxY { maxY = a.y }
-            if a.z < minZ { minZ = a.z };  if a.z > maxZ { maxZ = a.z }
-        }
-        let span = max(max(maxX - minX, maxY - minY), 1e-6)
-        let cx = (minX + maxX) / 2
-        let cy = (minY + maxY) / 2
-        let scale = Double(min(drawSize.width, drawSize.height)) * 0.82 / span
+                              width: rect.width, height: rect.height - labelPad)
+        let scale = Double(min(drawRect.width, drawRect.height)) * 0.82 / max(bbox.span, 1e-6)
         let atomRadius = max(2.0, scale * 0.6)
 
         let projected = working.map { a -> (px: Double, py: Double, depth: Double, atom: Atom) in
-            let px = (a.x - cx) * scale + Double(drawRect.midX)
-            let py = (a.y - cy) * scale + Double(drawRect.midY)
+            let px = (a.x - bbox.cx) * scale + Double(drawRect.midX)
+            let py = (a.y - bbox.cy) * scale + Double(drawRect.midY)
             return (px, py, a.z, a)
         }.sorted { $0.depth < $1.depth }
 
-        let zSpan = max(maxZ - minZ, 1e-6)
-
+        let zSpan = max(bbox.maxZ - bbox.minZ, 1e-6)
         for p in projected {
-            let depthFrac = (p.depth - minZ) / zSpan
+            let depthFrac = (p.depth - bbox.minZ) / zSpan
             let bright = 0.55 + 0.45 * depthFrac
             let color = colorFor(element: p.atom.element)
             drawShadedSphere(ctx: ctx,
@@ -415,28 +441,33 @@ final class ThumbnailProvider: QLThumbnailProvider {
                              color: color.blended(withFraction: CGFloat(1 - bright),
                                                   of: .black) ?? color)
         }
+    }
 
-        if s >= 64 {
-            let label = ext.uppercased() as NSString
-            let fontSize = max(s * 0.10, 9)
-            let font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: NSColor.white,
-                .kern: fontSize * 0.04
-            ]
-            let textSize = label.size(withAttributes: attrs)
-            let textOrigin = NSPoint(x: (rect.width - textSize.width) / 2,
-                                     y: rect.minY + s * 0.04)
-            label.draw(at: textOrigin, withAttributes: attrs)
+    // MARK: - Geometry helpers
+
+    private struct BBox {
+        var cx, cy, span, minZ, maxZ: Double
+    }
+
+    private static func boundingBox(_ atoms: [Atom]) -> BBox {
+        var minX = Double.infinity, maxX = -Double.infinity
+        var minY = Double.infinity, maxY = -Double.infinity
+        var minZ = Double.infinity, maxZ = -Double.infinity
+        for a in atoms {
+            if a.x < minX { minX = a.x };  if a.x > maxX { maxX = a.x }
+            if a.y < minY { minY = a.y };  if a.y > maxY { maxY = a.y }
+            if a.z < minZ { minZ = a.z };  if a.z > maxZ { maxZ = a.z }
         }
+        return BBox(cx: (minX + maxX) / 2,
+                    cy: (minY + maxY) / 2,
+                    span: max(maxX - minX, maxY - minY),
+                    minZ: minZ, maxZ: maxZ)
     }
 
     private static func drawShadedSphere(ctx: CGContext, center: CGPoint,
                                          radius: CGFloat, color: NSColor) {
         let r = max(radius, 0.5)
         let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
-
         let dark   = color.blended(withFraction: 0.40, of: .black) ?? color
         let bright = color.blended(withFraction: 0.30, of: .white) ?? color
 
@@ -444,7 +475,6 @@ final class ThumbnailProvider: QLThumbnailProvider {
         ctx.addEllipse(in: rect)
         ctx.clip()
         NSGradient(starting: bright, ending: dark)?.draw(in: rect, angle: -45)
-
         if r > 3 {
             let hiR = r * 0.5
             let hiRect = CGRect(x: center.x - r * 0.45,
@@ -458,7 +488,22 @@ final class ThumbnailProvider: QLThumbnailProvider {
         ctx.restoreGState()
     }
 
-    // MARK: - Glyph fallback (for formats we can't parse)
+    private static func drawFormatLabel(ext: String, in rect: NSRect) {
+        let s = min(rect.width, rect.height)
+        guard s >= 64 else { return }
+        let label = ext.uppercased() as NSString
+        let fontSize = max(s * 0.10, 9)
+        let font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: NSColor.white, .kern: fontSize * 0.04
+        ]
+        let textSize = label.size(withAttributes: attrs)
+        let textOrigin = NSPoint(x: (rect.width - textSize.width) / 2,
+                                 y: rect.minY + s * 0.04)
+        label.draw(at: textOrigin, withAttributes: attrs)
+    }
+
+    // MARK: - Glyph fallback
 
     private static let glyphColors: [String: NSColor] = [
         "pdb":    .systemBlue,    "ent":    .systemBlue,    "pdbqt":  .systemTeal,
@@ -516,20 +561,6 @@ final class ThumbnailProvider: QLThumbnailProvider {
         drawShadedSphere(ctx: ctx,
                          center: CGPoint(x: cx, y: cy),
                          radius: centerR, color: accent)
-
-        if s >= 64 {
-            let label = ext.uppercased() as NSString
-            let fontSize = max(s * 0.13, 9)
-            let font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: NSColor.white,
-                .kern: fontSize * 0.04
-            ]
-            let textSize = label.size(withAttributes: attrs)
-            let textOrigin = NSPoint(x: (rect.width - textSize.width) / 2,
-                                     y: rect.minY + s * 0.06)
-            label.draw(at: textOrigin, withAttributes: attrs)
-        }
+        drawFormatLabel(ext: ext, in: rect)
     }
 }
