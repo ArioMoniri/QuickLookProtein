@@ -827,11 +827,11 @@ jobs:
           "path=$setupExe"                    | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       # ----------------------------------------------------------------
-      # Package the all-in-one Windows installer bundle. Ships the
-      # .qlplugin, install.ps1, install.bat (double-clickable wrapper),
-      # and a plaintext README so the user has everything they need
-      # offline. install.ps1 auto-detects the sibling .qlplugin and
-      # installs it locally instead of refetching from GitHub.
+      # Package the all-in-one Windows installer bundle. Mostly a
+      # convenience artifact for users who want to inspect the scripts
+      # before running anything — the Setup.exe above is the primary
+      # path. Ships the .qlplugin, install.ps1, install.bat, and a
+      # plaintext README.
       - name: Package Windows installer bundle
         id: bundle
         shell: pwsh
@@ -916,18 +916,14 @@ jobs:
           Copy-Item -Path "${{ steps.pkg.outputs.path }}" -Destination $alias -Force
           gh release upload "v$version" $alias --clobber
 
-          # All-in-one installer bundle. Versioned + stable alias so the
-          # README's "Download for Windows" button can use a permanent URL.
+          # All-in-one installer bundle (single versioned zip — no
+          # separate "-latest" alias, the bundle is a fallback artifact
+          # and the README points at Setup.exe instead).
           gh release upload "v$version" "${{ steps.bundle.outputs.path }}" --clobber
-          $bundleAlias = "build/QuickLookProtein-Windows-Installer-latest.zip"
-          Copy-Item -Path "${{ steps.bundle.outputs.path }}" -Destination $bundleAlias -Force
-          gh release upload "v$version" $bundleAlias --clobber
 
-          # One-click self-extracting installer. Upload the versioned
-          # file plus a stable "QuickLookProtein-Setup.exe" alias the
-          # README button can point at.
+          # One-click installer .exe. The build step already names the
+          # file QuickLookProtein-Setup.exe (no version suffix) so the
+          # README button's
+          #   releases/latest/download/QuickLookProtein-Setup.exe
+          # URL resolves without needing a separate alias copy.
           gh release upload "v$version" "${{ steps.setupexe.outputs.path }}" --clobber
-          # The "${{ steps.setupexe.outputs.path }}" file is already named
-          # QuickLookProtein-Setup.exe (no version in the name) so no
-          # separate alias copy is needed — the upload above doubles as
-          # the stable URL target.

@@ -1,4 +1,4 @@
-# QuickLookProtein — one-line Windows installer.
+# QuickLookProtein - one-line Windows installer.
 #
 # Run from PowerShell (any modern version, no admin required for the per-user
 # plugin path):
@@ -9,11 +9,11 @@
 #   1. Detect whether QL-Win (https://github.com/QL-Win/QuickLook) is installed.
 #      If not, fetch the latest signed QuickLook installer .exe from their
 #      releases and run it silently. (User gets a SmartScreen prompt because
-#      we never bundle a different binary — this is QL-Win's own installer.)
+#      we never bundle a different binary - this is QL-Win's own installer.)
 #   2. Fetch the latest QuickLookProtein-X.Y.Z.qlplugin from our own GitHub
 #      release.
 #   3. Treat the .qlplugin as a zip (it is) and extract it into
-#      %LocalAppData%\QuickLook\plugins\QuickLookProtein\ — the per-user
+#      %LocalAppData%\QuickLook\plugins\QuickLookProtein\ - the per-user
 #      plugin folder QL-Win scans on startup. No admin rights needed.
 #   4. Restart QuickLook if it's already running so the new plugin is picked
 #      up without the user having to right-click the tray icon.
@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
     # Pin to a specific QuickLookProtein release tag for reproducible
-    # installs. Default is "latest" — resolves at runtime to whatever the
+    # installs. Default is "latest" - resolves at runtime to whatever the
     # GitHub /releases/latest endpoint returns.
     [string]$Version = "latest",
     # Skip the QL-Win bootstrap even if the host isn't installed. Useful
@@ -83,7 +83,7 @@ function Install-QuickLookHost {
     $installer = Join-Path $tempRoot $exe.name
     Write-Host "  Downloading $($exe.name) ($([math]::Round($exe.size / 1MB, 1)) MB)..."
     Invoke-WebRequest -Uri $exe.browser_download_url -OutFile $installer
-    Write-Host "  Running installer (you may see a SmartScreen prompt — click 'More info' → 'Run anyway')."
+    Write-Host "  Running installer (you may see a SmartScreen prompt - click 'More info' -> 'Run anyway')."
     # /SILENT shows progress but skips the wizard pages; /VERYSILENT is
     # fully silent but the Inno Setup installer still occasionally pops
     # a UAC dialog for per-machine installs.
@@ -145,7 +145,7 @@ function Install-Plugin {
     }
     New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
 
-    # .qlplugin is a zip — Expand-Archive accepts any extension provided
+    # .qlplugin is a zip - Expand-Archive accepts any extension provided
     # we hand it a .zip-shaped temp copy. (Expand-Archive in older Windows
     # PowerShell refuses anything not literally named *.zip.)
     New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
@@ -169,7 +169,7 @@ function Restart-QuickLookHost {
 }
 
 Write-Host ""
-Write-Host "QuickLookProtein — Windows installer" -ForegroundColor Green
+Write-Host "QuickLookProtein - Windows installer" -ForegroundColor Green
 Write-Host "Plugin folder: $pluginDir"
 
 if (-not (Test-QuickLookInstalled)) {
@@ -178,7 +178,7 @@ if (-not (Test-QuickLookInstalled)) {
     }
     Install-QuickLookHost
 } else {
-    Write-Host "QL-Win (QuickLook) is already installed — skipping host bootstrap."
+    Write-Host "QL-Win (QuickLook) is already installed - skipping host bootstrap."
 }
 
 Install-Plugin

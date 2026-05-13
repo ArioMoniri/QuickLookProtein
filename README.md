@@ -41,7 +41,7 @@ No admin rights, no PowerShell knowledge, no unzip step.
 irm https://raw.githubusercontent.com/ArioMoniri/QuickLookProtein/feature/ario-signed/Windows/install.ps1 | iex
 ```
 
-**Installer zip** ([download](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein-Windows-Installer-latest.zip)) — unpack, double-click `install.bat`. Same files as the `.exe` setup, exposed as separate scripts in case you want to inspect them before running.
+**Installer zip** — same scripts as the `.exe` setup, exposed for inspection. Grab `QuickLookProtein-Windows-Installer.zip` from the [latest release's assets](https://github.com/ArioMoniri/QuickLookProtein/releases/latest), unpack, double-click `install.bat`.
 
 **Fully manual** — install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest), download [`QuickLookProtein.qlplugin`](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.qlplugin), double-click the plugin while QuickLook is running, restart QuickLook from the tray.
 

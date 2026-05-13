@@ -4,6 +4,29 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.7] — 2026-05-14
+
+### 🐛 Fixed
+
+- **install.ps1 parser error on Windows PowerShell 5.1** — the script
+  contained em-dashes (`—`) and arrows (`→`) in comments and prompt
+  strings. Windows PowerShell 5.1 (the default `powershell.exe` shell,
+  which install.bat invokes) reads files without a BOM as the system
+  ANSI codepage, not UTF-8 — those multi-byte UTF-8 sequences got
+  mis-decoded into garbled quote characters, which the parser then
+  flagged with cascading "string is missing the terminator" errors
+  pointing at innocent ASCII lines further down. install.ps1 is now
+  pure ASCII.
+
+### 🪟 Windows
+
+- **Dropped the `QuickLookProtein-Windows-Installer-latest.zip` alias.**
+  Setup.exe is the recommended path; the installer zip remains as a
+  versioned fallback for users who want to read the scripts before
+  running them. Releases now ship six Windows assets instead of seven
+  (one .qlplugin, one versioned + one alias, the installer bundle, and
+  Setup.exe — no duplicate "-latest" zip).
+
 ## [1.7.6] — 2026-05-14
 
 ### 🪟 Windows
