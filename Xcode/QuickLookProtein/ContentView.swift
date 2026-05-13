@@ -41,7 +41,11 @@ struct ContentView: View {
         let cubePath = Bundle.main.path(forResource: "water",         ofType: "cube")!
         let pqrPath    = Bundle.main.path(forResource: "methane",     ofType: "pqr")!
         let vaspPath   = Bundle.main.path(forResource: "diamond",     ofType: "vasp")!
-        let cdjsonPath = Bundle.main.path(forResource: "methane",     ofType: "cdjson")!
+        // CDJSON intentionally has no demo tile: 3Dmol's bundled cdjson
+        // parser produces atoms but no usable bond data even on textbook
+        // ChemDoodle JSON input, so the tile would always render blank.
+        // The format is still registered (UTI, Settings Picker, file-drop
+        // support) so users with .cdjson files that DO render can use them.
 
         let baseUrl = URL(fileURLWithPath: htmlPath)
 
@@ -55,7 +59,6 @@ struct ContentView: View {
         let htmlCUBE   = previewHTML(htmlPath: htmlPath, filePath: cubePath,   ext: "cube")
         let htmlPQR    = previewHTML(htmlPath: htmlPath, filePath: pqrPath,    ext: "pqr")
         let htmlVASP   = previewHTML(htmlPath: htmlPath, filePath: vaspPath,   ext: "vasp")
-        let htmlCDJSON = previewHTML(htmlPath: htmlPath, filePath: cdjsonPath, ext: "cdjson")
 
         // Single scrollable page — settings + about at the top, previews below.
         // No fixed split, no clamped scroll region. The whole thing scrolls if
@@ -218,9 +221,6 @@ struct ContentView: View {
                     previewTile(html: htmlVASP, base: baseUrl,
                                 title: "VASP",
                                 caption: { Text("Diamond cubic carbon (POSCAR)") })
-                    previewTile(html: htmlCDJSON, base: baseUrl,
-                                title: "CDJSON",
-                                caption: { Text("Methane (ChemDoodle JSON)") })
 
                     customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
                 }
