@@ -109,8 +109,27 @@
 		A1WA7G1E3A2B3C4D00000002 /* water.gro */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = water.gro; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		05D0F5B12FB46E020059B3CB /* Exceptions for "QLThumbnail" folder in "QLThumbnail" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 05D0F59D2FB46E020059B3CB /* QLThumbnail */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		05D0F5A22FB46E020059B3CB /* QLThumbnail */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = QLThumbnail; sourceTree = "<group>"; };
+		05D0F5A22FB46E020059B3CB /* QLThumbnail */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				05D0F5B12FB46E020059B3CB /* Exceptions for "QLThumbnail" folder in "QLThumbnail" target */,
+			);
+			explicitFileTypes = {};
+			explicitFolders = ();
+			path = QLThumbnail;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
