@@ -9,18 +9,42 @@ import Foundation
 import SwiftUI
 
 class SettingsStorage: ObservableObject {
-    
+
+    // MARK: - Per-format atom display style
     @AppStorage("atomStyleCIF", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStyleCIF: Settings.AtomStyle = .stick
     @AppStorage("atomStylePDB", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStylePDB: Settings.AtomStyle = .cartoon
     @AppStorage("atomStyleSDF", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStyleSDF: Settings.AtomStyle = .stick
-    
+    @AppStorage("atomStyleMOL2", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var atomStyleMOL2: Settings.AtomStyle = .stick
+    @AppStorage("atomStyleXYZ", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var atomStyleXYZ: Settings.AtomStyle = .stick
+    @AppStorage("atomStyleMOL", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var atomStyleMOL: Settings.AtomStyle = .stick
+    @AppStorage("atomStyleGRO", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var atomStyleGRO: Settings.AtomStyle = .cartoon
+    @AppStorage("atomStyleCUBE", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var atomStyleCUBE: Settings.AtomStyle = .stick
+
+    // MARK: - Global rendering
     @AppStorage("rotationSpeed", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var rotationSpeed: Settings.RotationSpeed = .medium
-    
-    // store colors
+    @AppStorage("colorScheme", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var colorScheme: Settings.ColorScheme = .spectrum
+    @AppStorage("autoStyleHetero", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var autoStyleHetero: Bool = true
+    @AppStorage("showSurface", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var showSurface: Bool = false
+    @AppStorage("hideHydrogens", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var hideHydrogens: Bool = false
+    @AppStorage("showUnitCell", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var showUnitCell: Bool = false
+    @AppStorage("showInfoOverlay", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
+    var showInfoOverlay: Bool = true
+
+    // MARK: - Background color components
     @AppStorage("bgColorRed", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var bgColorRed: Double = 0.0
     @AppStorage("bgColorGreen", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
@@ -29,7 +53,7 @@ class SettingsStorage: ObservableObject {
     var bgColorBlue: Double = 0.0
     @AppStorage("bgColorOpacity", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var bgColorOpacity: Double = 0.0
-    
+
     var bgColor: Color {
         get {
             Color(.sRGB, red: bgColorRed, green: bgColorGreen, blue: bgColorBlue, opacity: bgColorOpacity)
@@ -41,7 +65,21 @@ class SettingsStorage: ObservableObject {
             bgColorOpacity = newValue.components.opacity
         }
     }
-    
+
+    /// Resolve the configured AtomStyle for a given file extension (lowercased, no dot).
+    func atomStyle(forExtension ext: String) -> Settings.AtomStyle {
+        switch ext.lowercased() {
+        case "pdb", "ent", "pdbqt":  return atomStylePDB
+        case "cif", "mmcif":         return atomStyleCIF
+        case "sdf":                  return atomStyleSDF
+        case "mol2":                 return atomStyleMOL2
+        case "xyz":                  return atomStyleXYZ
+        case "mol":                  return atomStyleMOL
+        case "gro":                  return atomStyleGRO
+        case "cube", "cub":          return atomStyleCUBE
+        default:                     return atomStylePDB
+        }
+    }
 }
 
 extension Color {
@@ -56,35 +94,79 @@ extension Color {
 }
 
 struct Settings {
-    
+
     enum AtomStyle: String, CaseIterable, Identifiable {
         case cartoon = "Cartoon"
         case line = "Line"
         case stick = "Stick"
         case sphere = "Sphere"
-        
-        var id: AtomStyle {
-            return self
+
+        var id: AtomStyle { return self }
+
+        /// 3Dmol.js style key — must match a property in the style spec object.
+        var jsValue: String {
+            switch self {
+            case .cartoon: return "cartoon"
+            case .line:    return "line"
+            case .stick:   return "stick"
+            case .sphere:  return "sphere"
+            }
         }
     }
-    
+
+    enum ColorScheme: String, CaseIterable, Identifiable {
+        case spectrum = "Spectrum (rainbow)"
+        case chain    = "By chain"
+        case element  = "By element (CPK)"
+        case ssJmol   = "Secondary structure"
+        case residue  = "By amino acid"
+
+        var id: ColorScheme { return self }
+
+        /// Token read by the JS in 3Dmol_viewer.html — keep in sync with the switch there.
+        var jsValue: String {
+            switch self {
+            case .spectrum: return "spectrum"
+            case .chain:    return "chain"
+            case .element:  return "element"
+            case .ssJmol:   return "ssJmol"
+            case .residue:  return "residue"
+            }
+        }
+    }
+
     enum RotationSpeed: String, CaseIterable, Identifiable {
         case noRotation = "No rotation"
         case slow = "Slow"
         case medium = "Medium"
         case fast = "Fast"
-        
-        var id: RotationSpeed {
-            return self
-        }
-        
+
+        var id: RotationSpeed { return self }
+
         func rotationSpeedNumber() -> Float {
             switch self {
-            case .slow: return 0.5
-            case .medium: return 1
-            case .fast: return 2
+            case .slow:       return 0.5
+            case .medium:     return 1
+            case .fast:       return 2
             case .noRotation: return 0
             }
+        }
+    }
+
+    /// Maps a file extension to the format token that 3Dmol.js's `addModel` understands.
+    /// Returns nil for unknown formats so the caller can surface an error.
+    static func dataFormat(forExtension ext: String) -> String? {
+        switch ext.lowercased() {
+        case "pdb", "ent":   return "pdb"
+        case "pdbqt":        return "pdbqt" // AutoDock / Vina docking output — 3Dmol handles natively
+        case "cif", "mmcif": return "cif"
+        case "sdf":          return "sdf"
+        case "mol":          return "sdf"   // 3Dmol parses single-molecule MOL files via the SDF parser
+        case "mol2":         return "mol2"
+        case "xyz":          return "xyz"
+        case "gro":          return "gro"
+        case "cube", "cub":  return "cube"
+        default:             return nil
         }
     }
 }

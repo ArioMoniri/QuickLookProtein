@@ -25,6 +25,7 @@
 		4BE18E02281F38DA00034BE4 /* PQQ.sdf in Resources */ = {isa = PBXBuildFile; fileRef = 4BE18E01281F38D900034BE4 /* PQQ.sdf */; };
 		4BE18E04281F3B4900034BE4 /* 1565673.cif in Resources */ = {isa = PBXBuildFile; fileRef = 4BE18E03281F3B4900034BE4 /* 1565673.cif */; };
 		4BE18E06281F3D0200034BE4 /* 6oc6.pdb in Resources */ = {isa = PBXBuildFile; fileRef = 4BE18E05281F3D0200034BE4 /* 6oc6.pdb */; };
+		A1CAF1E01A2B3C4D00000001 /* caffeine.mol2 in Resources */ = {isa = PBXBuildFile; fileRef = A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */; };
 		4BED22A32821CD6D003F66A0 /* 3Dmol.js in Resources */ = {isa = PBXBuildFile; fileRef = 4BED22A22821CD6D003F66A0 /* 3Dmol.js */; };
 		4BED22A42821CD6D003F66A0 /* 3Dmol.js in Resources */ = {isa = PBXBuildFile; fileRef = 4BED22A22821CD6D003F66A0 /* 3Dmol.js */; };
 /* End PBXBuildFile section */
@@ -74,6 +75,7 @@
 		4BE18E01281F38D900034BE4 /* PQQ.sdf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PQQ.sdf; sourceTree = "<group>"; };
 		4BE18E03281F3B4900034BE4 /* 1565673.cif */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 1565673.cif; sourceTree = "<group>"; };
 		4BE18E05281F3D0200034BE4 /* 6oc6.pdb */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 6oc6.pdb; sourceTree = "<group>"; };
+		A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = caffeine.mol2; sourceTree = "<group>"; };
 		4BED22A22821CD6D003F66A0 /* 3Dmol.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = 3Dmol.js; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -102,6 +104,7 @@
 				4BE18E05281F3D0200034BE4 /* 6oc6.pdb */,
 				4BE18E01281F38D900034BE4 /* PQQ.sdf */,
 				4BE18E03281F3B4900034BE4 /* 1565673.cif */,
+				A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */,
 			);
 			path = Assets;
 			sourceTree = "<group>";
@@ -274,6 +277,7 @@
 				4BE18E06281F3D0200034BE4 /* 6oc6.pdb in Resources */,
 				4BE18E04281F3B4900034BE4 /* 1565673.cif in Resources */,
 				4B20116F26D2D43B00B77CEF /* 3Dmol_viewer.html in Resources */,
+				A1CAF1E01A2B3C4D00000001 /* caffeine.mol2 in Resources */,
 				4B0FDF8326C9A32100C94DDE /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

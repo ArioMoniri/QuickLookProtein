@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>QuickLookProtein Extension</string>
+	<string>QuickLookProtein Spotlight Importer</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -20,48 +20,40 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<!--
+	  CSImportExtension is macOS 12+. We hard-code 12.0 here so the system
+	  refuses to load the bundle on macOS 11 rather than crashing at
+	  principal-class instantiation. The MDImporter target's
+	  MACOSX_DEPLOYMENT_TARGET must also be set to 12.0 in Xcode.
+	-->
 	<key>LSMinimumSystemVersion</key>
-	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<string>12.0</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>
 		<dict>
-			<key>QLSupportedContentTypes</key>
+			<key>CSSupportedContentTypes</key>
 			<array>
-				<!-- PDB -->
 				<string>org.libreoffice.pdb-document</string>
-				<string>dyn.ah62d4rv4ge80g4pg</string>
 				<string>net.sourceforge.openbabel.pdb</string>
-				<string>com.jethrohemmann.QuickLookProtein.pdb</string>
-				<!-- SDF / MDL Molfile -->
 				<string>net.sourceforge.openbabel.mdl</string>
-				<string>dyn.ah62d4rv4ge81a3dc</string>
-				<string>com.jethrohemmann.QuickLookProtein.sdf</string>
-				<string>com.jethrohemmann.QuickLookProtein.mol</string>
-				<!-- CIF / mmCIF -->
 				<string>com.cif</string>
-				<string>com.crystalmaker.crystalmaker.cif</string>
-				<string>com.revvity.external.cif</string>
-				<string>dyn.ah62d4rv4ge81g3dg</string>
+				<string>com.tripos.mol2</string>
+				<string>com.jethrohemmann.QuickLookProtein.pdb</string>
 				<string>com.jethrohemmann.QuickLookProtein.cif</string>
 				<string>com.jethrohemmann.QuickLookProtein.mmcif</string>
-				<!-- Tripos MOL2 -->
-				<string>com.tripos.mol2</string>
+				<string>com.jethrohemmann.QuickLookProtein.sdf</string>
+				<string>com.jethrohemmann.QuickLookProtein.mol</string>
 				<string>com.jethrohemmann.QuickLookProtein.mol2</string>
-				<!-- XYZ -->
 				<string>com.jethrohemmann.QuickLookProtein.xyz</string>
-				<!-- GROMACS -->
 				<string>com.jethrohemmann.QuickLookProtein.gro</string>
-				<!-- Gaussian CUBE -->
 				<string>com.jethrohemmann.QuickLookProtein.cube</string>
 			</array>
-			<key>QLSupportsSearchableItems</key>
-			<false/>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
-		<string>com.apple.quicklook.preview</string>
+		<string>com.apple.spotlight.import</string>
 		<key>NSExtensionPrincipalClass</key>
-		<string>$(PRODUCT_MODULE_NAME).PreviewViewController</string>
+		<string>$(PRODUCT_MODULE_NAME).ImportExtension</string>
 	</dict>
 </dict>
 </plist>
