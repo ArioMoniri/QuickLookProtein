@@ -42,12 +42,23 @@ echo "  (you may be prompted for your login keychain password)"
 echo ""
 
 # `generate_keys` is idempotent: if a key already exists in the keychain it
-# just prints the existing public key. We capture stdout for paste-ready
-# output.
-PUBLIC_KEY="$(./bin/generate_keys 2>&1 | tail -n 1 | tr -d '[:space:]')"
+# just prints the existing public key. Sparkle 2.6.x wraps the value in an
+# Info.plist snippet — extract from <string>…</string>. Fallback: scan for
+# any 44-char base64 token (32-byte Ed25519 key, base64-padded).
+GEN_OUTPUT="$(./bin/generate_keys 2>&1)"
+PUBLIC_KEY="$(printf '%s\n' "$GEN_OUTPUT" \
+    | sed -nE 's:.*<string>([A-Za-z0-9+/=]+)</string>.*:\1:p' \
+    | head -n 1)"
+if [[ -z "$PUBLIC_KEY" ]]; then
+    PUBLIC_KEY="$(printf '%s\n' "$GEN_OUTPUT" \
+        | grep -oE '[A-Za-z0-9+/]{43}=' \
+        | head -n 1)"
+fi
 
 if [[ -z "$PUBLIC_KEY" ]]; then
-    echo "✗ Could not read public key from generate_keys output."; exit 1
+    echo "✗ Could not read public key from generate_keys output. Raw:"
+    printf '%s\n' "$GEN_OUTPUT"
+    exit 1
 fi
 
 echo "── PUBLIC KEY (for Info.plist SUPublicEDKey) ──────────────────"
@@ -89,17 +100,29 @@ fi
 
 PRIVATE_B64="$(printf '%s' "$PRIVATE_RAW" | base64)"
 
-echo "── PRIVATE KEY (base64; paste into GitHub Actions Secrets) ────"
-echo "$PRIVATE_B64"
-echo "───────────────────────────────────────────────────────────────"
-echo ""
-
-# Copy to clipboard if available — convenient for pasting into the GitHub
-# secret form. We deliberately use pbcopy without a tee so it stays out of
-# any shell history.
+# Deliberately NOT printing the private key to stdout — terminal scrollback,
+# tmux/screen captures, and SSH logs are all places we don't want it
+# appearing. We copy it straight to the clipboard so the user can paste
+# into GitHub Secrets directly. If pbcopy isn't available (you're SSH'd
+# in somewhere headless), we write to a tempfile with restricted perms
+# and tell the user the path.
 if command -v pbcopy >/dev/null 2>&1; then
     printf '%s' "$PRIVATE_B64" | pbcopy
-    echo "(Private key base64 copied to clipboard.)"
+    echo "── PRIVATE KEY ────────────────────────────────────────────────"
+    echo "✅ Copied to clipboard. Paste into the GitHub Actions secret"
+    echo "   SPARKLE_ED_PRIVATE_KEY now, before doing anything else that"
+    echo "   touches your clipboard."
+    echo "───────────────────────────────────────────────────────────────"
+else
+    TMPFILE="$(mktemp -t sparkle-private.XXXXXX)"
+    chmod 600 "$TMPFILE"
+    printf '%s' "$PRIVATE_B64" > "$TMPFILE"
+    echo "── PRIVATE KEY ────────────────────────────────────────────────"
+    echo "✅ Written to $TMPFILE (chmod 600)."
+    echo "   Paste its contents into the GitHub Actions secret"
+    echo "   SPARKLE_ED_PRIVATE_KEY, then delete the file:"
+    echo "       rm $TMPFILE"
+    echo "───────────────────────────────────────────────────────────────"
 fi
 
 echo ""
