@@ -42,59 +42,37 @@ struct ContentView: View {
         let htmlSDF  = previewHTML(htmlPath: htmlPath, filePath: sdfPath,  ext: "sdf")
         let htmlMOL2 = previewHTML(htmlPath: htmlPath, filePath: mol2Path, ext: "mol2")
 
-        VStack(spacing: 0) {
-            // Top — settings + about, scrollable so it never starves the previews.
-            // The settings column genuinely doesn't fit in <360 px once all
-            // toggles + the "Additional formats" disclosure expand; rather than
-            // shoving them off-screen we let the column scroll.
-            ScrollView(.vertical, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 16) {
+        // Single scrollable page — settings + about at the top, previews below.
+        // No fixed split, no clamped scroll region. The whole thing scrolls if
+        // the window gets too short for everything; otherwise it just lays out
+        // naturally and the previews grow with the available width.
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 16) {
 
-                    // MARK: Settings
-                    VStack(alignment: .leading) {
-                        Text("Settings").font(.title).padding(.bottom, 4)
+                HStack(alignment: .top, spacing: 24) {
 
-                        Text("Atom display style").font(.headline).padding(.top, 4)
-                        Form {
-                            Picker("PDB:",  selection: $userSettings.atomStylePDB) {
-                                ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue) }
-                            }
-                            Picker("CIF:",  selection: $userSettings.atomStyleCIF) {
-                                ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue) }
-                            }
-                            Picker("SDF:",  selection: $userSettings.atomStyleSDF) {
-                                ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue) }
-                            }
-                            Picker("MOL2:", selection: $userSettings.atomStyleMOL2) {
-                                ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue) }
-                            }
+                    // MARK: Settings — every format in one list, every menu row
+                    //                 is fully clickable (label included).
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Settings").font(.title)
+
+                        Text("Atom display style").font(.headline)
+                        VStack(spacing: 4) {
+                            styleMenuRow(label: "PDB",   binding: $userSettings.atomStylePDB)
+                            styleMenuRow(label: "CIF",   binding: $userSettings.atomStyleCIF)
+                            styleMenuRow(label: "SDF",   binding: $userSettings.atomStyleSDF)
+                            styleMenuRow(label: "MOL",   binding: $userSettings.atomStyleMOL)
+                            styleMenuRow(label: "MOL2",  binding: $userSettings.atomStyleMOL2)
+                            styleMenuRow(label: "XYZ",   binding: $userSettings.atomStyleXYZ)
+                            styleMenuRow(label: "GRO",   binding: $userSettings.atomStyleGRO)
+                            styleMenuRow(label: "CUBE",  binding: $userSettings.atomStyleCUBE)
                         }
+                        .frame(maxWidth: 320)
 
-                        DisclosureGroup("Additional formats (XYZ, MOL, GRO, CUBE)") {
-                            Form {
-                                Picker("XYZ:",  selection: $userSettings.atomStyleXYZ) {
-                                    ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue) }
-                                }
-                                Picker("MOL:",  selection: $userSettings.atomStyleMOL) {
-                                    ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue) }
-                                }
-                                Picker("GRO:",  selection: $userSettings.atomStyleGRO) {
-                                    ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue) }
-                                }
-                                Picker("CUBE:", selection: $userSettings.atomStyleCUBE) {
-                                    ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue) }
-                                }
-                            }
-                        }.padding(.top, 4)
-
-                        Text("Appearance").font(.headline).padding(.top, 12)
-                        Form {
-                            Picker("Color scheme:", selection: $userSettings.colorScheme) {
-                                ForEach(Settings.ColorScheme.allCases) { Text($0.rawValue) }
-                            }
-                            Picker("Rotation:", selection: $userSettings.rotationSpeed) {
-                                ForEach(Settings.RotationSpeed.allCases) { Text($0.rawValue) }
-                            }
+                        Text("Appearance").font(.headline).padding(.top, 6)
+                        VStack(spacing: 4) {
+                            schemeMenuRow(label: "Color scheme", binding: $userSettings.colorScheme)
+                            rotationMenuRow(label: "Rotation",   binding: $userSettings.rotationSpeed)
                             HStack {
                                 ColorPicker("Background:", selection: $userSettings.bgColor, supportsOpacity: true)
                                     .help("#" + convertColorToRGB(color: userSettings.bgColor).rgbHex
@@ -102,9 +80,10 @@ struct ContentView: View {
                                 Button("Transparent", action: resetColor)
                             }
                         }
+                        .frame(maxWidth: 320)
 
-                        Text("Rendering options").font(.headline).padding(.top, 12)
-                        Form {
+                        Text("Rendering options").font(.headline).padding(.top, 6)
+                        VStack(alignment: .leading, spacing: 4) {
                             Toggle("Smart protein + ligand styling", isOn: $userSettings.autoStyleHetero)
                                 .help("When a file contains both a protein and a ligand, render the protein with the chosen style and ligands as sticks.")
                             Toggle("Show molecular surface",          isOn: $userSettings.showSurface)
@@ -155,14 +134,33 @@ struct ContentView: View {
                         // Quick Look troubleshooting — common after upgrading from
                         // upstream because the old extension's bundle ID differs
                         // and macOS keeps both registered until the old app is
-                        // deleted + caches cleared.
+                        // deleted + caches cleared. Two buttons that drive the
+                        // user to the right system pane / Finder location.
                         DisclosureGroup("Quick Look not updating?") {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Run this in Terminal to flush macOS's Quick Look caches and re-register the new extension:")
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("After installing a new version, macOS may still use a previously-installed extension. Two clicks to fix:")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
-                                HStack {
+
+                                HStack(spacing: 8) {
+                                    Button("Open Extensions settings") {
+                                        if let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences") {
+                                            NSWorkspace.shared.open(url)
+                                        }
+                                    }
+                                    .controlSize(.small)
+                                    Button("Reveal /Applications") {
+                                        NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+                                    }
+                                    .controlSize(.small)
+                                }
+
+                                Text("Then run this in Terminal to flush macOS's Quick Look caches:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                HStack(spacing: 6) {
                                     Text("qlmanage -r && qlmanage -r cache")
                                         .font(.system(.caption, design: .monospaced))
                                         .padding(.vertical, 4).padding(.horizontal, 6)
@@ -175,20 +173,16 @@ struct ContentView: View {
                                     }
                                     .controlSize(.small)
                                 }
-                                Text("If the wrong preview still appears, delete the previously installed QuickLookProtein.app from /Applications and rebuild.")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
                             }
+                            .padding(.top, 4)
                         }
                         .font(.caption)
                         .padding(.top, 6)
 
-                        Spacer(minLength: 0)
-
                         Text("Rendered by 3Dmol.js (Rego & Koes, 2015).")
                             .font(.caption2)
                             .foregroundColor(.secondary)
+                            .padding(.top, 8)
                         Link("3dmol.csb.pitt.edu",
                              destination: URL(string: "https://3dmol.csb.pitt.edu")!)
                             .font(.caption2)
@@ -197,38 +191,132 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .padding(.horizontal, 8)
+
+                Divider()
+                    .padding(.horizontal, 8)
+
+                // MARK: Live previews — WebGL canvases that rotate at the user's
+                //       chosen speed. Aspect-ratio constraint keeps each tile a
+                //       roughly 1:1 square as the window grows or shrinks, and
+                //       a 180 px floor means they never disappear in narrow
+                //       windows. They scale up freely when the window grows.
+                HStack(spacing: 10) {
+                    previewTile(html: htmlPDB,  base: baseUrl,
+                                title: "PDB",
+                                caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
+
+                    previewTile(html: htmlCIF,  base: baseUrl,
+                                title: "CIF",
+                                caption: { Text("Bioinspired Fe complex (1565673)") })
+
+                    previewTile(html: htmlSDF,  base: baseUrl,
+                                title: "SDF",
+                                caption: { Text("Pyrroloquinoline quinone (CID 1024)") })
+
+                    previewTile(html: htmlMOL2, base: baseUrl,
+                                title: "MOL2",
+                                caption: { Text("Caffeine") })
+
+                    customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
+                }
+                .frame(minHeight: 180, idealHeight: 280)
+                .aspectRatio(4.2, contentMode: .fit)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 16)
             }
-            .frame(maxHeight: 360)   // hard cap so the previews always get 360+ px
-
-            Divider()
-
-            // MARK: Live previews — WebGL canvases that spin at the user's chosen
-            //       rotation speed. Min-height ensures the canvases have enough
-            //       pixels to render even on small windows; without this the
-            //       molecules don't show even though 3Dmol parses them.
-            HStack(spacing: 8) {
-                previewTile(html: htmlPDB,  base: baseUrl,
-                            title: "PDB",
-                            caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
-
-                previewTile(html: htmlCIF,  base: baseUrl,
-                            title: "CIF",
-                            caption: { Text("Bioinspired Fe complex (1565673)") })
-
-                previewTile(html: htmlSDF,  base: baseUrl,
-                            title: "SDF",
-                            caption: { Text("Pyrroloquinoline quinone (CID 1024)") })
-
-                previewTile(html: htmlMOL2, base: baseUrl,
-                            title: "MOL2",
-                            caption: { Text("Caffeine") })
-
-                customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
-            }
-            .frame(minHeight: 320, maxHeight: .infinity)
-            .padding(.horizontal, 12)
-            .padding(.bottom, 12)
         }
+    }
+
+    // MARK: - Menu rows (entire row clickable, including the label)
+
+    private func styleMenuRow(label: String,
+                              binding: Binding<Settings.AtomStyle>) -> some View {
+        menuRow(label: label, currentValue: binding.wrappedValue.rawValue) {
+            ForEach(Settings.AtomStyle.allCases) { style in
+                Button {
+                    binding.wrappedValue = style
+                } label: {
+                    HStack {
+                        Text(style.rawValue)
+                        if binding.wrappedValue == style {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func schemeMenuRow(label: String,
+                               binding: Binding<Settings.ColorScheme>) -> some View {
+        menuRow(label: label, currentValue: binding.wrappedValue.rawValue) {
+            ForEach(Settings.ColorScheme.allCases) { scheme in
+                Button {
+                    binding.wrappedValue = scheme
+                } label: {
+                    HStack {
+                        Text(scheme.rawValue)
+                        if binding.wrappedValue == scheme {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func rotationMenuRow(label: String,
+                                 binding: Binding<Settings.RotationSpeed>) -> some View {
+        menuRow(label: label, currentValue: binding.wrappedValue.rawValue) {
+            ForEach(Settings.RotationSpeed.allCases) { speed in
+                Button {
+                    binding.wrappedValue = speed
+                } label: {
+                    HStack {
+                        Text(speed.rawValue)
+                        if binding.wrappedValue == speed {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Shared row layout used by all three menu helpers. The whole row — label
+    /// text included — is clickable; clicking anywhere opens the dropdown.
+    @ViewBuilder
+    private func menuRow<Content: View>(label: String,
+                                        currentValue: String,
+                                        @ViewBuilder content: () -> Content) -> some View {
+        Menu {
+            content()
+        } label: {
+            HStack(spacing: 8) {
+                Text("\(label):")
+                    .frame(width: 100, alignment: .leading)
+                    .foregroundColor(.primary)
+                Spacer()
+                Text(currentValue)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color(NSColor.controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(Color.secondary.opacity(0.25), lineWidth: 0.5))
+            .contentShape(Rectangle())   // makes the whole row hit-test
+        }
+        .buttonStyle(.plain)
+        .menuStyle(.borderlessButton)
     }
 
     /// Fifth tile that accepts a dragged file and renders it live with the current
