@@ -47,24 +47,42 @@ final class ThumbnailProvider: QLThumbnailProvider {
                log: thumbLog, type: .info, request.fileURL.path, ext, size.width, size.height)
 
         let atoms = Self.parseAtoms(from: request.fileURL, ext: ext)
-        if let atoms = atoms, !atoms.isEmpty {
-            os_log("parsed %{public}d atoms — rendering molecule",
-                   log: thumbLog, type: .info, atoms.count)
-            let reply = QLThumbnailReply(contextSize: size) { cgCtx -> Bool in
-                Self.withNSGraphicsContext(cgCtx) {
-                    Self.drawMolecule(atoms: atoms, ext: ext,
-                                      in: NSRect(origin: .zero, size: size))
-                }
-                return true
+
+        // Render to a temp PNG and hand Finder a file URL rather than a
+        // drawing block. The `imageFileURL:` initializer tells the system
+        // "this is a pre-rendered full-bleed thumbnail" and skips the
+        // document-page template wrap that `drawing:` triggers at small
+        // list-view icon sizes (the wrap appears as a white page with our
+        // thumbnail embedded in the lower half). For icon-view sizes the
+        // result is identical; for list-view the URL form is full-bleed.
+        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("qlp-thumb-\(UUID().uuidString).png")
+        let renderedOK = Self.renderToPNG(at: tempURL, size: size) { rect in
+            if let atoms = atoms, !atoms.isEmpty {
+                Self.drawMolecule(atoms: atoms, ext: ext, in: rect)
+            } else {
+                Self.drawAtomGlyph(ext: ext, in: rect)
             }
-            handler(reply, nil)
+        }
+        if renderedOK {
+            os_log("returning imageFileURL thumbnail (%{public}@)",
+                   log: thumbLog, type: .info, tempURL.path)
+            handler(QLThumbnailReply(imageFileURL: tempURL), nil)
             return
         }
 
-        os_log("could not parse atoms — drawing glyph fallback", log: thumbLog, type: .info)
+        // Last-ditch fallback: use the drawing-block init even though it
+        // may get the doc-template wrap. Better a wrapped thumbnail than
+        // none at all.
+        os_log("PNG render failed — falling back to drawing block", log: thumbLog, type: .error)
         let reply = QLThumbnailReply(contextSize: size) { cgCtx -> Bool in
             Self.withNSGraphicsContext(cgCtx) {
-                Self.drawAtomGlyph(ext: ext, in: NSRect(origin: .zero, size: size))
+                if let atoms = atoms, !atoms.isEmpty {
+                    Self.drawMolecule(atoms: atoms, ext: ext,
+                                      in: NSRect(origin: .zero, size: size))
+                } else {
+                    Self.drawAtomGlyph(ext: ext, in: NSRect(origin: .zero, size: size))
+                }
             }
             return true
         }
@@ -77,6 +95,41 @@ final class ThumbnailProvider: QLThumbnailProvider {
         NSGraphicsContext.current = nsCtx
         body()
         NSGraphicsContext.restoreGraphicsState()
+    }
+
+    /// Renders `body` into a backed NSBitmapImageRep at the requested
+    /// size, writes the PNG to disk, returns true on success. Pre-rendering
+    /// like this is how we hand Finder a full-bleed thumbnail via the
+    /// `imageFileURL:` init — see the comment in provideThumbnail.
+    private static func renderToPNG(at url: URL,
+                                    size: CGSize,
+                                    body: (NSRect) -> Void) -> Bool {
+        guard let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: Int(size.width),
+                pixelsHigh: Int(size.height),
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0)
+        else { return false }
+        guard let nsCtx = NSGraphicsContext(bitmapImageRep: rep) else { return false }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = nsCtx
+        body(NSRect(origin: .zero, size: size))
+        NSGraphicsContext.restoreGraphicsState()
+        guard let png = rep.representation(using: .png, properties: [:]) else { return false }
+        do {
+            try png.write(to: url, options: .atomic)
+            return true
+        } catch {
+            os_log("PNG write failed: %{public}@", log: thumbLog, type: .error,
+                   error.localizedDescription)
+            return false
+        }
     }
 
     // MARK: - Atom model
