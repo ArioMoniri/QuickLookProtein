@@ -20,7 +20,13 @@
 
 **macOS:** unzip / open the disk image, drag **QuickLookProtein.app** into **Applications**, then hit <kbd>Space</kbd> on any `.pdb` / `.cif` / `.mol2` / etc. file in Finder.
 
-**Windows:** install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest), download the `.qlplugin`, double-click it while QuickLook is running, restart QuickLook from the tray, then hit <kbd>Space</kbd> on a supported file in Explorer.
+**Windows (one-liner):** paste this into PowerShell — it installs [QuickLook](https://github.com/QL-Win/QuickLook) if you don't already have it, fetches the latest signed plugin, drops it into `%LocalAppData%\QuickLook\plugins\QuickLookProtein\`, and restarts the QuickLook tray app:
+
+```powershell
+irm https://raw.githubusercontent.com/ArioMoniri/QuickLookProtein/feature/ario-signed/Windows/install.ps1 | iex
+```
+
+Prefer the manual route? Install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest), download the `.qlplugin` from the [latest release](https://github.com/ArioMoniri/QuickLookProtein/releases/latest), double-click it while QuickLook is running, restart QuickLook from the tray, then hit <kbd>Space</kbd> on a supported file in Explorer.
 
 > 🔱 This is **[Ariorad Moniri](https://github.com/ArioMoniri)'s signed fork** of the original [QuickLookProtein by Jethro Hemmann](https://github.com/JethroHemmann/QuickLookProtein), distributed via [releases on this fork](https://github.com/ArioMoniri/QuickLookProtein/releases) and notarised under Apple Developer team `FF68N39FU5`. Looking for the upstream pull request? See [the PR branch](https://github.com/ArioMoniri/QuickLookProtein/tree/feature/3dmol-upgrade).
 

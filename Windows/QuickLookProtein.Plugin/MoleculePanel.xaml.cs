@@ -39,6 +39,9 @@ public partial class MoleculePanel : UserControl, IDisposable
 
     public async void LoadFile(string path, ContextObject context)
     {
+        // Surface the filename on the splash before WebView2 starts —
+        // gives the user something to recognise while the renderer warms.
+        SplashTitle.Text = $"Loading {Path.GetFileName(path)}…";
         try
         {
             await LoadFileAsync(path, context);
@@ -118,6 +121,16 @@ public partial class MoleculePanel : UserControl, IDisposable
             browserExecutableFolder: null,
             userDataFolder: userDataFolder);
         await WebView.EnsureCoreWebView2Async(env);
+
+        // Hide the splash once the WebView has fully painted. We use
+        // NavigationCompleted (not ContentLoading) because the WebGL
+        // canvas inside the page only becomes visible after 3Dmol's
+        // `viewer.render()` runs, and that happens in the page's load
+        // handler — by NavigationCompleted, the molecule is on screen.
+        WebView.CoreWebView2.NavigationCompleted += (_, _) =>
+        {
+            Splash.Visibility = System.Windows.Visibility.Collapsed;
+        };
     }
 
     /// Substitute every <c>{KEY}</c> placeholder the macOS viewer
@@ -208,6 +221,10 @@ public partial class MoleculePanel : UserControl, IDisposable
 
     private static string BuildErrorHtml(string title, string detail)
     {
+        // Slightly fancier error page than the previous one-liner: shows a
+        // branded header, the actual error, and a hint about supported
+        // formats so the user can tell at a glance whether the failure is
+        // "this format isn't supported" vs "the file is malformed".
         var safeTitle  = System.Net.WebUtility.HtmlEncode(title);
         var safeDetail = System.Net.WebUtility.HtmlEncode(detail);
         return $@"
@@ -216,18 +233,50 @@ public partial class MoleculePanel : UserControl, IDisposable
 <head>
   <meta charset=""utf-8"">
   <style>
-    html, body {{ margin: 0; height: 100%; display: flex;
-                  align-items: center; justify-content: center;
-                  background: #111; color: #ffb0b0;
-                  font: 13px -apple-system, 'Segoe UI', sans-serif;
-                  text-align: center; padding: 24px; }}
-    .t {{ font-weight: 600; color: #ff8a8a; margin-bottom: 6px; }}
+    :root {{ color-scheme: dark; }}
+    html, body {{ margin: 0; height: 100%; background: #0e0e10;
+                  color: #e6e6e8; font: 13px/1.45 'Segoe UI Variable',
+                  'Segoe UI', -apple-system, BlinkMacSystemFont,
+                  Helvetica, Arial, sans-serif; }}
+    .wrap {{ height: 100%; display: flex; align-items: center;
+             justify-content: center; padding: 24px; }}
+    .card {{ max-width: 480px; padding: 28px 30px; border-radius: 14px;
+             background: linear-gradient(180deg, #1c1c20, #131316);
+             border: 1px solid #2a2a2e; text-align: center;
+             box-shadow: 0 8px 24px rgba(0,0,0,0.45); }}
+    .icon {{ width: 52px; height: 52px; border-radius: 12px;
+             background: rgba(255, 102, 102, 0.14);
+             color: #ff8a8a; display: inline-flex; align-items: center;
+             justify-content: center; font-size: 28px;
+             margin-bottom: 14px; }}
+    .title {{ font-size: 16px; font-weight: 600;
+              color: #ff8a8a; margin-bottom: 6px; }}
+    .detail {{ font-size: 13px; color: #c8c8cc; margin-bottom: 14px;
+               word-break: break-word; }}
+    .hint {{ font-size: 11.5px; color: #8a8a90; line-height: 1.55; }}
+    code {{ font-family: 'Cascadia Code', 'JetBrains Mono', Consolas,
+            monospace; font-size: 11px;
+            background: rgba(255,255,255,0.04); padding: 2px 5px;
+            border-radius: 4px; }}
   </style>
 </head>
 <body>
-  <div>
-    <div class=""t"">{safeTitle}</div>
-    <div>{safeDetail}</div>
+  <div class=""wrap"">
+    <div class=""card"">
+      <div class=""icon"">!</div>
+      <div class=""title"">{safeTitle}</div>
+      <div class=""detail"">{safeDetail}</div>
+      <div class=""hint"">
+        Supported formats:
+        <code>.pdb</code> <code>.cif</code> <code>.sdf</code>
+        <code>.mol</code> <code>.mol2</code> <code>.xyz</code>
+        <code>.gro</code> <code>.cube</code> <code>.pqr</code>
+        <code>.vasp</code> <code>.cdjson</code> <code>.mmtf</code>
+        <br>If your file is one of these and still fails to render,
+        please open an issue at
+        github.com/ArioMoniri/QuickLookProtein
+      </div>
+    </div>
   </div>
 </body>
 </html>";

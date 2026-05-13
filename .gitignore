@@ -92,3 +92,8 @@ fastlane/test_output
 # https://github.com/johnno1962/injectionforxcode
 
 iOSInjectionProject/
+
+# .NET / Windows plugin build output
+Windows/**/bin/
+Windows/**/obj/
+Windows/**/libs/QuickLook.Common.dll

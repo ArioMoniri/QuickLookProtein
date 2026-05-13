@@ -6,6 +6,22 @@ The renderer is the same `3Dmol.js` and `viewer.html` that ship in the macOS app
 
 ## Install
 
+### One-liner (recommended)
+
+```powershell
+irm https://raw.githubusercontent.com/ArioMoniri/QuickLookProtein/feature/ario-signed/Windows/install.ps1 | iex
+```
+
+What it does:
+1. Detects whether [QuickLook](https://github.com/QL-Win/QuickLook) is installed; if not, downloads and runs the official QL-Win installer.
+2. Fetches **QuickLookProtein-X.Y.Z.qlplugin** from the [latest release](https://github.com/ArioMoniri/QuickLookProtein/releases/latest).
+3. Extracts it into `%LocalAppData%\QuickLook\plugins\QuickLookProtein\` (per-user, no admin needed).
+4. Restarts QuickLook so the new plugin is picked up immediately.
+
+Re-runs upgrade in place. To uninstall, delete the plugin folder.
+
+### Manual
+
 1. Install [QuickLook](https://github.com/QL-Win/QuickLook/releases/latest) (free, GPL-3, the Windows-side Quick Look daemon — required host for this plugin).
 2. Download **QuickLookProtein-X.Y.Z.qlplugin** from the [latest release](https://github.com/ArioMoniri/QuickLookProtein/releases/latest).
 3. Either double-click the `.qlplugin` while QuickLook is running, **or** extract it into `%LocalAppData%\QuickLook\plugins\`.

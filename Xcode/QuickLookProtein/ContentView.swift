@@ -131,121 +131,19 @@ struct ContentView: View {
                     }
                     .padding()
 
-                    // MARK: About — kept compact so the live previews below have room
-                    VStack(alignment: .leading, spacing: 6) {
+                    // MARK: About — three card-style sections (Updates, Credits,
+                    //               Troubleshooting). The big shift from the old layout
+                    //               is that "Check for updates" is now the primary CTA
+                    //               in its own card, with a colored icon + version line
+                    //               + prominent button, rather than a tiny right-aligned
+                    //               control next to "Installed version:".
+                    VStack(alignment: .leading, spacing: 14) {
                         Text("About").font(.title).padding(.bottom, 2)
 
-                        Text("Originally by Jethro Hemmann (2021–2022).")
-                            .font(.callout)
-                        Text("Extended by Ariorad Moniri (2026) — multi-format, smart styling, surface, thumbnails, Spotlight, auto-update.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Link("github.com/ArioMoniri/QuickLookProtein",
-                             destination: URL(string: "https://github.com/ArioMoniri/QuickLookProtein")!)
-                            .font(.callout)
-
-                        // Prominent download CTA — opens the GitHub Releases
-                        // page so users running the dev build or a friend's
-                        // copy can grab the latest signed/notarised .zip.
-                        // The in-place Sparkle "Check for updates" path is
-                        // still below; this is a separate manual download
-                        // that always works even before SUPublicEDKey is
-                        // configured for the build.
-                        Button(action: {
-                            if let url = URL(string: "https://github.com/ArioMoniri/QuickLookProtein/releases/latest") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.down.circle.fill")
-                                Text("Download latest release")
-                            }
-                            .font(.callout)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                        }
-                        .padding(.top, 6)
-                        .help("Open the GitHub Releases page and download the latest QuickLookProtein.zip")
-
-                        if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                            HStack(spacing: 8) {
-                                Text("Installed version: \(appVersion)")
-                                    .font(.callout)
-                                Button("Check for updates") { updater.checkForUpdates() }
-                                    .controlSize(.small)
-                                    .disabled(!updater.canCheck)
-                            }
-                            .padding(.top, 2)
-                        }
-
-                        if !updater.lastCheckStatus.isEmpty {
-                            Text(updater.lastCheckStatus)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Text("Tip: click any atom in a preview to see its residue and chain.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 4)
-
-                        // Quick Look troubleshooting — common after upgrading from
-                        // upstream because the old extension's bundle ID differs
-                        // and macOS keeps both registered until the old app is
-                        // deleted + caches cleared. Two buttons that drive the
-                        // user to the right system pane / Finder location.
-                        DisclosureGroup("Quick Look not updating?") {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("After installing a new version, macOS may still use a previously-installed extension. Two clicks to fix:")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-
-                                HStack(spacing: 8) {
-                                    Button("Open Extensions settings") {
-                                        if let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences") {
-                                            NSWorkspace.shared.open(url)
-                                        }
-                                    }
-                                    .controlSize(.small)
-                                    Button("Reveal /Applications") {
-                                        NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
-                                    }
-                                    .controlSize(.small)
-                                }
-
-                                Text("Then run this in Terminal to flush macOS's Quick Look caches:")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                HStack(spacing: 6) {
-                                    Text("qlmanage -r && qlmanage -r cache")
-                                        .font(.system(.caption, design: .monospaced))
-                                        .padding(.vertical, 4).padding(.horizontal, 6)
-                                        .background(Color.secondary.opacity(0.12))
-                                        .cornerRadius(4)
-                                    Button("Copy") {
-                                        let pb = NSPasteboard.general
-                                        pb.clearContents()
-                                        pb.setString("qlmanage -r && qlmanage -r cache", forType: .string)
-                                    }
-                                    .controlSize(.small)
-                                }
-                            }
-                            .padding(.top, 4)
-                        }
-                        .font(.caption)
-                        .padding(.top, 6)
-
-                        Text("Rendered by 3Dmol.js (Rego & Koes, 2015).")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 8)
-                        Link("3dmol.csb.pitt.edu",
-                             destination: URL(string: "https://3dmol.csb.pitt.edu")!)
-                            .font(.caption2)
+                        updatesCard
+                        creditsCard
+                        troubleshootingCard
+                        footerCredit
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -311,6 +209,203 @@ struct ContentView: View {
     @ViewBuilder
     private var atomStyleOptions: some View {
         ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue).tag($0) }
+    }
+
+    // MARK: - About card sections
+
+    /// Top card — version, last-check status, and the two big update buttons.
+    /// "Check for Updates" is the primary action (filled blue pill); the
+    /// fallback "Download Latest Release" is a quieter secondary action that
+    /// still works when Sparkle isn't configured for this build.
+    @ViewBuilder
+    private var updatesCard: some View {
+        let installedVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "—"
+        let buildNumber      = (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? ""
+
+        AboutCard {
+            HStack(alignment: .top, spacing: 14) {
+                CardIcon(systemName: "arrow.triangle.2.circlepath.circle.fill",
+                         tint: .blue)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Software Updates")
+                        .font(.headline)
+                    Text("Get the latest signed and notarised release. Updates are verified with Sparkle's EdDSA signature before installing.")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Version + status row
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundColor(.green)
+                        Text("Installed version: \(installedVersion)")
+                            .font(.callout)
+                            .fontWeight(.medium)
+                        if !buildNumber.isEmpty && buildNumber != installedVersion {
+                            Text("(build \(buildNumber))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.top, 2)
+
+                    if !updater.lastCheckStatus.isEmpty {
+                        Text(updater.lastCheckStatus)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    // Action row — primary CTA on the left, fallback on the right.
+                    HStack(spacing: 10) {
+                        Button(action: { updater.checkForUpdates() }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                Text("Check for Updates")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .buttonStyle(PrimaryPillButtonStyle())
+                        .disabled(!updater.canCheck)
+                        .help("Ask Sparkle to check the appcast for a newer signed release. If one is available you'll get a standard 'Install Update' dialog.")
+
+                        Button(action: {
+                            if let url = URL(string: "https://github.com/ArioMoniri/QuickLookProtein/releases/latest") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.down.circle")
+                                Text("Download from GitHub")
+                            }
+                        }
+                        .buttonStyle(SecondaryPillButtonStyle())
+                        .help("Open the GitHub Releases page and download the latest QuickLookProtein.zip manually.")
+                    }
+                    .padding(.top, 6)
+                }
+            }
+        }
+    }
+
+    /// Middle card — original author + extender credits, repo link, and a tip
+    /// row. Lighter visual weight than the updates card.
+    @ViewBuilder
+    private var creditsCard: some View {
+        AboutCard {
+            HStack(alignment: .top, spacing: 14) {
+                CardIcon(systemName: "person.2.crop.square.stack.fill",
+                         tint: .purple)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Credits & Source")
+                        .font(.headline)
+
+                    Text("Originally built by Jethro Hemmann (2021–2022).")
+                        .font(.callout)
+                    Text("Extended by Ariorad Moniri (2026) — multi-format support, smart protein+ligand styling, molecular surfaces, Finder thumbnails, Spotlight indexing, drag-and-drop preview, and Sparkle auto-update.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "link")
+                            .foregroundColor(.secondary)
+                        Link("github.com/ArioMoniri/QuickLookProtein",
+                             destination: URL(string: "https://github.com/ArioMoniri/QuickLookProtein")!)
+                            .font(.callout)
+                    }
+                    .padding(.top, 2)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundColor(.yellow)
+                        Text("Tip: click any atom in a preview to see its residue and chain.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.top, 2)
+                }
+            }
+        }
+    }
+
+    /// Bottom card — collapsible Quick Look troubleshooting. Most users won't
+    /// need it; collapse by default so it doesn't dominate the panel.
+    @ViewBuilder
+    private var troubleshootingCard: some View {
+        AboutCard {
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("After installing a new version, macOS may still use a previously-installed extension. Two clicks to fix:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 8) {
+                        Button("Open Extensions settings") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .controlSize(.small)
+                        Button("Reveal /Applications") {
+                            NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+                        }
+                        .controlSize(.small)
+                    }
+
+                    Text("Then flush macOS's Quick Look caches from Terminal:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 6) {
+                        Text("qlmanage -r && qlmanage -r cache")
+                            .font(.system(.caption, design: .monospaced))
+                            .padding(.vertical, 4).padding(.horizontal, 6)
+                            .background(Color.secondary.opacity(0.12))
+                            .cornerRadius(4)
+                        Button("Copy") {
+                            let pb = NSPasteboard.general
+                            pb.clearContents()
+                            pb.setString("qlmanage -r && qlmanage -r cache", forType: .string)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+                .padding(.top, 6)
+            } label: {
+                HStack(spacing: 10) {
+                    CardIcon(systemName: "wrench.and.screwdriver.fill",
+                             tint: .orange,
+                             size: 32)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Quick Look not updating?")
+                            .font(.headline)
+                        Text("Reset macOS's Quick Look cache after upgrading.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Tiny footer below the cards — 3Dmol.js attribution.
+    @ViewBuilder
+    private var footerCredit: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Rendered by 3Dmol.js (Rego & Koes, 2015).")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            Link("3dmol.csb.pitt.edu",
+                 destination: URL(string: "https://3dmol.csb.pitt.edu")!)
+                .font(.caption2)
+        }
+        .padding(.leading, 4)
+        .padding(.top, 2)
     }
 
     /// Ninth tile — accepts a drag-and-drop *or* a click to open an
@@ -474,6 +569,97 @@ struct ContentView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
+    }
+}
+
+// MARK: - Reusable card chrome
+//
+// Single-source styling for the three About-panel cards so they share
+// padding, corner radius, and background treatment. Kept simple
+// (Color.secondary.opacity → cornerRadius → overlay) because
+// `.regularMaterial` / `.background(.thinMaterial)` would require macOS 12
+// and the project's deployment target is 11.
+
+struct AboutCard<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(NSColor.controlBackgroundColor).opacity(0.65))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
+            )
+    }
+}
+
+/// Colored, rounded-square icon plate used at the leading edge of each card.
+/// Mirrors the look of macOS Settings rows (e.g. iCloud, AirDrop) where each
+/// section has a tinted glyph plate. `tint.opacity(0.18)` gives a soft fill,
+/// `tint` colors the SF Symbol on top.
+struct CardIcon: View {
+    let systemName: String
+    let tint: Color
+    var size: CGFloat = 36
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(tint.opacity(0.18))
+            Image(systemName: systemName)
+                .font(.system(size: size * 0.55, weight: .semibold))
+                .foregroundColor(tint)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// Big blue filled pill — the primary "Check for Updates" CTA. Custom
+/// ButtonStyle (rather than `.borderedProminent`) because that style is
+/// macOS 12+, and we still target 11.
+struct PrimaryPillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.callout)
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.accentColor)
+                    .opacity(configuration.isPressed ? 0.75 : 1.0)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+/// Quieter outlined pill — used for the secondary "Download from GitHub"
+/// fallback and other neutral actions in the About panel.
+struct SecondaryPillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.callout)
+            .foregroundColor(.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.secondary.opacity(configuration.isPressed ? 0.18 : 0.10))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
