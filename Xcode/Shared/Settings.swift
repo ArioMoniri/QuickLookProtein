@@ -131,6 +131,15 @@ class SettingsStorage: ObservableObject {
     }
 
     /// Resolve the configured AtomStyle for a given file extension (lowercased, no dot).
+    ///
+    /// Small-molecule formats (PQR, VASP/POSCAR, CDJSON) default to `.stick`
+    /// rather than falling through to `atomStylePDB`. The cartoon style requires
+    /// protein backbone atoms (N/CA/C/O), so any small-molecule file that gets
+    /// the cartoon treatment renders as an empty viewport. The viewer template
+    /// has a `cartoon` → `stick` fallback gated on protein detection, but that
+    /// gate trips on residue-name lookups (e.g. a PQR file using "MET" for
+    /// methane is misclassified as methionine and gets cartoon), so we'd
+    /// rather not rely on it.
     func atomStyle(forExtension ext: String) -> Settings.AtomStyle {
         switch ext.lowercased() {
         case "pdb", "ent", "pdbqt":  return atomStylePDB
@@ -141,7 +150,10 @@ class SettingsStorage: ObservableObject {
         case "mol":                  return atomStyleMOL
         case "gro":                  return atomStyleGRO
         case "cube", "cub":          return atomStyleCUBE
-        default:                     return atomStylePDB
+        case "pqr":                  return .stick   // PQR is PDB-shaped but typically small molecules
+        case "vasp", "poscar":       return .stick   // VASP/POSCAR crystals — sticks beat empty cartoon
+        case "cdjson", "json":       return .stick   // ChemDoodle JSON small molecules
+        default:                     return .stick   // unknown small-molecule formats — better than empty
         }
     }
 }
