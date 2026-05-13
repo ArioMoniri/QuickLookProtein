@@ -4,6 +4,47 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.15] — 2026-05-14
+
+### 🐛 Fixed
+
+- **Thumbnail handler registration was binding to a wrong assembly
+  version**. `install.ps1` hard-coded `Version=0.0.0.0` in the
+  `Assembly` value of the InProcServer32 key, but MSBuild defaults
+  the actual DLL to `1.0.0.0`. mscoree's COM-to-CLR bridge couldn't
+  find a matching type, Explorer fell back to the generic icon.
+  install.ps1 now reads the version + culture + public-key-token
+  directly from the DLL via `Reflection.AssemblyName.GetAssemblyName`
+  and writes the actual `FullName`. This is the kind of latent bug
+  you only catch by reading what the registry says vs. what the
+  loader does, hence the audit.
+
+### 🆕 Added
+
+- **CIF / mmCIF parser** in the thumbnail provider. Walks the
+  `_atom_site` loop, locates the `Cartn_x/_y/_z` and `type_symbol`
+  columns by name (so different small-mol / mmCIF column orders all
+  work), reads up to 5,000 atoms.
+- **Gaussian Cube parser** in the thumbnail provider. Skips the
+  voxel-axis header and parses the atom block, converting Bohr
+  radii to Ångströms so the renderer's existing scale heuristics
+  apply unchanged. Compact atomic-number → element table covering
+  the common biology / chemistry set.
+- **SniffFormat** now detects CIF (looks for `data_` + `_atom_site`)
+  and Cube (looks for the counts-line + 3 axis-lines pattern), so
+  even renamed-extension files thumb correctly.
+
+## [1.7.14] — 2026-05-14
+
+### 🐛 Fixed
+
+- Compile error in the new thumbnail project — `WTS_ALPHATYPE` enum
+  and `IThumbnailProvider` / `IInitializeWithStream` interfaces were
+  internal but referenced by the public `MoleculeThumbnailProvider`'s
+  public method signatures. C# refused with `CS0051: Inconsistent
+  accessibility`. Promoted them to public; COM consumers don't
+  observe C# accessibility anyway.
+
 ## [1.7.13] — 2026-05-14
 
 ### 🐛 Fixed

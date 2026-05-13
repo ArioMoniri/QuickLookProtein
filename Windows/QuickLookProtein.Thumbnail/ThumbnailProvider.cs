@@ -174,10 +174,20 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
     private static string SniffFormat(byte[] data)
     {
         // Look at the first ~4KB and dispatch on simple markers.
+        // Order matters: more-specific signatures first, generic
+        // fallbacks last.
         int n = Math.Min(data.Length, 4096);
         var head = System.Text.Encoding.UTF8.GetString(data, 0, n);
 
         if (head.Contains("@<TRIPOS>"))               return "mol2";
+        // CIF / mmCIF: starts with "data_" and contains "_atom_site"
+        // somewhere in the header. We check both because some PDB
+        // files have stray "data_" in their REMARK lines.
+        if (head.StartsWith("data_", StringComparison.Ordinal)
+            && head.IndexOf("_atom_site", StringComparison.Ordinal) >= 0)
+        {
+            return "cif";
+        }
         if (head.IndexOf("HETATM", StringComparison.Ordinal) >= 0
          || head.IndexOf("ATOM  ", StringComparison.Ordinal) >= 0)
         {
@@ -185,18 +195,58 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
         }
         // MOL/SDF V2000: line 4 has "  N  M  ...V2000"
         if (head.Contains("V2000"))                   return "mol";
-        // XYZ: first line is just an integer
-        var firstLine = head.Split('\n')[0].Trim();
-        if (int.TryParse(firstLine, out _))           return "xyz";
-        // GRO: first line is title, second is integer atom count.
-        // Easy false-positive with XYZ; check by looking at the
-        // *third* line's column 21 (GRO's x-coord field).
+
         var lines = head.Split('\n');
+
+        // Gaussian Cube: 2 comment lines, then a counts line where
+        // the first token is +/- atom count and 3 floats follow.
+        // We check for "5 numeric tokens on line 3 + 4 + 5 + 6".
+        if (lines.Length >= 6
+            && LooksLikeCubeCountsLine(lines[2])
+            && LooksLikeCubeAxisLine(lines[3])
+            && LooksLikeCubeAxisLine(lines[4])
+            && LooksLikeCubeAxisLine(lines[5]))
+        {
+            return "cube";
+        }
+
+        // GRO: first line is title, second is integer atom count, third
+        // has 8-char-wide coordinate fields starting at col 20.
         if (lines.Length >= 3 && int.TryParse(lines[1].Trim(), out _)
             && lines[2].Length > 44)
         {
             return "gro";
         }
+
+        // XYZ: first line is just an integer. Check this AFTER the
+        // GRO check to avoid false positives (GRO's line 2 is also
+        // an integer).
+        var firstLine = lines[0].Trim();
+        if (int.TryParse(firstLine, out _))           return "xyz";
+
         return "pdb";  // best-effort fallback
+    }
+
+    private static bool LooksLikeCubeCountsLine(string line)
+    {
+        var parts = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 4) return false;
+        if (!int.TryParse(parts[0], out _)) return false;
+        for (int i = 1; i < 4; i++)
+            if (!float.TryParse(parts[i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                return false;
+        return true;
+    }
+
+    private static bool LooksLikeCubeAxisLine(string line)
+    {
+        // Axis lines: voxel-count followed by 3 floats (the basis vector).
+        var parts = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 4) return false;
+        if (!int.TryParse(parts[0], out _)) return false;
+        for (int i = 1; i < 4; i++)
+            if (!float.TryParse(parts[i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                return false;
+        return true;
     }
 }

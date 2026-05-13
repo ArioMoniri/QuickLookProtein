@@ -317,12 +317,30 @@ function Register-ThumbnailHandler {
     Set-ItemProperty -Path "$clsidKey" -Name "(Default)" -Value "QuickLookProtein Thumbnail Provider"
     Set-ItemProperty -Path "$clsidKey" -Name "DisableProcessIsolation" -Value 1 -Type DWord
 
+    # Resolve the actual assembly name / version / culture / public-
+    # key-token from the DLL on disk so the InProcServer32\Assembly
+    # value matches exactly what mscoree's CLR loader will see. Hard-
+    # coding "Version=0.0.0.0" worked until v1.7.13 when MSBuild
+    # started emitting Version=1.0.0.0 by default - the registry
+    # value drifted out of sync and Explorer couldn't bind to the
+    # type. Reading from the DLL keeps this in lock-step regardless
+    # of csproj changes.
+    try {
+        $asmName = [System.Reflection.AssemblyName]::GetAssemblyName($thumbDll)
+        $asmFullName = $asmName.FullName
+    } catch {
+        # Last-ditch fallback. If GetAssemblyName fails the DLL is
+        # corrupt or not a .NET assembly anyway, but at least leave
+        # a registry entry that documents what we tried.
+        $asmFullName = "QuickLookProtein.Thumbnail, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"
+    }
+
     $inproc = "$clsidKey\InProcServer32"
     New-Item -Path $inproc -Force | Out-Null
     Set-ItemProperty -Path $inproc -Name "(Default)"      -Value "mscoree.dll"
     Set-ItemProperty -Path $inproc -Name "ThreadingModel" -Value "Both"
     Set-ItemProperty -Path $inproc -Name "Class"          -Value "QuickLookProtein.Thumbnail.MoleculeThumbnailProvider"
-    Set-ItemProperty -Path $inproc -Name "Assembly"       -Value "QuickLookProtein.Thumbnail, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"
+    Set-ItemProperty -Path $inproc -Name "Assembly"       -Value $asmFullName
     Set-ItemProperty -Path $inproc -Name "RuntimeVersion" -Value "v4.0.30319"
     Set-ItemProperty -Path $inproc -Name "CodeBase"       -Value ("file:///" + ($thumbDll -replace '\\','/'))
 

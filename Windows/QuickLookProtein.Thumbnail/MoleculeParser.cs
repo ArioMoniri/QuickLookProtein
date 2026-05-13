@@ -37,12 +37,188 @@ internal static class MoleculeParser
         return ext switch
         {
             "pdb" or "ent" or "pdbqt" or "pqr" => ParsePdb(reader),
-            "mol" or "sdf" => ParseMol(reader),
-            "mol2"         => ParseMol2(reader),
-            "xyz"          => ParseXyz(reader),
-            "gro"          => ParseGro(reader),
-            _              => null,
+            "mol" or "sdf"        => ParseMol(reader),
+            "mol2"                => ParseMol2(reader),
+            "xyz"                 => ParseXyz(reader),
+            "gro"                 => ParseGro(reader),
+            "cif" or "mmcif"      => ParseCif(reader),
+            "cube" or "cub"       => ParseCube(reader),
+            _                     => null,
         };
+    }
+
+    /// <summary>
+    /// Parse the atom_site loop of a CIF / mmCIF file. Handles both
+    /// small-molecule CIF (one block, simple key-value) and the much
+    /// more common macromolecular mmCIF (loop_-driven). We only need
+    /// the Cartesian coordinates + element identifiers, so we walk
+    /// the loop column headers, note which columns hold what, and
+    /// read each data row by index.
+    /// </summary>
+    private static List<Atom> ParseCif(StreamReader r)
+    {
+        var atoms = new List<Atom>();
+        string? line;
+        // Step 1: scan to a `loop_` whose first column is an
+        // `_atom_site.*` (mmCIF) or `_atom_site_*` (small-mol CIF).
+        bool inLoopHeader = false;
+        var loopColumns = new List<string>();
+        while ((line = r.ReadLine()) != null)
+        {
+            var t = line.Trim();
+            if (t.Length == 0 || t.StartsWith("#")) continue;
+            if (t.Equals("loop_", StringComparison.Ordinal))
+            {
+                inLoopHeader = true;
+                loopColumns.Clear();
+                continue;
+            }
+            if (inLoopHeader && t.StartsWith("_"))
+            {
+                loopColumns.Add(t);
+                continue;
+            }
+            if (inLoopHeader && loopColumns.Count > 0)
+            {
+                // First non-header line - either we're in the right
+                // loop (atom_site) or we should skip its rows and
+                // keep scanning for the right loop.
+                var first = loopColumns[0];
+                bool isAtomLoop = first.StartsWith("_atom_site.") || first.StartsWith("_atom_site_");
+                if (!isAtomLoop)
+                {
+                    // Skip rows until the next directive.
+                    while (line != null && !line.TrimStart().StartsWith("_") && !line.TrimStart().StartsWith("loop_") && !line.TrimStart().StartsWith("data_"))
+                    {
+                        line = r.ReadLine();
+                    }
+                    inLoopHeader = false;
+                    if (line == null) break;
+                    // Rewind logic isn't possible with StreamReader;
+                    // re-evaluate the current line by falling through.
+                    if (line.TrimStart().Equals("loop_", StringComparison.Ordinal))
+                    {
+                        inLoopHeader = true;
+                        loopColumns.Clear();
+                    }
+                    continue;
+                }
+
+                // Find column indices we care about.
+                int idxX = FindColumn(loopColumns, "Cartn_x", "x");
+                int idxY = FindColumn(loopColumns, "Cartn_y", "y");
+                int idxZ = FindColumn(loopColumns, "Cartn_z", "z");
+                int idxSymbol = FindColumn(loopColumns, "type_symbol");
+                int idxLabel  = FindColumn(loopColumns, "label_atom_id", "auth_atom_id");
+                if (idxX < 0 || idxY < 0 || idxZ < 0) { inLoopHeader = false; continue; }
+
+                // Read rows until we hit another directive / EOF.
+                // CIF rows can wrap across multiple lines if a value
+                // is quoted with semicolons - we don't bother with
+                // that here since coordinates and elements never use
+                // multi-line values.
+                inLoopHeader = false;
+                do
+                {
+                    var rowText = line!.Trim();
+                    if (rowText.Length == 0 || rowText.StartsWith("#")) continue;
+                    if (rowText.StartsWith("_") || rowText.StartsWith("loop_") || rowText.StartsWith("data_")) break;
+                    var parts = rowText.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length <= Math.Max(idxX, Math.Max(idxY, idxZ))) continue;
+                    if (!float.TryParse(parts[idxX], NumberStyles.Float, CultureInfo.InvariantCulture, out var x)) continue;
+                    if (!float.TryParse(parts[idxY], NumberStyles.Float, CultureInfo.InvariantCulture, out var y)) continue;
+                    if (!float.TryParse(parts[idxZ], NumberStyles.Float, CultureInfo.InvariantCulture, out var z)) continue;
+                    string element = "";
+                    if (idxSymbol >= 0 && idxSymbol < parts.Length) element = parts[idxSymbol];
+                    else if (idxLabel >= 0 && idxLabel < parts.Length)
+                        element = ExtractElementFromAtomName(parts[idxLabel].Trim('"', '\''));
+                    if (string.IsNullOrEmpty(element)) element = "C";
+                    atoms.Add(new Atom(x, y, z, element));
+                    if (atoms.Count >= MaxAtoms) return atoms;
+                } while ((line = r.ReadLine()) != null);
+                break;
+            }
+        }
+        return atoms;
+    }
+
+    private static int FindColumn(List<string> cols, params string[] candidates)
+    {
+        for (int i = 0; i < cols.Count; i++)
+        {
+            var name = cols[i];
+            // Strip "_atom_site." / "_atom_site_" / "_" prefixes.
+            var dot = name.IndexOf('.');
+            string bare = dot >= 0 ? name.Substring(dot + 1) : name.TrimStart('_');
+            // mmCIF uses Cartn_x; small-molecule CIF uses atom_site_fract_x or atom_site_Cartn_x
+            // - we already stripped the leading _atom_site_ above when dot < 0.
+            if (bare.StartsWith("atom_site_")) bare = bare.Substring("atom_site_".Length);
+            foreach (var c in candidates)
+            {
+                if (string.Equals(bare, c, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Parse the atoms section of a Gaussian Cube file. The header
+    /// has line 3 = (natoms, originX, originY, originZ) and lines 4
+    /// through (4 + |natoms| - 1) listing one atom each (atomic
+    /// number, charge, x, y, z) in Bohr radii. We convert Bohr to
+    /// Angstroms (* 0.529177) so the renderer's scale matches the
+    /// other formats.
+    /// </summary>
+    private static List<Atom> ParseCube(StreamReader r)
+    {
+        var atoms = new List<Atom>();
+        r.ReadLine(); r.ReadLine();   // two comment lines
+        var nAtomsLine = r.ReadLine();
+        if (nAtomsLine == null) return atoms;
+        var parts = nAtomsLine.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 1) return atoms;
+        if (!int.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var nAtomsRaw)) return atoms;
+        // Cube format encodes "negative natoms = volumetric data follows"
+        // but the absolute count still applies for atom rows.
+        int nAtoms = Math.Min(Math.Abs(nAtomsRaw), MaxAtoms);
+        // Skip the three voxel-axis lines.
+        r.ReadLine(); r.ReadLine(); r.ReadLine();
+        const float bohrToAngstrom = 0.529177f;
+        for (int i = 0; i < nAtoms; i++)
+        {
+            var line = r.ReadLine();
+            if (line == null) break;
+            var p = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (p.Length < 5) continue;
+            if (!int.TryParse(p[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var atomicNumber)) continue;
+            if (!float.TryParse(p[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var x)) continue;
+            if (!float.TryParse(p[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var y)) continue;
+            if (!float.TryParse(p[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var z)) continue;
+            atoms.Add(new Atom(x * bohrToAngstrom, y * bohrToAngstrom, z * bohrToAngstrom,
+                               AtomicNumberToElement(atomicNumber)));
+        }
+        return atoms;
+    }
+
+    private static string AtomicNumberToElement(int z)
+    {
+        // Compact periodic table for the most common biology /
+        // chemistry elements. Out-of-range falls back to "C" so the
+        // renderer still produces something at thumbnail size.
+        switch (z)
+        {
+            case  1: return "H";  case  2: return "He"; case  3: return "Li";
+            case  4: return "Be"; case  5: return "B";  case  6: return "C";
+            case  7: return "N";  case  8: return "O";  case  9: return "F";
+            case 10: return "Ne"; case 11: return "Na"; case 12: return "Mg";
+            case 13: return "Al"; case 14: return "Si"; case 15: return "P";
+            case 16: return "S";  case 17: return "Cl"; case 18: return "Ar";
+            case 19: return "K";  case 20: return "Ca"; case 25: return "Mn";
+            case 26: return "Fe"; case 29: return "Cu"; case 30: return "Zn";
+            case 35: return "Br"; case 53: return "I";
+            default: return "C";
+        }
     }
 
     // PDB ATOM/HETATM record - columns 13-16 atom name, 77-78 element,
