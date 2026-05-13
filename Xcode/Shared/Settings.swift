@@ -8,6 +8,22 @@
 import Foundation
 import SwiftUI
 
+/// Persistence + change-publishing for every user-tunable preview setting.
+///
+/// Originally implemented with `@AppStorage` properties on this ObservableObject.
+/// That subtly fails on macOS 11/12: `@AppStorage` is a `DynamicProperty` designed
+/// for use *inside a View*, and when placed on a class it writes to UserDefaults
+/// but never invokes `objectWillChange.send()` on its enclosing ObservableObject.
+/// Result: a Picker bound to `$userSettings.atomStylePDB` flips a UserDefaults
+/// value but the View hosting `@StateObject var userSettings` never re-renders,
+/// so the WebView keeps showing the old structure.
+///
+/// Fix: replace every `@AppStorage` with a manually persisted `@Published`
+/// property whose `didSet` writes the new value back into UserDefaults. Reads
+/// happen once in `init()` so the published value mirrors what's on disk. This
+/// guarantees a Picker mutation triggers the standard ObservableObject ->
+/// @StateObject -> View invalidation chain and the preview re-renders
+/// immediately.
 class SettingsStorage: ObservableObject {
 
     /// Shared preferences store, computed once at first access.
@@ -18,15 +34,12 @@ class SettingsStorage: ObservableObject {
     /// silently fails — cfprefsd then logs
     /// `Using kCFPreferencesAnyUser with a container is only allowed
     /// for System Containers, detaching from cfprefsd` and rejects
-    /// writes, which means @AppStorage Picker changes never persist
-    /// and the previews never update.
-    ///
-    /// To survive that, we round-trip a probe key. If the write+read
-    /// makes it back intact, the App Group is usable; otherwise we
-    /// fall back to `UserDefaults.standard`. The cost of the fallback
-    /// is that settings won't sync between main app and extensions
-    /// until the user adds the App Groups capability via Xcode UI —
-    /// but at least everything inside the host app works.
+    /// writes. To survive that we round-trip a probe key; if the write+
+    /// read makes it back intact, the App Group is usable; otherwise we
+    /// fall back to `UserDefaults.standard`. Cost of the fallback: settings
+    /// won't sync between main app and extensions until the user adds the
+    /// App Groups capability via Xcode UI — but everything inside the host
+    /// app still works.
     static let preferencesStore: UserDefaults = {
         let groupID = "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"
         guard let group = UserDefaults(suiteName: groupID) else { return .standard }
@@ -38,54 +51,72 @@ class SettingsStorage: ObservableObject {
     }()
 
     // MARK: - Per-format atom display style
-    @AppStorage("atomStyleCIF", store: SettingsStorage.preferencesStore)
-    var atomStyleCIF: Settings.AtomStyle = .stick
-    @AppStorage("atomStylePDB", store: SettingsStorage.preferencesStore)
-    var atomStylePDB: Settings.AtomStyle = .cartoon
-    @AppStorage("atomStyleSDF", store: SettingsStorage.preferencesStore)
-    var atomStyleSDF: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleMOL2", store: SettingsStorage.preferencesStore)
-    var atomStyleMOL2: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleXYZ", store: SettingsStorage.preferencesStore)
-    var atomStyleXYZ: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleMOL", store: SettingsStorage.preferencesStore)
-    var atomStyleMOL: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleGRO", store: SettingsStorage.preferencesStore)
-    var atomStyleGRO: Settings.AtomStyle = .cartoon
-    @AppStorage("atomStyleCUBE", store: SettingsStorage.preferencesStore)
-    var atomStyleCUBE: Settings.AtomStyle = .stick
+    @Published var atomStyleCIF:  Settings.AtomStyle { didSet { Self.write(atomStyleCIF,  forKey: "atomStyleCIF")  } }
+    @Published var atomStylePDB:  Settings.AtomStyle { didSet { Self.write(atomStylePDB,  forKey: "atomStylePDB")  } }
+    @Published var atomStyleSDF:  Settings.AtomStyle { didSet { Self.write(atomStyleSDF,  forKey: "atomStyleSDF")  } }
+    @Published var atomStyleMOL2: Settings.AtomStyle { didSet { Self.write(atomStyleMOL2, forKey: "atomStyleMOL2") } }
+    @Published var atomStyleXYZ:  Settings.AtomStyle { didSet { Self.write(atomStyleXYZ,  forKey: "atomStyleXYZ")  } }
+    @Published var atomStyleMOL:  Settings.AtomStyle { didSet { Self.write(atomStyleMOL,  forKey: "atomStyleMOL")  } }
+    @Published var atomStyleGRO:  Settings.AtomStyle { didSet { Self.write(atomStyleGRO,  forKey: "atomStyleGRO")  } }
+    @Published var atomStyleCUBE: Settings.AtomStyle { didSet { Self.write(atomStyleCUBE, forKey: "atomStyleCUBE") } }
 
     // MARK: - Global rendering
-    @AppStorage("rotationSpeed", store: SettingsStorage.preferencesStore)
-    var rotationSpeed: Settings.RotationSpeed = .medium
-    @AppStorage("colorScheme", store: SettingsStorage.preferencesStore)
-    var colorScheme: Settings.ColorScheme = .spectrum
-    @AppStorage("autoStyleHetero", store: SettingsStorage.preferencesStore)
-    var autoStyleHetero: Bool = true
-    @AppStorage("showSurface", store: SettingsStorage.preferencesStore)
-    var showSurface: Bool = false
-    @AppStorage("hideHydrogens", store: SettingsStorage.preferencesStore)
-    var hideHydrogens: Bool = false
-    @AppStorage("showUnitCell", store: SettingsStorage.preferencesStore)
-    var showUnitCell: Bool = false
-    @AppStorage("showInfoOverlay", store: SettingsStorage.preferencesStore)
-    var showInfoOverlay: Bool = true
+    @Published var rotationSpeed:   Settings.RotationSpeed { didSet { Self.write(rotationSpeed,   forKey: "rotationSpeed")   } }
+    @Published var colorScheme:     Settings.ColorScheme   { didSet { Self.write(colorScheme,     forKey: "colorScheme")     } }
+    @Published var autoStyleHetero: Bool                   { didSet { Self.preferencesStore.set(autoStyleHetero, forKey: "autoStyleHetero") } }
+    @Published var showSurface:     Bool                   { didSet { Self.preferencesStore.set(showSurface,     forKey: "showSurface")     } }
+    @Published var hideHydrogens:   Bool                   { didSet { Self.preferencesStore.set(hideHydrogens,   forKey: "hideHydrogens")   } }
+    @Published var showUnitCell:    Bool                   { didSet { Self.preferencesStore.set(showUnitCell,    forKey: "showUnitCell")    } }
+    @Published var showInfoOverlay: Bool                   { didSet { Self.preferencesStore.set(showInfoOverlay, forKey: "showInfoOverlay") } }
 
     /// Initial zoom factor applied after 3Dmol's `viewer.zoomTo()` auto-fit.
-    /// Lets the user open Quick Look previews wider or tighter on the molecule
-    /// without manually scrolling to zoom every time.
-    @AppStorage("defaultZoom", store: SettingsStorage.preferencesStore)
-    var defaultZoom: Settings.DefaultZoom = .auto
+    @Published var defaultZoom: Settings.DefaultZoom { didSet { Self.write(defaultZoom, forKey: "defaultZoom") } }
 
     // MARK: - Background color components
-    @AppStorage("bgColorRed", store: SettingsStorage.preferencesStore)
-    var bgColorRed: Double = 0.0
-    @AppStorage("bgColorGreen", store: SettingsStorage.preferencesStore)
-    var bgColorGreen: Double = 0.0
-    @AppStorage("bgColorBlue", store: SettingsStorage.preferencesStore)
-    var bgColorBlue: Double = 0.0
-    @AppStorage("bgColorOpacity", store: SettingsStorage.preferencesStore)
-    var bgColorOpacity: Double = 0.0
+    @Published var bgColorRed:     Double { didSet { Self.preferencesStore.set(bgColorRed,     forKey: "bgColorRed")     } }
+    @Published var bgColorGreen:   Double { didSet { Self.preferencesStore.set(bgColorGreen,   forKey: "bgColorGreen")   } }
+    @Published var bgColorBlue:    Double { didSet { Self.preferencesStore.set(bgColorBlue,    forKey: "bgColorBlue")    } }
+    @Published var bgColorOpacity: Double { didSet { Self.preferencesStore.set(bgColorOpacity, forKey: "bgColorOpacity") } }
+
+    init() {
+        let store = Self.preferencesStore
+        self.atomStyleCIF    = Self.read(forKey: "atomStyleCIF",    default: .stick)
+        self.atomStylePDB    = Self.read(forKey: "atomStylePDB",    default: .cartoon)
+        self.atomStyleSDF    = Self.read(forKey: "atomStyleSDF",    default: .stick)
+        self.atomStyleMOL2   = Self.read(forKey: "atomStyleMOL2",   default: .stick)
+        self.atomStyleXYZ    = Self.read(forKey: "atomStyleXYZ",    default: .stick)
+        self.atomStyleMOL    = Self.read(forKey: "atomStyleMOL",    default: .stick)
+        self.atomStyleGRO    = Self.read(forKey: "atomStyleGRO",    default: .cartoon)
+        self.atomStyleCUBE   = Self.read(forKey: "atomStyleCUBE",   default: .stick)
+        self.rotationSpeed   = Self.read(forKey: "rotationSpeed",   default: .medium)
+        self.colorScheme     = Self.read(forKey: "colorScheme",     default: .spectrum)
+        self.defaultZoom     = Self.read(forKey: "defaultZoom",     default: .auto)
+        self.autoStyleHetero = store.object(forKey: "autoStyleHetero") as? Bool ?? true
+        self.showSurface     = store.bool(forKey: "showSurface")
+        self.hideHydrogens   = store.bool(forKey: "hideHydrogens")
+        self.showUnitCell    = store.bool(forKey: "showUnitCell")
+        self.showInfoOverlay = store.object(forKey: "showInfoOverlay") as? Bool ?? true
+        self.bgColorRed      = store.double(forKey: "bgColorRed")
+        self.bgColorGreen    = store.double(forKey: "bgColorGreen")
+        self.bgColorBlue     = store.double(forKey: "bgColorBlue")
+        self.bgColorOpacity  = store.double(forKey: "bgColorOpacity")
+    }
+
+    /// Read a RawRepresentable (String-backed) enum from the shared store.
+    /// Returns `default` on miss so missing keys land on the same defaults as
+    /// the old @AppStorage declarations.
+    private static func read<T: RawRepresentable>(forKey key: String, default fallback: T) -> T
+        where T.RawValue == String {
+        guard let raw = preferencesStore.string(forKey: key),
+              let value = T(rawValue: raw) else { return fallback }
+        return value
+    }
+
+    /// Persist a RawRepresentable as its raw string value.
+    private static func write<T: RawRepresentable>(_ value: T, forKey key: String)
+        where T.RawValue == String {
+        preferencesStore.set(value.rawValue, forKey: key)
+    }
 
     var bgColor: Color {
         get {
