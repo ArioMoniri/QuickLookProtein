@@ -1,0 +1,15 @@
+<UserControl x:Class="QuickLookProtein.Plugin.MoleculePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             Background="Black">
+    <!--
+      Single WebView2 filling the panel — the molecule renderer is 3Dmol.js
+      running in WebGL inside this WebView. No native chrome on the panel
+      itself; QL-Win supplies the window frame, titlebar, and busy
+      indicator via ContextObject.
+    -->
+    <Grid>
+        <wv2:WebView2 x:Name="WebView" />
+    </Grid>
+</UserControl>

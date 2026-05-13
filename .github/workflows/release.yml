@@ -417,6 +417,8 @@ jobs:
 
           ### 📥 Install
 
+          #### 🍎 macOS
+
           **Option A — Disk image (recommended)**
 
           1. Download **${DMGNAME}** from the Assets below.
@@ -430,7 +432,17 @@ jobs:
 
           Either way: open any \`.pdb\` / \`.cif\` / \`.sdf\` / \`.mol\` / \`.mol2\` / \`.xyz\` / \`.gro\` / \`.cube\` / \`.pqr\` / \`.vasp\` / \`.cdjson\` / \`.mmtf\` file in Finder, hit <kbd>Space</kbd> for the interactive 3D preview, or switch to Icon View for molecular thumbnails.
 
-          🔐 **Signed with Developer ID** and **notarised by Apple** — Gatekeeper will let it run without warning.
+          🔐 macOS build is **signed with Developer ID** and **notarised by Apple** — Gatekeeper runs it without warning.
+
+          #### 🪟 Windows
+
+          1. Install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest) (the Windows-side Quick Look daemon — free, GPL-3).
+          2. Download **QuickLookProtein-${VERSION}.qlplugin** from the Assets below.
+          3. Double-click the \`.qlplugin\` file while QuickLook is running (or extract it into \`%LocalAppData%\\QuickLook\\plugins\\\`).
+          4. Restart QuickLook from the system tray.
+          5. Hit <kbd>Space</kbd> on any supported file in Explorer.
+
+          ⚠️ The Windows plugin is **not code-signed** yet — SmartScreen will show "Windows protected your PC" on first install. Click **More info → Run anyway**.
 
           ### 📦 What's inside
 
@@ -516,3 +528,94 @@ jobs:
         run: |
           KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
           security delete-keychain "$KEYCHAIN" 2>/dev/null || true
+
+  # ------------------------------------------------------------------------
+  # Windows plugin job — runs after the macOS job creates the release.
+  # Cross-compiling WPF from a Mac/Linux runner isn't viable (the
+  # WindowsBase / PresentationFramework reference assemblies require the
+  # Windows targeting pack), so this lives on its own windows-latest
+  # runner. The plugin is unsigned per project decision; SmartScreen
+  # will show "More info → Run anyway" on first install.
+  windows-plugin:
+    needs: release
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v',''
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Fetch QuickLook.Common.dll from QL-Win release
+        shell: pwsh
+        # Plugin compiles against QL-Win's public API surface. We don't
+        # ship this dll in our .qlplugin — the host process supplies it
+        # at load time. Pull a recent QL-Win release zip just to extract
+        # the reference dll.
+        run: |
+          $qlWinVersion = "5.1.6"
+          $url = "https://github.com/QL-Win/QuickLook/releases/download/$qlWinVersion/QuickLook-$qlWinVersion.zip"
+          Write-Host "Downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile QuickLook.zip
+          Expand-Archive QuickLook.zip -DestinationPath QuickLook-extracted
+          New-Item -ItemType Directory -Path Windows/QuickLookProtein.Plugin/libs -Force | Out-Null
+          # Recent QL-Win releases nest the dlls one level deep; find by name.
+          $commonDll = Get-ChildItem -Path QuickLook-extracted -Recurse -Filter QuickLook.Common.dll | Select-Object -First 1
+          if (-not $commonDll) { throw "QuickLook.Common.dll not found in QL-Win release zip" }
+          Copy-Item $commonDll.FullName Windows/QuickLookProtein.Plugin/libs/QuickLook.Common.dll
+          Write-Host "Reference dll staged at:"
+          Get-Item Windows/QuickLookProtein.Plugin/libs/QuickLook.Common.dll | Format-List FullName, Length
+
+      - name: Build plugin
+        shell: pwsh
+        run: |
+          dotnet build Windows/QuickLookProtein.Plugin/QuickLookProtein.Plugin.csproj `
+              -c Release `
+              -o build/plugin
+
+      - name: Package .qlplugin
+        id: pkg
+        shell: pwsh
+        # The .qlplugin format is just a zip with the .dll + bundled
+        # assets. QL-Win extracts it into
+        # %LocalAppData%\QuickLook\plugins\<plugin-name>\ when the user
+        # opens it. We exclude the .pdb to keep the archive small.
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $stage = "build/qlplugin-stage"
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+
+          # Copy DLL, deps json, and the runtime config
+          Get-ChildItem build/plugin -File `
+              | Where-Object { $_.Extension -in '.dll','.json' } `
+              | Copy-Item -Destination $stage
+
+          # Copy the Resources/ folder (3Dmol.js + viewer.html)
+          Copy-Item -Path "build/plugin/Resources" -Destination $stage -Recurse
+
+          $qlpName = "QuickLookProtein-$version.qlplugin"
+          # PowerShell's Compress-Archive will produce a .zip; we rename
+          # the extension. QL-Win identifies plugins by the extension.
+          Compress-Archive -Path "$stage/*" -DestinationPath "build/$qlpName" -Force
+          Write-Host "Packaged $qlpName"
+          Get-Item "build/$qlpName" | Format-List FullName, Length
+          "name=$qlpName"             | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "path=build/$qlpName"       | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload .qlplugin to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          gh release upload "v$version" "${{ steps.pkg.outputs.path }}" --clobber

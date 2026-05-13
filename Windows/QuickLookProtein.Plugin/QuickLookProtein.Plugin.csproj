@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    QuickLookProtein plugin for QL-Win/QuickLook (https://github.com/QL-Win/QuickLook).
+    Builds a single .dll that QL-Win loads when the user previews a molecular
+    structure file. The .dll + bundled 3Dmol.js + viewer.html ship as a
+    `.qlplugin` archive (a renamed .zip); installing is "drop the .qlplugin
+    on QuickLook running in the tray" or "extract into
+    %LocalAppData%\QuickLook\plugins\".
+
+    The renderer is identical to the macOS QL extension's: same 3Dmol.js
+    bundle, same viewer.html template, same per-format defaults. Only the
+    host (WebView2 inside WPF) differs.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <OutputType>Library</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>QuickLook.Plugin.Protein</AssemblyName>
+    <RootNamespace>QuickLookProtein.Plugin</RootNamespace>
+    <!--
+      QL-Win loads plugin DLLs from disk and resolves their dependencies
+      from the plugin's own folder. Don't copy WebView2 host runtime
+      assemblies into the plugin output — they'd shadow the host's copy.
+      We let the host runtime provide WebView2 at load time.
+    -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      QuickLook.Common.dll is loaded by the QL-Win host process at runtime.
+      We only need the API surface to compile against — Private=False keeps
+      it out of our output so we don't ship two copies (which would crash
+      the host with a type-identity mismatch on IViewer).
+      The libs/ dir is populated by the GitHub Actions workflow that
+      downloads the matching QL-Win release; locally, place
+      QuickLook.Common.dll there from any recent QL-Win release zip.
+    -->
+    <Reference Include="QuickLook.Common">
+      <HintPath>libs\QuickLook.Common.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Reuse the macOS app's existing 3Dmol bundle and viewer template so
+      the Windows preview is visually identical and there's one source of
+      truth for renderer changes. MSBuild links them in under Resources/
+      in the plugin output.
+    -->
+    <Content Include="..\..\Xcode\Shared\Assets\3Dmol.js">
+      <Link>Resources\3Dmol.js</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\Shared\Assets\3Dmol_viewer.html">
+      <Link>Resources\viewer.html</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>
