@@ -1,27 +1,19 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
   <channel>
     <title>QuickLookProtein</title>
     <link>https://ariomoniri.github.io/QuickLookProtein/appcast.xml</link>
     <description>Auto-update feed for QuickLookProtein (Ariorad Moniri's signed fork).</description>
     <language>en</language>
-    <!--
-      Release entries are appended here automatically by
-      .github/workflows/release.yml on every `v*` tag push. Each entry looks
-      like:
-
-      <item>
-        <title>QuickLookProtein 2.0.0</title>
-        <pubDate>Tue, 13 May 2026 17:00:00 +0000</pubDate>
-        <sparkle:version>2.0.0</sparkle:version>
-        <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
-        <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
-        <description><![CDATA[<h2>What's new</h2><p>...</p>]]></description>
-        <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v2.0.0/QuickLookProtein-2.0.0.zip"
-                   sparkle:edSignature="..."
-                   length="12345678"
-                   type="application/octet-stream" />
-      </item>
-    -->
+    <item>
+      <title>QuickLookProtein 1.7.0</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.0</link>
+      <pubDate>Wed, 13 May 2026 14:35:46 +0000</pubDate>
+      <sparkle:version>1.7.0</sparkle:version>
+      <sparkle:shortVersionString>1.7.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;p&gt;See &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.0"&gt;the GitHub release&lt;/a&gt; for full notes and the binary download.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.0/QuickLookProtein-1.7.0.zip" sparkle:edSignature="o0wlcw7MorSH0pSRcdHUTymNOhYa/zl0U0WlIRN9gi6/svUxi1QH1zClzqvTWjpy+lq42n9Fwojc3ia0lZqhCg==" length="3698742" type="application/octet-stream" />
+    </item>
   </channel>
 </rss>
