@@ -182,18 +182,73 @@ function Install-Plugin {
     Copy-Item $pluginPath $tmpZip -Force
     Expand-Archive -Path $tmpZip -DestinationPath $pluginDir -Force
     Remove-Item $tmpZip -Force
+
+    # Sanity check - if the .dll didn't land, the plugin won't load
+    # and the user won't get any preview when they hit Space. Surface
+    # the failure loudly rather than letting it slip through.
+    $expected = Join-Path $pluginDir "QuickLook.Plugin.Protein.dll"
+    if (-not (Test-Path $expected)) {
+        Write-Host "  WARNING: $expected was not extracted. Plugin folder contents:"
+        Get-ChildItem $pluginDir | ForEach-Object { Write-Host "    $($_.Name)" }
+    } else {
+        Write-Host "  Plugin installed: $expected"
+    }
+}
+
+function Find-QuickLookExePath {
+    # Search the standard QL-Win install locations. /VERYSILENT with
+    # PrivilegesRequired=lowest (QL-Win's default) drops the binary
+    # under %LocalAppData%\Programs\QuickLook\ on most modern boxes,
+    # but per-machine installs (older builds, admin-elevated runs)
+    # can land in Program Files. We check all three.
+    $candidates = @(
+        (Join-Path $env:LocalAppData "Programs\QuickLook\QuickLook.exe"),
+        (Join-Path ${env:ProgramFiles} "QuickLook\QuickLook.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "QuickLook\QuickLook.exe")
+    )
+    foreach ($p in $candidates) {
+        if ($p -and (Test-Path $p)) { return $p }
+    }
+    return $null
 }
 
 function Restart-QuickLookHost {
+    # Active goal: QuickLook MUST be running by the time this function
+    # returns, regardless of whether it was running before. Previous
+    # version only acted if QuickLook was already alive; on a first-
+    # time install (Setup.exe -> QL-Win installer with /VERYSILENT)
+    # QuickLook is installed but never launched, so the dropped plugin
+    # had no daemon to pick it up and the user's double-click on a
+    # .qlplugin / structure file did nothing.
+
+    $exePath = $null
     $proc = Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue
     if ($proc) {
         Write-Step "Restarting QuickLook to pick up the new plugin..."
         $exePath = $proc[0].Path
         $proc | Stop-Process -Force
+        # cfprefsd-style: give the OS a beat to release the executable
+        # lock before relaunching, otherwise the new process can race
+        # the old one and fail.
         Start-Sleep -Seconds 1
-        if ($exePath -and (Test-Path $exePath)) {
-            Start-Process -FilePath $exePath
+    } else {
+        Write-Step "Starting QuickLook (first-time launch)..."
+        $exePath = Find-QuickLookExePath
+    }
+
+    if ($exePath -and (Test-Path $exePath)) {
+        Start-Process -FilePath $exePath
+        Start-Sleep -Seconds 2
+        if (Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue) {
+            Write-Host "  QuickLook is running. Press SPACE on a supported file in Explorer."
+        } else {
+            Write-Host "  WARNING: launched $exePath but QuickLook isn't showing up in the process list."
+            Write-Host "  You can start it manually from the Start Menu."
         }
+    } else {
+        Write-Host "  WARNING: could not find QuickLook.exe under %LocalAppData%\Programs\QuickLook\,"
+        Write-Host "  Program Files\QuickLook\, or Program Files (x86)\QuickLook\."
+        Write-Host "  Launch QuickLook manually from the Start Menu - the plugin is already in place."
     }
 }
 

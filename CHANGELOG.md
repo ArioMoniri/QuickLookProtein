@@ -4,6 +4,28 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.9] — 2026-05-14
+
+### 🐛 Fixed
+
+- **First-time Windows install left QuickLook installed but not running**,
+  so the plugin was sitting in `%LocalAppData%\QuickLook\plugins\` with
+  no daemon to load it. Double-clicking the `.qlplugin` separately
+  also did nothing because Windows' file association only fires for
+  a running QuickLook. `install.ps1`'s `Restart-QuickLookHost` only
+  restarted QuickLook if it was *already* running — fine for upgrades,
+  silently broken for first-time setup. It now actively starts
+  QuickLook in both cases, locates the binary by probing
+  `%LocalAppData%\Programs\QuickLook\`, `Program Files\QuickLook\`,
+  and `Program Files (x86)\QuickLook\`, and waits 2 s to confirm the
+  process is alive before reporting success.
+- **Post-install verification**: install.ps1 now checks that
+  `QuickLook.Plugin.Protein.dll` is actually present in the install
+  folder after the extraction and prints the folder contents if it
+  isn't, so a silently-failed Expand-Archive surfaces in the cmd log
+  instead of being discovered the next day when previews still don't
+  work.
+
 ## [1.7.8] — 2026-05-14
 
 ### 🪟 Windows
