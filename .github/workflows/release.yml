@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
 
     steps:
@@ -62,7 +62,18 @@ jobs:
           fi
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+        # Project uses PBX objectVersion 70 which requires Xcode 16+.
+        # macos-15 runners ship multiple Xcode 16 minor versions; pick
+        # whichever is newest so we follow Apple's most recent toolchain
+        # automatically as runners are refreshed.
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [[ -z "$NEWEST" ]]; then
+              NEWEST=/Applications/Xcode.app
+          fi
+          echo "Selecting $NEWEST"
+          sudo xcode-select -s "$NEWEST"
+          xcodebuild -version
 
       # ----------------------------------------------------------------
       # Import the Developer ID Application certificate into a temporary
