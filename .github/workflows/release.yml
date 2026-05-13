@@ -801,7 +801,13 @@ jobs:
             "Source: ""$stageAbs\install.bat"";               DestDir: ""{app}""; Flags: ignoreversion",
             '',
             '[Run]',
-            'Filename: "{app}\install.bat"; Description: "Install QuickLookProtein"; Flags: shellexec runascurrentuser waituntilterminated'
+            '; Run install.bat with QLP_SETUP_EXE=1 set so the .bat skips its',
+            '; "press any key" prompts and auto-closes 5s after success. The',
+            '; cmd window stays visible so the user sees the spinner during',
+            '; the (potentially 60-second) QL-Win download/install step -',
+            '; otherwise the Inno Setup wizard sits at "Finishing..." and',
+            '; looks frozen.',
+            'Filename: "cmd.exe"; Parameters: "/C set QLP_SETUP_EXE=1 && ""{app}\install.bat"""; StatusMsg: "Installing QuickLook host and plugin (this can take up to a minute)..."; Flags: waituntilterminated'
           )
           $issPath = Join-Path $buildAbs "setup.iss"
           [System.IO.File]::WriteAllText(

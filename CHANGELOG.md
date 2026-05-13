@@ -4,6 +4,31 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.8] — 2026-05-14
+
+### 🪟 Windows
+
+- **Setup.exe no longer appears to hang** during the QL-Win install
+  step. Three changes:
+  - `install.ps1` calls QL-Win's installer with
+    `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS`
+    instead of `/SILENT`. /SILENT pops a progress dialog that
+    sometimes lands behind our cmd window, so users saw nothing
+    happening and assumed the install had frozen.
+  - While waiting on the silent install, `install.ps1` runs a
+    polling spinner (`Working | (15 s)`) so the user can tell the
+    process is alive.
+  - `install.bat` detects the Setup.exe context via a `QLP_SETUP_EXE=1`
+    env var Inno Setup sets in `[Run]` and auto-closes 5 seconds
+    after success instead of waiting for a keypress — which kept
+    the parent Inno Setup wizard stuck on "Finishing installation…"
+    until the user noticed and dismissed the hidden cmd window.
+- **Inno Setup `[Run]` step** invokes install.bat via
+  `cmd.exe /C set QLP_SETUP_EXE=1 && install.bat` so the auto-close
+  path triggers, and shows a `StatusMsg` ("Installing QuickLook host
+  and plugin (this can take up to a minute)…") on the wizard while
+  it runs.
+
 ## [1.7.7] — 2026-05-14
 
 ### 🐛 Fixed

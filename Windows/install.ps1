@@ -83,11 +83,40 @@ function Install-QuickLookHost {
     $installer = Join-Path $tempRoot $exe.name
     Write-Host "  Downloading $($exe.name) ($([math]::Round($exe.size / 1MB, 1)) MB)..."
     Invoke-WebRequest -Uri $exe.browser_download_url -OutFile $installer
-    Write-Host "  Running installer (you may see a SmartScreen prompt - click 'More info' -> 'Run anyway')."
-    # /SILENT shows progress but skips the wizard pages; /VERYSILENT is
-    # fully silent but the Inno Setup installer still occasionally pops
-    # a UAC dialog for per-machine installs.
-    Start-Process -FilePath $installer -ArgumentList "/SILENT" -Wait
+
+    # Run the QL-Win installer in fully-silent mode.
+    #  /VERYSILENT          - no wizard UI, no progress bar
+    #  /SUPPRESSMSGBOXES    - skip "Restart needed" / "Already running" dialogs
+    #  /NORESTART           - never reboot the user's machine
+    #  /CLOSEAPPLICATIONS   - if an old QuickLook is running, close it
+    #  /TASKS=startup       - register QL-Win to launch at sign-in
+    # Previously we used /SILENT which still shows a progress dialog;
+    # the user reported the install appearing to hang because the
+    # progress window can land behind our cmd console. VERYSILENT
+    # removes that ambiguity at the cost of no visual feedback during
+    # the install itself - we counter that below with a polling
+    # spinner so the user can see we're still alive.
+    Write-Host "  Launching silent installer (this can take 30-60 seconds)..."
+    $proc = Start-Process -FilePath $installer `
+        -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS" `
+        -PassThru
+
+    $spinner = @('|', '/', '-', '\')
+    $i = 0
+    $startedAt = Get-Date
+    while (-not $proc.HasExited) {
+        $elapsed = [int]((Get-Date) - $startedAt).TotalSeconds
+        Write-Host -NoNewline "`r  Working $($spinner[$i % 4])  ($elapsed s)   "
+        $i++
+        Start-Sleep -Milliseconds 250
+    }
+    # WaitForExit() is a no-op here (HasExited is already true) but
+    # guarantees ExitCode is populated before we read it.
+    $proc.WaitForExit()
+    Write-Host "`r  QL-Win install finished (exit code $($proc.ExitCode)).                "
+    if ($proc.ExitCode -ne 0) {
+        throw "QuickLook installer returned a non-zero exit code ($($proc.ExitCode))."
+    }
 }
 
 function Get-PluginReleaseAsset {
