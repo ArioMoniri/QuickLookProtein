@@ -58,6 +58,7 @@
 				<string>com.jethrohemmann.QuickLookProtein.prmtop</string>
 				<string>com.jethrohemmann.QuickLookProtein.vasp</string>
 				<string>com.jethrohemmann.QuickLookProtein.cdjson</string>
+				<string>com.jethrohemmann.QuickLookProtein.mmtf</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

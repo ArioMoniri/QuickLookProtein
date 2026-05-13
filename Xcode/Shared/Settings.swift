@@ -151,8 +151,9 @@ class SettingsStorage: ObservableObject {
         case "gro":                  return atomStyleGRO
         case "cube", "cub":          return atomStyleCUBE
         case "pqr":                  return .stick   // PQR is PDB-shaped but typically small molecules
-        case "vasp", "poscar":       return .stick   // VASP/POSCAR crystals — sticks beat empty cartoon
+        case "vasp", "poscar":       return .sphere  // VASP/POSCAR crystals — atoms-as-balls is the convention and renders even without bonds
         case "cdjson", "json":       return .stick   // ChemDoodle JSON small molecules
+        case "mmtf":                 return .cartoon // MMTF is compressed PDB — same convention as PDB
         default:                     return .stick   // unknown small-molecule formats — better than empty
         }
     }
@@ -276,6 +277,7 @@ struct Settings {
         case "cube", "cub":    return "cube"    // Gaussian volumetric
         case "vasp", "poscar": return "vasp"    // VASP / POSCAR
         case "cdjson", "json": return "cdjson"  // ChemDoodle JSON
+        case "mmtf":           return "mmtf"    // RCSB compressed binary PDB
         default:               return nil
         }
     }
