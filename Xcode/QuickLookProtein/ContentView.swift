@@ -56,22 +56,29 @@ struct ContentView: View {
                         Text("Settings").font(.title)
 
                         Text("Atom display style").font(.headline)
-                        VStack(spacing: 4) {
-                            styleMenuRow(label: "PDB",   binding: $userSettings.atomStylePDB)
-                            styleMenuRow(label: "CIF",   binding: $userSettings.atomStyleCIF)
-                            styleMenuRow(label: "SDF",   binding: $userSettings.atomStyleSDF)
-                            styleMenuRow(label: "MOL",   binding: $userSettings.atomStyleMOL)
-                            styleMenuRow(label: "MOL2",  binding: $userSettings.atomStyleMOL2)
-                            styleMenuRow(label: "XYZ",   binding: $userSettings.atomStyleXYZ)
-                            styleMenuRow(label: "GRO",   binding: $userSettings.atomStyleGRO)
-                            styleMenuRow(label: "CUBE",  binding: $userSettings.atomStyleCUBE)
+                        // Standard Form-wrapped Pickers: the entire row including
+                        // the "PDB:" label is the popup button's hit area on macOS,
+                        // so clicking the label opens the dropdown natively.
+                        Form {
+                            Picker("PDB:",  selection: $userSettings.atomStylePDB)  { atomStyleOptions }
+                            Picker("CIF:",  selection: $userSettings.atomStyleCIF)  { atomStyleOptions }
+                            Picker("SDF:",  selection: $userSettings.atomStyleSDF)  { atomStyleOptions }
+                            Picker("MOL:",  selection: $userSettings.atomStyleMOL)  { atomStyleOptions }
+                            Picker("MOL2:", selection: $userSettings.atomStyleMOL2) { atomStyleOptions }
+                            Picker("XYZ:",  selection: $userSettings.atomStyleXYZ)  { atomStyleOptions }
+                            Picker("GRO:",  selection: $userSettings.atomStyleGRO)  { atomStyleOptions }
+                            Picker("CUBE:", selection: $userSettings.atomStyleCUBE) { atomStyleOptions }
                         }
-                        .frame(maxWidth: 320)
+                        .frame(maxWidth: 340)
 
                         Text("Appearance").font(.headline).padding(.top, 6)
-                        VStack(spacing: 4) {
-                            schemeMenuRow(label: "Color scheme", binding: $userSettings.colorScheme)
-                            rotationMenuRow(label: "Rotation",   binding: $userSettings.rotationSpeed)
+                        Form {
+                            Picker("Color scheme:", selection: $userSettings.colorScheme) {
+                                ForEach(Settings.ColorScheme.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                            Picker("Rotation:", selection: $userSettings.rotationSpeed) {
+                                ForEach(Settings.RotationSpeed.allCases) { Text($0.rawValue).tag($0) }
+                            }
                             HStack {
                                 ColorPicker("Background:", selection: $userSettings.bgColor, supportsOpacity: true)
                                     .help("#" + convertColorToRGB(color: userSettings.bgColor).rgbHex
@@ -79,7 +86,7 @@ struct ContentView: View {
                                 Button("Transparent", action: resetColor)
                             }
                         }
-                        .frame(maxWidth: 320)
+                        .frame(maxWidth: 340)
 
                         Text("Rendering options").font(.headline).padding(.top, 6)
                         VStack(alignment: .leading, spacing: 4) {
@@ -176,96 +183,10 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Menu rows (entire row clickable, including the label)
-
-    private func styleMenuRow(label: String,
-                              binding: Binding<Settings.AtomStyle>) -> some View {
-        menuRow(label: label, currentValue: binding.wrappedValue.rawValue) {
-            ForEach(Settings.AtomStyle.allCases) { style in
-                Button {
-                    binding.wrappedValue = style
-                } label: {
-                    HStack {
-                        Text(style.rawValue)
-                        if binding.wrappedValue == style {
-                            Spacer()
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func schemeMenuRow(label: String,
-                               binding: Binding<Settings.ColorScheme>) -> some View {
-        menuRow(label: label, currentValue: binding.wrappedValue.rawValue) {
-            ForEach(Settings.ColorScheme.allCases) { scheme in
-                Button {
-                    binding.wrappedValue = scheme
-                } label: {
-                    HStack {
-                        Text(scheme.rawValue)
-                        if binding.wrappedValue == scheme {
-                            Spacer()
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func rotationMenuRow(label: String,
-                                 binding: Binding<Settings.RotationSpeed>) -> some View {
-        menuRow(label: label, currentValue: binding.wrappedValue.rawValue) {
-            ForEach(Settings.RotationSpeed.allCases) { speed in
-                Button {
-                    binding.wrappedValue = speed
-                } label: {
-                    HStack {
-                        Text(speed.rawValue)
-                        if binding.wrappedValue == speed {
-                            Spacer()
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Shared row layout used by all three menu helpers. The whole row — label
-    /// text included — is clickable; clicking anywhere opens the dropdown.
+    /// Shared option list for every per-format atom-style Picker.
     @ViewBuilder
-    private func menuRow<Content: View>(label: String,
-                                        currentValue: String,
-                                        @ViewBuilder content: () -> Content) -> some View {
-        Menu {
-            content()
-        } label: {
-            HStack(spacing: 8) {
-                Text("\(label):")
-                    .frame(width: 100, alignment: .leading)
-                    .foregroundColor(.primary)
-                Spacer()
-                Text(currentValue)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color(NSColor.controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(Color.secondary.opacity(0.25), lineWidth: 0.5))
-            .contentShape(Rectangle())   // makes the whole row hit-test
-        }
-        .buttonStyle(.plain)
-        .menuStyle(.borderlessButton)
+    private var atomStyleOptions: some View {
+        ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue).tag($0) }
     }
 
     /// Fifth tile that accepts a dragged file and renders it live with the current
