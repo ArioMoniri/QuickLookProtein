@@ -4,6 +4,18 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.6] — 2026-05-14
+
+### 🪟 Windows
+
+- **Setup.exe build finally green.** Two CI iterations missed: ISCC
+  was resolving relative `OutputDir=build` against its post-Push-
+  Location cwd (so it dropped the .exe in `build/build/`), and a
+  PowerShell here-string was injecting leading whitespace into
+  `[Files]` lines that some ISCC versions choke on. Fixed by building
+  the .iss line-by-line with absolute paths and removing the
+  Push-Location dance.
+
 ## [1.7.5] — 2026-05-14
 
 ### 🪟 Windows
