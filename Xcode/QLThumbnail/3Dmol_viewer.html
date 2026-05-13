@@ -1,0 +1,311 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <!--
+          Bundled 3Dmol.js (which has jQuery 3.6 inlined into it). The viewer's
+          createViewer(element, …) internally calls jQuery methods on the
+          container element, so we must pass it a jQuery object — passing a
+          plain DOM element silently leaves the canvas un-attached. This matches
+          the upstream JethroHemmann/QuickLookProtein baseline exactly; the
+          smart-styling / info-overlay / click-label features are layered on top.
+        -->
+        <script src="3Dmol.js"></script>
+        <style>
+            html, body { margin: 0; padding: 0; height: 100%; width: 100%;
+                         overflow: hidden;
+                         font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+            #info      { position: absolute; top: 8px; left: 8px; z-index: 10;
+                         font-size: 11px; color: #555;
+                         background: rgba(255,255,255,0.70);
+                         padding: 4px 8px; border-radius: 4px; pointer-events: none;
+                         max-width: calc(100% - 32px); overflow: hidden;
+                         text-overflow: ellipsis; white-space: nowrap; }
+            #label     { position: absolute; bottom: 8px; left: 8px; z-index: 10;
+                         font-size: 11px; color: #222;
+                         background: rgba(255,255,255,0.92);
+                         padding: 4px 8px; border-radius: 4px; pointer-events: none;
+                         display: none; }
+            #error     { position: absolute; inset: 0; display: flex;
+                         flex-direction: column; align-items: center; justify-content: center;
+                         padding: 24px; text-align: center; color: #b00;
+                         font-size: 13px; line-height: 1.4; }
+            #error .title { font-weight: 600; margin-bottom: 6px; color: #800; }
+            @media (prefers-color-scheme: dark) {
+                #info  { color: #ddd; background: rgba(30,30,30,0.70); }
+                #label { color: #fff; background: rgba(30,30,30,0.92); }
+                #error { color: #ff8a8a; }
+                #error .title { color: #ffb0b0; }
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Inline width/height/position match upstream's working markup byte-
+             for-byte. Don't move these to a <style> block — WebKit resolves
+             inline styles before script-eval; styles applied via stylesheet
+             can race the createViewer call. -->
+        <div style="height: 100vh; width: 100%; position: relative;" id="3dviewer"></div>
+        <div id="info"></div>
+        <div id="label"></div>
+        <script type="text/plain" id="mol-data">{MOL_DATA}</script>
+        <script>
+            // jQuery is bundled inside 3Dmol.js (verified: 3Dmol.js's first
+            // 2000 lines are jQuery 3.6.0). Using $(…) DOMReady + $('#…')
+            // selector matches exactly how upstream calls createViewer, and
+            // is the only call pattern that reliably gets the WebGL canvas
+            // attached to the document.
+            $(function () {
+                // --- residue / atom classification tables -------------------
+                var AA_STANDARD = /^(ALA|ARG|ASN|ASP|CYS|GLN|GLU|GLY|HIS|ILE|LEU|LYS|MET|PHE|PRO|SER|THR|TRP|TYR|VAL|SEC|PYL)$/;
+                var AA_MODIFIED = /^(MSE|SEP|TPO|PTR|CSO|OCS|KCX|HYP|PCA|FME|NLE|ABA|ORN|HID|HIE|HIP|HSD|HSE|HSP|CYX|CYM|ASH|GLH|LYN|TPQ|M3L|MLY|MLZ|SMC|DAL|DAR|DAS|DCY|DGL|DGN|DHI|DIL|DLE|DLY|DPN|DPR|DSG|DSN|DTH|DTR|DTY|DVA|MEN|AIB|TYS|CAS|SUI|CCS|CME|CSD|CSE|CSP|CSS|CSX)$/;
+                var NA_RESIDUES = /^(A|U|G|C|T|I|DA|DT|DG|DC|DU|DI|RA|RU|RG|RC|RI|ADE|URA|GUA|CYT|THY)$/;
+                var BUFFER_RES = /^(HOH|WAT|DOD|H2O|SO4|PO4|GOL|EDO|PEG|PG4|PGE|ACT|TRS|IMD|MPD|DMS|FMT|BME|CIT|TLA|MES|EPE|BTB)$/;
+                var MONATOMIC = /^(ZN|FE|FE2|FE3|MG|CA|MN|MN3|CU|CU1|CU2|NA|K|RB|CS|LI|CL|BR|F|HG|NI|CO|CO3|CD|PB|AU|AG|PT|PD|TH|Y|YB|TL|SR|BA|BE|AL|GA|GE|AS|SE|TE|XE|KR|AR)$/;
+
+                function showError(title, detail) {
+                    var v = document.getElementById('3dviewer');
+                    if (v) v.style.display = 'none';
+                    var e = document.createElement('div');
+                    e.id = 'error';
+                    var t = document.createElement('div');
+                    t.className = 'title';
+                    t.textContent = title || 'Could not render structure';
+                    e.appendChild(t);
+                    if (detail) {
+                        var d = document.createElement('div');
+                        d.textContent = detail;
+                        e.appendChild(d);
+                    }
+                    document.body.appendChild(e);
+                }
+
+                try {
+                    if (typeof $3Dmol === 'undefined') {
+                        return showError('3Dmol.js failed to load');
+                    }
+
+                    // Read the molecule data from the <script type="text/plain">
+                    // block (escapes-immune injection — see Swift sanitizer).
+                    var dataEl = document.getElementById('mol-data');
+                    var data = dataEl ? dataEl.textContent : '';
+                    if (!data || data.trim().length === 0) {
+                        return showError('Empty file', 'The file contains no readable data.');
+                    }
+
+                    // === EXACTLY upstream's createViewer call pattern ========
+                    //     This is the load-bearing line. Pass a jQuery object,
+                    //     not a string or DOM element — see note at top of file.
+                    var element = $('#3dviewer');
+                    var config  = { backgroundAlpha: {BG_ALPHA} };
+                    var viewer  = $3Dmol.createViewer(element, config);
+                    if (!viewer) {
+                        return showError('WebGL unavailable',
+                                         'Your system or this WKWebView does not support WebGL.');
+                    }
+                    viewer.setBackgroundColor(0x{BG_COLOR}, {BG_ALPHA});
+
+                    // === parse model =========================================
+                    var format  = "{DATA_FORMAT}";
+                    var addOpts = { keepH: true, multimodel: false };
+                    if (format === 'xyz') addOpts.assignBonds = true;
+                    try {
+                        viewer.addModel(data, format, addOpts);
+                    } catch (parseErr) {
+                        return showError('Could not parse ' + format.toUpperCase(),
+                                         parseErr && parseErr.message ? parseErr.message : String(parseErr));
+                    }
+
+                    var model = viewer.getModel();
+                    var atoms = model ? model.selectedAtoms({}) : [];
+                    if (!atoms || atoms.length === 0) {
+                        return showError('No atoms found',
+                                         'The file parsed successfully but contained no atoms.');
+                    }
+
+                    // === classify atoms ======================================
+                    var hasProtein = false, hasNucleic = false;
+                    var polySerials = [], ligSerials = [], metalSerials = [],
+                        waterSerials = [], bufSerials = [];
+                    var chains = {};
+                    for (var i = 0; i < atoms.length; i++) {
+                        var a = atoms[i];
+                        var resn = (a.resn || '').toUpperCase();
+                        var elem = (a.elem || '').toUpperCase();
+                        if (a.chain) chains[a.chain] = 1;
+
+                        var isStdAA  = AA_STANDARD.test(resn);
+                        var isModAA  = AA_MODIFIED.test(resn);
+                        var isNA     = NA_RESIDUES.test(resn);
+                        var isPoly   = isStdAA || isModAA || isNA;
+                        var isWater  = (resn === 'HOH' || resn === 'WAT' || resn === 'DOD' || resn === 'H2O');
+                        var isBuffer = BUFFER_RES.test(resn) && !isWater;
+                        var isMetal  = !isPoly && (MONATOMIC.test(resn) || MONATOMIC.test(elem));
+
+                        var key = (a.serial !== undefined) ? a.serial : a.index;
+                        if      (isPoly)    polySerials.push(key);
+                        else if (isMetal)   metalSerials.push(key);
+                        else if (isWater)   waterSerials.push(key);
+                        else if (isBuffer)  bufSerials.push(key);
+                        else if (a.hetflag) ligSerials.push(key);
+
+                        if (isStdAA || isModAA) hasProtein = true;
+                        if (isNA)               hasNucleic = true;
+                    }
+                    var chainCount = Object.keys(chains).length;
+                    var hasPolymer = hasProtein || hasNucleic;
+                    var hasLigand  = ligSerials.length   > 0;
+                    var hasMetal   = metalSerials.length > 0;
+
+                    // === resolve color scheme ================================
+                    var colorScheme = "{COLOR_SCHEME}";
+                    function colorFor() {
+                        switch (colorScheme) {
+                            case 'chain':   return { colorscheme: 'chainHetatm' };
+                            case 'element': return { colorscheme: 'Jmol' };
+                            case 'ssJmol':  return hasProtein ? { colorscheme: 'ssJmol' }
+                                                              : { colorscheme: 'Jmol' };
+                            case 'residue': return { colorscheme: 'amino' };
+                            default:        return { color: 'spectrum' };
+                        }
+                    }
+
+                    // === apply styling =======================================
+                    var requestedStyle = "{ATOM_STYLE}";
+                    var styleType = requestedStyle;
+                    if (styleType === 'cartoon' && !hasPolymer) styleType = 'stick';
+
+                    // Base style FIRST — guarantees every atom has *some* style
+                    // even if the smart-style serial-array selectors below match
+                    // nothing on a particular 3Dmol build.
+                    var baseStyle = {}; baseStyle[styleType] = colorFor();
+                    viewer.setStyle({}, baseStyle);
+
+                    // Smart styling — gated on the user toggle. We previously
+                    // required the structure to have BOTH a polymer AND a
+                    // ligand/metal before any per-class styling kicked in,
+                    // which silently no-op'd for pure-protein PDBs that have
+                    // cofactors but no metals, and for ligand-only files.
+                    // Now: if the toggle is on and there's *any* class to
+                    // distinguish, apply the per-class styles. Polymer styling
+                    // also applies when hasPolymer alone is true.
+                    if ({AUTO_STYLE_HETERO}) {
+                        if (hasPolymer) {
+                            var polymer = {}; polymer[styleType] = colorFor();
+                            viewer.setStyle({ serial: polySerials }, polymer);
+                        }
+                        if (hasLigand) {
+                            viewer.setStyle({ serial: ligSerials },
+                                            { stick: { colorscheme: 'Jmol', radius: 0.18 } });
+                        }
+                        if (hasMetal) {
+                            viewer.setStyle({ serial: metalSerials },
+                                            { sphere: { colorscheme: 'Jmol', scale: 0.45 } });
+                        }
+                        if (bufSerials.length > 0) {
+                            viewer.setStyle({ serial: bufSerials },
+                                            { line: { colorscheme: 'Jmol' } });
+                        }
+                        if (waterSerials.length > 0) {
+                            viewer.setStyle({ serial: waterSerials }, {});
+                        }
+                    } else if (hasMetal) {
+                        // Auto-styling off but metals still need spheres
+                        // (otherwise single-atom ions are invisible).
+                        viewer.setStyle({ serial: metalSerials },
+                                        { sphere: { colorscheme: 'Jmol', scale: 0.45 } });
+                    }
+
+                    if ({HIDE_H}) viewer.setStyle({ elem: 'H' }, {});
+
+                    // === surface (capped + thumbnail-mode override) ==========
+                    var doSurface = {SHOW_SURFACE} || ({THUMBNAIL_MODE} && hasProtein);
+                    if (doSurface && atoms.length <= 3000) {
+                        try {
+                            var surfSel = hasPolymer ? { serial: polySerials } : {};
+                            var surfStyle = {THUMBNAIL_MODE}
+                                ? { opacity: 1.0, colorscheme: 'whiteCarbon' }
+                                : { opacity: 0.50, color: 'white' };
+                            viewer.addSurface($3Dmol.SurfaceType.VDW, surfStyle, surfSel);
+                        } catch (e) {}
+                    }
+
+                    viewer.zoomTo();
+                    // User-configurable default zoom: 3Dmol's zoomTo() picks a
+                    // distance that fits the bounding sphere; a multiplicative
+                    // viewer.zoom() afterwards tightens (>1) or loosens (<1)
+                    // that framing. Skipped when the user picks "Auto-fit".
+                    if (!({ZOOM_IS_AUTO})) {
+                        try { viewer.zoom({ZOOM_FACTOR}); } catch (e) {}
+                    }
+                    if ({SHOW_UNIT_CELL}) {
+                        try { viewer.addUnitCell(); } catch (e) {}
+                    }
+
+                    // === info overlay ========================================
+                    if ({SHOW_INFO}) {
+                        var infoEl = document.getElementById('info');
+                        var parts = [];
+                        var fileName = "{FILE_NAME}";
+                        if (fileName) parts.push(fileName);
+                        parts.push(atoms.length.toLocaleString() + ' atoms');
+                        if (chainCount > 0) parts.push(chainCount + ' chain' + (chainCount === 1 ? '' : 's'));
+                        parts.push(format.toUpperCase());
+                        infoEl.textContent = parts.join(' · ');
+                    }
+
+                    // === click-to-label ======================================
+                    var labelEl = document.getElementById('label');
+                    viewer.setClickable({}, true, function (atom) {
+                        if (!atom) { labelEl.style.display = 'none'; return; }
+                        var bits = [];
+                        if (atom.elem) bits.push(atom.elem);
+                        if (atom.atom && atom.atom !== atom.elem) bits.push(atom.atom);
+                        if (atom.resn) bits.push(atom.resn);
+                        if (atom.resi !== undefined && atom.resi !== '') bits.push(atom.resi);
+                        if (atom.chain) bits.push('Chain ' + atom.chain);
+                        labelEl.textContent = bits.join(' · ');
+                        labelEl.style.display = 'block';
+                    });
+
+                    // === EXACTLY upstream's render+spin pattern ==============
+                    viewer.render();
+                    var spin = {ROTATION_SPEED};
+                    if (spin > 0) viewer.spin('y', spin);
+
+                    // === thumbnail bridge ====================================
+                    if ({THUMBNAIL_MODE}) {
+                        try {
+                            viewer.center();
+                            viewer.rotate(30, 'x');
+                            viewer.rotate(-30, 'y');
+                            viewer.zoomTo();
+                            viewer.render();
+                            requestAnimationFrame(function () {
+                                requestAnimationFrame(function () {
+                                    try {
+                                        var uri = viewer.pngURI();
+                                        if (window.webkit && window.webkit.messageHandlers
+                                            && window.webkit.messageHandlers.qlThumbnailReady) {
+                                            window.webkit.messageHandlers.qlThumbnailReady.postMessage(uri);
+                                        }
+                                    } catch (e) {}
+                                });
+                            });
+                        } catch (e) {}
+                    }
+
+                    // === window-resize → canvas-resize =======================
+                    var resizeTimer = null;
+                    $(window).on('resize', function () {
+                        if (resizeTimer) clearTimeout(resizeTimer);
+                        resizeTimer = setTimeout(function () {
+                            try { viewer.resize(); viewer.render(); } catch (e) {}
+                        }, 50);
+                    });
+                } catch (err) {
+                    showError('Unexpected error', err && err.message ? err.message : String(err));
+                }
+            });
+        </script>
+    </body>
+</html>

@@ -54,6 +54,10 @@
 				<string>com.jethrohemmann.QuickLookProtein.gro</string>
 				<!-- Gaussian CUBE -->
 				<string>com.jethrohemmann.QuickLookProtein.cube</string>
+				<string>com.jethrohemmann.QuickLookProtein.pqr</string>
+				<string>com.jethrohemmann.QuickLookProtein.prmtop</string>
+				<string>com.jethrohemmann.QuickLookProtein.vasp</string>
+				<string>com.jethrohemmann.QuickLookProtein.cdjson</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

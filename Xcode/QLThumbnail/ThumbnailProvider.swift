@@ -95,14 +95,17 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
             return
         }
 
-        // Look up the bundled viewer template in the host app's Resources.
-        // We deliberately do NOT keep a private copy of 3Dmol.js inside the
-        // extension — it lives in the main app's bundle and is reachable
-        // from here via the relative path of the .appex.
-        guard let hostResourcesURL = self.hostResourcesURL(),
-              let templateURL = self.urlIfExists(hostResourcesURL.appendingPathComponent("3Dmol_viewer.html")),
+        // Viewer template + 3Dmol.js are bundled INSIDE this extension's own
+        // .appex (copied into QLThumbnail/ so the synchronised file-system
+        // group picks them up automatically). Earlier versions tried to read
+        // them from the host app's Resources directory but the sandboxed
+        // WebContent process can't follow file:// URLs across the
+        // .appex → host bundle boundary reliably, which made the WebView
+        // hang while 3Dmol.js silently failed to load. Self-bundling
+        // duplicates ~4 MB but is the only sandbox-safe path.
+        guard let templateURL = Bundle.main.url(forResource: "3Dmol_viewer", withExtension: "html"),
               let template = try? String(contentsOf: templateURL, encoding: .utf8) else {
-            handler(nil, self.error(code: 3, message: "Viewer template not found in host bundle"))
+            handler(nil, self.error(code: 3, message: "Viewer template not found in extension bundle"))
             return
         }
 
@@ -244,24 +247,6 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
         handler = nil
     }
 
-    // MARK: Helpers — locating the host bundle --------------------------------
-
-    /// The .appex lives at:
-    ///     <hostApp>.app/Contents/PlugIns/<extension>.appex
-    /// so its great-grandparent is the host .app, and its Resources URL is
-    /// the standard `Contents/Resources` next to PlugIns.
-    private func hostResourcesURL() -> URL? {
-        let appex = Bundle.main.bundleURL
-        let host = appex.deletingLastPathComponent()         // PlugIns
-                        .deletingLastPathComponent()         // Contents
-                        .deletingLastPathComponent()         // .app
-        return Bundle(url: host)?.resourceURL
-    }
-
-    private func urlIfExists(_ url: URL) -> URL? {
-        FileManager.default.fileExists(atPath: url.path) ? url : nil
-    }
-
     // MARK: Helpers — file I/O & format ---------------------------------------
 
     private static func readText(at url: URL) throws -> String {
@@ -278,16 +263,20 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
     /// this extension doesn't depend on Shared/.
     private func formatToken(for ext: String) -> String? {
         switch ext {
-        case "pdb", "ent":    return "pdb"
-        case "pdbqt":         return "pdbqt"
-        case "cif", "mmcif":  return "cif"
-        case "sdf":           return "sdf"
-        case "mol":           return "sdf"   // 3Dmol parses single MOL via the SDF parser
-        case "mol2":          return "mol2"
-        case "xyz":           return "xyz"
-        case "gro":           return "gro"
-        case "cube", "cub":   return "cube"  // declined above; included for completeness
-        default:              return nil
+        case "pdb", "ent":     return "pdb"
+        case "pdbqt":          return "pdbqt"
+        case "pqr":            return "pqr"     // PDB + per-atom charge/radius (APBS/PDB2PQR)
+        case "cif", "mmcif":   return "cif"
+        case "sdf":            return "sdf"
+        case "mol":            return "sdf"     // 3Dmol parses single MOL via the SDF parser
+        case "mol2":           return "mol2"
+        case "xyz":            return "xyz"
+        case "gro":            return "gro"
+        case "prmtop", "top":  return "prmtop"  // AMBER topology
+        case "cube", "cub":    return "cube"    // declined above; included for completeness
+        case "vasp", "poscar": return "vasp"
+        case "cdjson", "json": return "cdjson"  // ChemDoodle JSON (3Dmol native)
+        default:               return nil
         }
     }
 

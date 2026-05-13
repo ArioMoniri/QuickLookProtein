@@ -220,16 +220,20 @@ struct Settings {
     /// Returns nil for unknown formats so the caller can surface an error.
     static func dataFormat(forExtension ext: String) -> String? {
         switch ext.lowercased() {
-        case "pdb", "ent":   return "pdb"
-        case "pdbqt":        return "pdbqt" // AutoDock / Vina docking output — 3Dmol handles natively
-        case "cif", "mmcif": return "cif"
-        case "sdf":          return "sdf"
-        case "mol":          return "sdf"   // 3Dmol parses single-molecule MOL files via the SDF parser
-        case "mol2":         return "mol2"
-        case "xyz":          return "xyz"
-        case "gro":          return "gro"
-        case "cube", "cub":  return "cube"
-        default:             return nil
+        case "pdb", "ent":     return "pdb"
+        case "pdbqt":          return "pdbqt"   // AutoDock / Vina docking output
+        case "pqr":            return "pqr"     // PDB + per-atom charge/radius (APBS, PDB2PQR)
+        case "cif", "mmcif":   return "cif"
+        case "sdf":            return "sdf"
+        case "mol":            return "sdf"     // 3Dmol parses single MOL via the SDF parser
+        case "mol2":           return "mol2"
+        case "xyz":            return "xyz"
+        case "gro":            return "gro"
+        case "prmtop", "top":  return "prmtop"  // AMBER topology
+        case "cube", "cub":    return "cube"    // Gaussian volumetric
+        case "vasp", "poscar": return "vasp"    // VASP / POSCAR
+        case "cdjson", "json": return "cdjson"  // ChemDoodle JSON
+        default:               return nil
         }
     }
 }

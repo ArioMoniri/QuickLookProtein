@@ -47,7 +47,7 @@
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.ariomoniri.QuickLookProtein.pdb</string>
+			<string>com.jethrohemmann.QuickLookProtein.pdb</string>
 			<key>UTTypeDescription</key>
 			<string>Protein Data Bank file</string>
 			<key>UTTypeConformsTo</key>
@@ -69,7 +69,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.ariomoniri.QuickLookProtein.cif</string>
+			<string>com.jethrohemmann.QuickLookProtein.cif</string>
 			<key>UTTypeDescription</key>
 			<string>Crystallographic Information File</string>
 			<key>UTTypeConformsTo</key>
@@ -90,7 +90,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.ariomoniri.QuickLookProtein.mmcif</string>
+			<string>com.jethrohemmann.QuickLookProtein.mmcif</string>
 			<key>UTTypeDescription</key>
 			<string>Macromolecular Crystallographic Information File</string>
 			<key>UTTypeConformsTo</key>
@@ -111,7 +111,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.ariomoniri.QuickLookProtein.sdf</string>
+			<string>com.jethrohemmann.QuickLookProtein.sdf</string>
 			<key>UTTypeDescription</key>
 			<string>MDL Structure-Data File</string>
 			<key>UTTypeConformsTo</key>
@@ -132,7 +132,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.ariomoniri.QuickLookProtein.mol</string>
+			<string>com.jethrohemmann.QuickLookProtein.mol</string>
 			<key>UTTypeDescription</key>
 			<string>MDL Molfile</string>
 			<key>UTTypeConformsTo</key>
@@ -153,7 +153,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.ariomoniri.QuickLookProtein.mol2</string>
+			<string>com.jethrohemmann.QuickLookProtein.mol2</string>
 			<key>UTTypeDescription</key>
 			<string>Tripos MOL2 file</string>
 			<key>UTTypeConformsTo</key>
@@ -174,7 +174,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.ariomoniri.QuickLookProtein.xyz</string>
+			<string>com.jethrohemmann.QuickLookProtein.xyz</string>
 			<key>UTTypeDescription</key>
 			<string>XMol XYZ coordinate file</string>
 			<key>UTTypeConformsTo</key>
@@ -195,7 +195,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.ariomoniri.QuickLookProtein.gro</string>
+			<string>com.jethrohemmann.QuickLookProtein.gro</string>
 			<key>UTTypeDescription</key>
 			<string>GROMACS structure file</string>
 			<key>UTTypeConformsTo</key>
@@ -216,7 +216,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.ariomoniri.QuickLookProtein.cube</string>
+			<string>com.jethrohemmann.QuickLookProtein.cube</string>
 			<key>UTTypeDescription</key>
 			<string>Gaussian Cube file</string>
 			<key>UTTypeConformsTo</key>
@@ -233,6 +233,76 @@
 				<key>public.mime-type</key>
 				<array>
 					<string>chemical/x-gaussian-cube</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.jethrohemmann.QuickLookProtein.pqr</string>
+			<key>UTTypeDescription</key>
+			<string>APBS / PDB2PQR file</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>pqr</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.jethrohemmann.QuickLookProtein.prmtop</string>
+			<key>UTTypeDescription</key>
+			<string>AMBER topology file</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>prmtop</string>
+					<string>top</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.jethrohemmann.QuickLookProtein.vasp</string>
+			<key>UTTypeDescription</key>
+			<string>VASP / POSCAR file</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>vasp</string>
+					<string>poscar</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.jethrohemmann.QuickLookProtein.cdjson</string>
+			<key>UTTypeDescription</key>
+			<string>ChemDoodle JSON</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>cdjson</string>
 				</array>
 			</dict>
 		</dict>

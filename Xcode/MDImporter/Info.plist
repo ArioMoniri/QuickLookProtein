@@ -48,6 +48,10 @@
 				<string>com.jethrohemmann.QuickLookProtein.xyz</string>
 				<string>com.jethrohemmann.QuickLookProtein.gro</string>
 				<string>com.jethrohemmann.QuickLookProtein.cube</string>
+				<string>com.jethrohemmann.QuickLookProtein.pqr</string>
+				<string>com.jethrohemmann.QuickLookProtein.prmtop</string>
+				<string>com.jethrohemmann.QuickLookProtein.vasp</string>
+				<string>com.jethrohemmann.QuickLookProtein.cdjson</string>
 			</array>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
