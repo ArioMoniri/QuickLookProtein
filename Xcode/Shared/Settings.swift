@@ -51,14 +51,18 @@ class SettingsStorage: ObservableObject {
     }()
 
     // MARK: - Per-format atom display style
-    @Published var atomStyleCIF:  Settings.AtomStyle { didSet { Self.write(atomStyleCIF,  forKey: "atomStyleCIF")  } }
-    @Published var atomStylePDB:  Settings.AtomStyle { didSet { Self.write(atomStylePDB,  forKey: "atomStylePDB")  } }
-    @Published var atomStyleSDF:  Settings.AtomStyle { didSet { Self.write(atomStyleSDF,  forKey: "atomStyleSDF")  } }
-    @Published var atomStyleMOL2: Settings.AtomStyle { didSet { Self.write(atomStyleMOL2, forKey: "atomStyleMOL2") } }
-    @Published var atomStyleXYZ:  Settings.AtomStyle { didSet { Self.write(atomStyleXYZ,  forKey: "atomStyleXYZ")  } }
-    @Published var atomStyleMOL:  Settings.AtomStyle { didSet { Self.write(atomStyleMOL,  forKey: "atomStyleMOL")  } }
-    @Published var atomStyleGRO:  Settings.AtomStyle { didSet { Self.write(atomStyleGRO,  forKey: "atomStyleGRO")  } }
-    @Published var atomStyleCUBE: Settings.AtomStyle { didSet { Self.write(atomStyleCUBE, forKey: "atomStyleCUBE") } }
+    @Published var atomStyleCIF:    Settings.AtomStyle { didSet { Self.write(atomStyleCIF,    forKey: "atomStyleCIF")    } }
+    @Published var atomStylePDB:    Settings.AtomStyle { didSet { Self.write(atomStylePDB,    forKey: "atomStylePDB")    } }
+    @Published var atomStyleSDF:    Settings.AtomStyle { didSet { Self.write(atomStyleSDF,    forKey: "atomStyleSDF")    } }
+    @Published var atomStyleMOL2:   Settings.AtomStyle { didSet { Self.write(atomStyleMOL2,   forKey: "atomStyleMOL2")   } }
+    @Published var atomStyleXYZ:    Settings.AtomStyle { didSet { Self.write(atomStyleXYZ,    forKey: "atomStyleXYZ")    } }
+    @Published var atomStyleMOL:    Settings.AtomStyle { didSet { Self.write(atomStyleMOL,    forKey: "atomStyleMOL")    } }
+    @Published var atomStyleGRO:    Settings.AtomStyle { didSet { Self.write(atomStyleGRO,    forKey: "atomStyleGRO")    } }
+    @Published var atomStyleCUBE:   Settings.AtomStyle { didSet { Self.write(atomStyleCUBE,   forKey: "atomStyleCUBE")   } }
+    @Published var atomStylePQR:    Settings.AtomStyle { didSet { Self.write(atomStylePQR,    forKey: "atomStylePQR")    } }
+    @Published var atomStyleVASP:   Settings.AtomStyle { didSet { Self.write(atomStyleVASP,   forKey: "atomStyleVASP")   } }
+    @Published var atomStyleCDJSON: Settings.AtomStyle { didSet { Self.write(atomStyleCDJSON, forKey: "atomStyleCDJSON") } }
+    @Published var atomStyleMMTF:   Settings.AtomStyle { didSet { Self.write(atomStyleMMTF,   forKey: "atomStyleMMTF")   } }
 
     // MARK: - Global rendering
     @Published var rotationSpeed:   Settings.RotationSpeed { didSet { Self.write(rotationSpeed,   forKey: "rotationSpeed")   } }
@@ -88,6 +92,10 @@ class SettingsStorage: ObservableObject {
         self.atomStyleMOL    = Self.read(forKey: "atomStyleMOL",    default: .stick)
         self.atomStyleGRO    = Self.read(forKey: "atomStyleGRO",    default: .cartoon)
         self.atomStyleCUBE   = Self.read(forKey: "atomStyleCUBE",   default: .stick)
+        self.atomStylePQR    = Self.read(forKey: "atomStylePQR",    default: .stick)
+        self.atomStyleVASP   = Self.read(forKey: "atomStyleVASP",   default: .sphere)
+        self.atomStyleCDJSON = Self.read(forKey: "atomStyleCDJSON", default: .stick)
+        self.atomStyleMMTF   = Self.read(forKey: "atomStyleMMTF",   default: .cartoon)
         self.rotationSpeed   = Self.read(forKey: "rotationSpeed",   default: .medium)
         self.colorScheme     = Self.read(forKey: "colorScheme",     default: .spectrum)
         self.defaultZoom     = Self.read(forKey: "defaultZoom",     default: .auto)
@@ -150,10 +158,10 @@ class SettingsStorage: ObservableObject {
         case "mol":                  return atomStyleMOL
         case "gro":                  return atomStyleGRO
         case "cube", "cub":          return atomStyleCUBE
-        case "pqr":                  return .stick   // PQR is PDB-shaped but typically small molecules
-        case "vasp", "poscar":       return .sphere  // VASP/POSCAR crystals — atoms-as-balls is the convention and renders even without bonds
-        case "cdjson", "json":       return .stick   // ChemDoodle JSON small molecules
-        case "mmtf":                 return .cartoon // MMTF is compressed PDB — same convention as PDB
+        case "pqr":                  return atomStylePQR
+        case "vasp", "poscar":       return atomStyleVASP
+        case "cdjson", "json":       return atomStyleCDJSON
+        case "mmtf":                 return atomStyleMMTF
         default:                     return .stick   // unknown small-molecule formats — better than empty
         }
     }
