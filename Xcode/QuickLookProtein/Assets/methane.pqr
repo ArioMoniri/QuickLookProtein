@@ -1,0 +1,8 @@
+REMARK   Methane in PQR format (PDB + per-atom charge + radius)
+ATOM      1  C   MET     1       0.0000   0.0000   0.0000 -0.4000  1.7000
+ATOM      2  H1  MET     1       1.0890   0.0000   0.0000  0.1000  1.2000
+ATOM      3  H2  MET     1      -0.3630   1.0260   0.0000  0.1000  1.2000
+ATOM      4  H3  MET     1      -0.3630  -0.5130   0.8888  0.1000  1.2000
+ATOM      5  H4  MET     1      -0.3630  -0.5130  -0.8888  0.1000  1.2000
+TER
+END

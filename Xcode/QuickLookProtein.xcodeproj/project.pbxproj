@@ -27,12 +27,14 @@
 		4BE18E06281F3D0200034BE4 /* 6oc6.pdb in Resources */ = {isa = PBXBuildFile; fileRef = 4BE18E05281F3D0200034BE4 /* 6oc6.pdb */; };
 		4BED22A32821CD6D003F66A0 /* 3Dmol.js in Resources */ = {isa = PBXBuildFile; fileRef = 4BED22A22821CD6D003F66A0 /* 3Dmol.js */; };
 		4BED22A42821CD6D003F66A0 /* 3Dmol.js in Resources */ = {isa = PBXBuildFile; fileRef = 4BED22A22821CD6D003F66A0 /* 3Dmol.js */; };
-		A1AR10AA1A2B3C4D00000001 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AR10AA1A2B3C4D00000002 /* Updater.swift */; };
 		A1CAF1E01A2B3C4D00000001 /* caffeine.mol2 in Resources */ = {isa = PBXBuildFile; fileRef = A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */; };
 		A1ME74A1E1A2B3C4D00000001 /* methane.mol in Resources */ = {isa = PBXBuildFile; fileRef = A1ME74A1E1A2B3C4D00000002 /* methane.mol */; };
 		A1BE7Z1E2A2B3C4D00000001 /* benzene.xyz in Resources */ = {isa = PBXBuildFile; fileRef = A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */; };
 		A1WA7G1E3A2B3C4D00000001 /* water.gro in Resources */ = {isa = PBXBuildFile; fileRef = A1WA7G1E3A2B3C4D00000002 /* water.gro */; };
 		A1WA7C1E4A2B3C4D00000001 /* water.cube in Resources */ = {isa = PBXBuildFile; fileRef = A1WA7C1E4A2B3C4D00000002 /* water.cube */; };
+		A1PQR1E5A2B3C4D00000001 /* methane.pqr in Resources */ = {isa = PBXBuildFile; fileRef = A1PQR1E5A2B3C4D00000002 /* methane.pqr */; };
+		A1VSP1E6A2B3C4D00000001 /* diamond.vasp in Resources */ = {isa = PBXBuildFile; fileRef = A1VSP1E6A2B3C4D00000002 /* diamond.vasp */; };
+		A1CDJ1E7A2B3C4D00000001 /* methane.cdjson in Resources */ = {isa = PBXBuildFile; fileRef = A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,12 +83,14 @@
 		4BE18E03281F3B4900034BE4 /* 1565673.cif */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 1565673.cif; sourceTree = "<group>"; };
 		4BE18E05281F3D0200034BE4 /* 6oc6.pdb */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 6oc6.pdb; sourceTree = "<group>"; };
 		4BED22A22821CD6D003F66A0 /* 3Dmol.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = 3Dmol.js; sourceTree = "<group>"; };
-		A1AR10AA1A2B3C4D00000002 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = caffeine.mol2; sourceTree = "<group>"; };
 		A1ME74A1E1A2B3C4D00000002 /* methane.mol */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.mol; sourceTree = "<group>"; };
 		A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = benzene.xyz; sourceTree = "<group>"; };
 		A1WA7G1E3A2B3C4D00000002 /* water.gro */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = water.gro; sourceTree = "<group>"; };
 		A1WA7C1E4A2B3C4D00000002 /* water.cube */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = water.cube; sourceTree = "<group>"; };
+		A1PQR1E5A2B3C4D00000002 /* methane.pqr */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.pqr; sourceTree = "<group>"; };
+		A1VSP1E6A2B3C4D00000002 /* diamond.vasp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = diamond.vasp; sourceTree = "<group>"; };
+		A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.cdjson; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -119,6 +123,9 @@
 				A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */,
 				A1WA7G1E3A2B3C4D00000002 /* water.gro */,
 				A1WA7C1E4A2B3C4D00000002 /* water.cube */,
+				A1PQR1E5A2B3C4D00000002 /* methane.pqr */,
+				A1VSP1E6A2B3C4D00000002 /* diamond.vasp */,
+				A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */,
 			);
 			path = Assets;
 			sourceTree = "<group>";
@@ -148,7 +155,6 @@
 			children = (
 				4B0888B626D64B54009492C5 /* Assets */,
 				4B0FDF7E26C9A31F00C94DDE /* QuickLookProteinApp.swift */,
-				A1AR10AA1A2B3C4D00000002 /* Updater.swift */,
 				4B0FDF8026C9A31F00C94DDE /* ContentView.swift */,
 				4B0FDF8226C9A32100C94DDE /* Assets.xcassets */,
 				4B0FDF8726C9A32100C94DDE /* Info.plist */,
@@ -297,6 +303,9 @@
 				A1BE7Z1E2A2B3C4D00000001 /* benzene.xyz in Resources */,
 				A1WA7G1E3A2B3C4D00000001 /* water.gro in Resources */,
 				A1WA7C1E4A2B3C4D00000001 /* water.cube in Resources */,
+				A1PQR1E5A2B3C4D00000001 /* methane.pqr in Resources */,
+				A1VSP1E6A2B3C4D00000001 /* diamond.vasp in Resources */,
+				A1CDJ1E7A2B3C4D00000001 /* methane.cdjson in Resources */,
 				4B0FDF8326C9A32100C94DDE /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -321,7 +330,6 @@
 				4B20116126D2692200B77CEF /* Settings.swift in Sources */,
 				4B0FDF8126C9A31F00C94DDE /* ContentView.swift in Sources */,
 				4B0FDF7F26C9A31F00C94DDE /* QuickLookProteinApp.swift in Sources */,
-				A1AR10AA1A2B3C4D00000001 /* Updater.swift in Sources */,
 				4B99E5C526E4FD7200B44AD9 /* VersionCheck.swift in Sources */,
 				4B450AC326D2D6D1007F0A39 /* SharedFunctions.swift in Sources */,
 			);

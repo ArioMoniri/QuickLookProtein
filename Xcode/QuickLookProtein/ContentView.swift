@@ -12,7 +12,8 @@ import UniformTypeIdentifiers
 
 /// Extensions we know 3Dmol can render — used by the drag-and-drop tile.
 private let supportedExtensions: Set<String> = [
-    "pdb", "ent", "pdbqt", "cif", "mmcif", "sdf", "mol", "mol2", "xyz", "gro", "cube", "cub"
+    "pdb", "ent", "pdbqt", "pqr", "cif", "mmcif", "sdf", "mol", "mol2",
+    "xyz", "gro", "cube", "cub", "vasp", "poscar", "cdjson"
 ]
 
 /// Drop-path size cap: same 25 MB ceiling the Quick Look extension uses. Preview the
@@ -38,17 +39,23 @@ struct ContentView: View {
         let xyzPath  = Bundle.main.path(forResource: "benzene",       ofType: "xyz")!
         let groPath  = Bundle.main.path(forResource: "water",         ofType: "gro")!
         let cubePath = Bundle.main.path(forResource: "water",         ofType: "cube")!
+        let pqrPath    = Bundle.main.path(forResource: "methane",     ofType: "pqr")!
+        let vaspPath   = Bundle.main.path(forResource: "diamond",     ofType: "vasp")!
+        let cdjsonPath = Bundle.main.path(forResource: "methane",     ofType: "cdjson")!
 
         let baseUrl = URL(fileURLWithPath: htmlPath)
 
-        let htmlPDB  = previewHTML(htmlPath: htmlPath, filePath: pdbPath,  ext: "pdb")
-        let htmlCIF  = previewHTML(htmlPath: htmlPath, filePath: cifPath,  ext: "cif")
-        let htmlSDF  = previewHTML(htmlPath: htmlPath, filePath: sdfPath,  ext: "sdf")
-        let htmlMOL  = previewHTML(htmlPath: htmlPath, filePath: molPath,  ext: "mol")
-        let htmlMOL2 = previewHTML(htmlPath: htmlPath, filePath: mol2Path, ext: "mol2")
-        let htmlXYZ  = previewHTML(htmlPath: htmlPath, filePath: xyzPath,  ext: "xyz")
-        let htmlGRO  = previewHTML(htmlPath: htmlPath, filePath: groPath,  ext: "gro")
-        let htmlCUBE = previewHTML(htmlPath: htmlPath, filePath: cubePath, ext: "cube")
+        let htmlPDB    = previewHTML(htmlPath: htmlPath, filePath: pdbPath,    ext: "pdb")
+        let htmlCIF    = previewHTML(htmlPath: htmlPath, filePath: cifPath,    ext: "cif")
+        let htmlSDF    = previewHTML(htmlPath: htmlPath, filePath: sdfPath,    ext: "sdf")
+        let htmlMOL    = previewHTML(htmlPath: htmlPath, filePath: molPath,    ext: "mol")
+        let htmlMOL2   = previewHTML(htmlPath: htmlPath, filePath: mol2Path,   ext: "mol2")
+        let htmlXYZ    = previewHTML(htmlPath: htmlPath, filePath: xyzPath,    ext: "xyz")
+        let htmlGRO    = previewHTML(htmlPath: htmlPath, filePath: groPath,    ext: "gro")
+        let htmlCUBE   = previewHTML(htmlPath: htmlPath, filePath: cubePath,   ext: "cube")
+        let htmlPQR    = previewHTML(htmlPath: htmlPath, filePath: pqrPath,    ext: "pqr")
+        let htmlVASP   = previewHTML(htmlPath: htmlPath, filePath: vaspPath,   ext: "vasp")
+        let htmlCDJSON = previewHTML(htmlPath: htmlPath, filePath: cdjsonPath, ext: "cdjson")
 
         // Single scrollable page — settings + about at the top, previews below.
         // No fixed split, no clamped scroll region. The whole thing scrolls if
@@ -200,6 +207,16 @@ struct ContentView: View {
                     previewTile(html: htmlCUBE, base: baseUrl,
                                 title: "CUBE",
                                 caption: { Text("Water (Gaussian Cube)") })
+                    previewTile(html: htmlPQR,  base: baseUrl,
+                                title: "PQR",
+                                caption: { Text("Methane (PDB + charge/radius)") })
+
+                    previewTile(html: htmlVASP, base: baseUrl,
+                                title: "VASP",
+                                caption: { Text("Diamond cubic carbon (POSCAR)") })
+                    previewTile(html: htmlCDJSON, base: baseUrl,
+                                title: "CDJSON",
+                                caption: { Text("Methane (ChemDoodle JSON)") })
 
                     customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
                 }
@@ -239,7 +256,7 @@ struct ContentView: View {
                                     Image(systemName: "square.and.arrow.down")
                                         .font(.system(size: 26))
                                     Text("Drop or click to choose").font(.callout)
-                                    Text("PDB · CIF · SDF · MOL · MOL2\nXYZ · GRO · CUBE · PDBQT")
+                                    Text("PDB · CIF · SDF · MOL · MOL2 · XYZ\nGRO · CUBE · PQR · PDBQT · VASP · CDJSON")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                         .multilineTextAlignment(.center)
@@ -378,6 +395,19 @@ struct ContentView_Previews: PreviewProvider {
 // updates often (e.g. on `isDropTargeted` hover). Keep no view ownership on the struct;
 // let SwiftUI cache the WKWebView via `makeNSView`, and reload only when the rendered
 // HTML actually changed (tracked via the coordinator).
+/// WKWebView subclass that forwards vertical scroll-wheel events to the enclosing
+/// SwiftUI ScrollView instead of consuming them itself. Without this, hovering the
+/// cursor over any preview tile while scrolling the main app makes the page scroll
+/// stall — the WebView captures the event, 3Dmol's mouse handler interprets it as
+/// a zoom gesture, and the outer ScrollView never sees it. We give up scroll-to-zoom
+/// inside the in-app tiles to make the overall scroll behaviour predictable; users
+/// can still zoom interactively in Quick Look previews.
+final class PassthroughWebView: WKWebView {
+    override func scrollWheel(with event: NSEvent) {
+        self.nextResponder?.scrollWheel(with: event)
+    }
+}
+
 struct WebView: NSViewRepresentable {
 
     var html: String
@@ -390,7 +420,7 @@ struct WebView: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> WKWebView {
-        let view = WKWebView()
+        let view = PassthroughWebView()
         view.setValue(false, forKeyPath: "drawsBackground") // allow transparent background
         return view
     }
