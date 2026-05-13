@@ -24,7 +24,10 @@ struct QuickLookProteinApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .frame(width: 800, height: 600)
+                // Bumped from 800×600 — with the additional formats and the
+                // drag-drop tile, the previews row needs more horizontal room,
+                // and the richer settings column wants the extra height.
+                .frame(minWidth: 1100, idealWidth: 1100, minHeight: 720, idealHeight: 720)
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
                 }

@@ -153,11 +153,15 @@ struct ContentView: View {
                     }
                     .padding()
                 }
+                // Pin the top settings/about row to its natural height so the
+                // previews HStack below claims every leftover pixel — without
+                // this, the WebView tiles get squeezed to ~0 px and look blank.
+                .fixedSize(horizontal: false, vertical: true)
 
                 Divider()
 
-                // MARK: Live previews
-                HStack {
+                // MARK: Live previews (rotate at the user's chosen rotation speed)
+                HStack(spacing: 8) {
                     previewTile(html: htmlPDB,  base: baseUrl,
                                 title: "PDB",
                                 caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
@@ -176,6 +180,9 @@ struct ContentView: View {
 
                     customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
                 }
+                .frame(maxHeight: .infinity)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
             }
         }
     }
