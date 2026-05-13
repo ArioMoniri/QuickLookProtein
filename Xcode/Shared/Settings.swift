@@ -11,53 +11,53 @@ import SwiftUI
 class SettingsStorage: ObservableObject {
 
     // MARK: - Per-format atom display style
-    @AppStorage("atomStyleCIF", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleCIF", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStyleCIF: Settings.AtomStyle = .stick
-    @AppStorage("atomStylePDB", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStylePDB", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStylePDB: Settings.AtomStyle = .cartoon
-    @AppStorage("atomStyleSDF", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleSDF", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStyleSDF: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleMOL2", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleMOL2", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStyleMOL2: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleXYZ", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleXYZ", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStyleXYZ: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleMOL", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleMOL", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStyleMOL: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleGRO", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleGRO", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStyleGRO: Settings.AtomStyle = .cartoon
-    @AppStorage("atomStyleCUBE", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleCUBE", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var atomStyleCUBE: Settings.AtomStyle = .stick
 
     // MARK: - Global rendering
-    @AppStorage("rotationSpeed", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("rotationSpeed", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var rotationSpeed: Settings.RotationSpeed = .medium
-    @AppStorage("colorScheme", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("colorScheme", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var colorScheme: Settings.ColorScheme = .spectrum
-    @AppStorage("autoStyleHetero", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("autoStyleHetero", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var autoStyleHetero: Bool = true
-    @AppStorage("showSurface", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("showSurface", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var showSurface: Bool = false
-    @AppStorage("hideHydrogens", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("hideHydrogens", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var hideHydrogens: Bool = false
-    @AppStorage("showUnitCell", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("showUnitCell", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var showUnitCell: Bool = false
-    @AppStorage("showInfoOverlay", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("showInfoOverlay", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var showInfoOverlay: Bool = true
 
     /// Initial zoom factor applied after 3Dmol's `viewer.zoomTo()` auto-fit.
     /// Lets the user open Quick Look previews wider or tighter on the molecule
     /// without manually scrolling to zoom every time.
-    @AppStorage("defaultZoom", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("defaultZoom", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var defaultZoom: Settings.DefaultZoom = .auto
 
     // MARK: - Background color components
-    @AppStorage("bgColorRed", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("bgColorRed", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var bgColorRed: Double = 0.0
-    @AppStorage("bgColorGreen", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("bgColorGreen", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var bgColorGreen: Double = 0.0
-    @AppStorage("bgColorBlue", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("bgColorBlue", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var bgColorBlue: Double = 0.0
-    @AppStorage("bgColorOpacity", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("bgColorOpacity", store: UserDefaults(suiteName: "W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein"))
     var bgColorOpacity: Double = 0.0
 
     var bgColor: Color {
