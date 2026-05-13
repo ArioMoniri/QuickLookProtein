@@ -180,14 +180,37 @@
                     var baseStyle = {}; baseStyle[styleType] = colorFor();
                     viewer.setStyle({}, baseStyle);
 
-                    if ({AUTO_STYLE_HETERO} && hasPolymer && (hasLigand || hasMetal)) {
-                        var polymer = {}; polymer[styleType] = colorFor();
-                        viewer.setStyle({ serial: polySerials  }, polymer);
-                        viewer.setStyle({ serial: ligSerials   }, { stick:  { colorscheme: 'Jmol', radius: 0.18 } });
-                        viewer.setStyle({ serial: metalSerials }, { sphere: { colorscheme: 'Jmol', scale: 0.45 } });
-                        viewer.setStyle({ serial: bufSerials   }, { line:   { colorscheme: 'Jmol' } });
-                        viewer.setStyle({ serial: waterSerials }, {});
+                    // Smart styling — gated on the user toggle. We previously
+                    // required the structure to have BOTH a polymer AND a
+                    // ligand/metal before any per-class styling kicked in,
+                    // which silently no-op'd for pure-protein PDBs that have
+                    // cofactors but no metals, and for ligand-only files.
+                    // Now: if the toggle is on and there's *any* class to
+                    // distinguish, apply the per-class styles. Polymer styling
+                    // also applies when hasPolymer alone is true.
+                    if ({AUTO_STYLE_HETERO}) {
+                        if (hasPolymer) {
+                            var polymer = {}; polymer[styleType] = colorFor();
+                            viewer.setStyle({ serial: polySerials }, polymer);
+                        }
+                        if (hasLigand) {
+                            viewer.setStyle({ serial: ligSerials },
+                                            { stick: { colorscheme: 'Jmol', radius: 0.18 } });
+                        }
+                        if (hasMetal) {
+                            viewer.setStyle({ serial: metalSerials },
+                                            { sphere: { colorscheme: 'Jmol', scale: 0.45 } });
+                        }
+                        if (bufSerials.length > 0) {
+                            viewer.setStyle({ serial: bufSerials },
+                                            { line: { colorscheme: 'Jmol' } });
+                        }
+                        if (waterSerials.length > 0) {
+                            viewer.setStyle({ serial: waterSerials }, {});
+                        }
                     } else if (hasMetal) {
+                        // Auto-styling off but metals still need spheres
+                        // (otherwise single-atom ions are invisible).
                         viewer.setStyle({ serial: metalSerials },
                                         { sphere: { colorscheme: 'Jmol', scale: 0.45 } });
                     }

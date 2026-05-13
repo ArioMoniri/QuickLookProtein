@@ -24,17 +24,27 @@ struct QuickLookProteinApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                // Scrollable settings column up top (capped at 360 px) +
-                // previews row with a 320 px minimum + a divider + padding.
-                // 1180×780 gives everything natural room; the user can grow
-                // the window from there.
-                .frame(minWidth: 1080, idealWidth: 1180, minHeight: 740, idealHeight: 780)
+                // Open at a comfortable laptop-friendly size, not maximised.
+                // Three-column preview grid + side-by-side settings/about
+                // fits at ~900×680 with everything visible. The user can grow
+                // the window from there — content is in a ScrollView, so
+                // smaller is fine too.
+                .frame(minWidth: 760, idealWidth: 940, minHeight: 600, idealHeight: 720)
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
+                    // Sparkle's SPUStandardUpdaterController starts its scheduled-check
+                    // timer in its initializer (referenced via Updater.shared); we just
+                    // need to touch it to keep the singleton alive.
+                    _ = Updater.shared
                 }
         }
         .commands {
             CommandGroup(replacing: .newItem, addition: {}) // remove File -> New Window from menu
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    Updater.shared.checkForUpdates()
+                }
+            }
         }
     }
     
