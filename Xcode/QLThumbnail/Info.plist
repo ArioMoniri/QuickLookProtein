@@ -35,15 +35,15 @@
 				<string>com.crystalmaker.crystalmaker.cif</string>
 				<string>com.revvity.external.cif</string>
 				<string>com.tripos.mol2</string>
-				<string>com.jethrohemmann.QuickLookProtein.pdb</string>
-				<string>com.jethrohemmann.QuickLookProtein.cif</string>
-				<string>com.jethrohemmann.QuickLookProtein.mmcif</string>
-				<string>com.jethrohemmann.QuickLookProtein.sdf</string>
-				<string>com.jethrohemmann.QuickLookProtein.mol</string>
-				<string>com.jethrohemmann.QuickLookProtein.mol2</string>
-				<string>com.jethrohemmann.QuickLookProtein.xyz</string>
-				<string>com.jethrohemmann.QuickLookProtein.gro</string>
-				<string>com.jethrohemmann.QuickLookProtein.cube</string>
+				<string>com.ariomoniri.QuickLookProtein.pdb</string>
+				<string>com.ariomoniri.QuickLookProtein.cif</string>
+				<string>com.ariomoniri.QuickLookProtein.mmcif</string>
+				<string>com.ariomoniri.QuickLookProtein.sdf</string>
+				<string>com.ariomoniri.QuickLookProtein.mol</string>
+				<string>com.ariomoniri.QuickLookProtein.mol2</string>
+				<string>com.ariomoniri.QuickLookProtein.xyz</string>
+				<string>com.ariomoniri.QuickLookProtein.gro</string>
+				<string>com.ariomoniri.QuickLookProtein.cube</string>
 			</array>
 			<key>QLThumbnailMinimumSize</key>
 			<integer>16</integer>

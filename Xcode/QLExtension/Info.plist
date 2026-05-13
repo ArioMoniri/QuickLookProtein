@@ -32,28 +32,28 @@
 				<string>org.libreoffice.pdb-document</string>
 				<string>dyn.ah62d4rv4ge80g4pg</string>
 				<string>net.sourceforge.openbabel.pdb</string>
-				<string>com.jethrohemmann.QuickLookProtein.pdb</string>
+				<string>com.ariomoniri.QuickLookProtein.pdb</string>
 				<!-- SDF / MDL Molfile -->
 				<string>net.sourceforge.openbabel.mdl</string>
 				<string>dyn.ah62d4rv4ge81a3dc</string>
-				<string>com.jethrohemmann.QuickLookProtein.sdf</string>
-				<string>com.jethrohemmann.QuickLookProtein.mol</string>
+				<string>com.ariomoniri.QuickLookProtein.sdf</string>
+				<string>com.ariomoniri.QuickLookProtein.mol</string>
 				<!-- CIF / mmCIF -->
 				<string>com.cif</string>
 				<string>com.crystalmaker.crystalmaker.cif</string>
 				<string>com.revvity.external.cif</string>
 				<string>dyn.ah62d4rv4ge81g3dg</string>
-				<string>com.jethrohemmann.QuickLookProtein.cif</string>
-				<string>com.jethrohemmann.QuickLookProtein.mmcif</string>
+				<string>com.ariomoniri.QuickLookProtein.cif</string>
+				<string>com.ariomoniri.QuickLookProtein.mmcif</string>
 				<!-- Tripos MOL2 -->
 				<string>com.tripos.mol2</string>
-				<string>com.jethrohemmann.QuickLookProtein.mol2</string>
+				<string>com.ariomoniri.QuickLookProtein.mol2</string>
 				<!-- XYZ -->
-				<string>com.jethrohemmann.QuickLookProtein.xyz</string>
+				<string>com.ariomoniri.QuickLookProtein.xyz</string>
 				<!-- GROMACS -->
-				<string>com.jethrohemmann.QuickLookProtein.gro</string>
+				<string>com.ariomoniri.QuickLookProtein.gro</string>
 				<!-- Gaussian CUBE -->
-				<string>com.jethrohemmann.QuickLookProtein.cube</string>
+				<string>com.ariomoniri.QuickLookProtein.cube</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

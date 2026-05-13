@@ -16,7 +16,7 @@ Cover Flow, Gallery view, and large-icon mode.
 **Steps:**
 
 1. *Xcode → File → New → Target… → Thumbnail Extension* (macOS).
-2. Bundle ID: `com.jethrohemmann.QuickLookProtein.Thumbnail`.
+2. Bundle ID: `com.ariomoniri.QuickLookProtein.Thumbnail`.
 3. The generated `ThumbnailProvider.swift` should:
    - Build a headless `WKWebView` sized to `request.maximumSize`.
    - Load the shared `3Dmol_viewer.html` with `ROTATION_SPEED=0`,
@@ -59,10 +59,10 @@ EXPDTA, etc.) so the user can search `kind:pdb resolution:<2`.
 
 ## Signing / App Group
 
-The App Group identifier `W3SKSV7VPT.group.com.jethrohemmann.QuickLookProtein`
+The App Group identifier `FF68N39FU5.group.com.ariomoniri.QuickLookProtein`
 is hard-coded in `Settings.swift` and in the entitlements files. To
 build under a different developer account, search-and-replace
-`W3SKSV7VPT` with your own team ID in:
+`FF68N39FU5` with your own team ID in:
 
 - `Xcode/Shared/Settings.swift`
 - `Xcode/QuickLookProtein/QuickLookProtein.entitlements`

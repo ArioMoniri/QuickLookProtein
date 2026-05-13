@@ -6,6 +6,9 @@
 [![Swift 5](https://img.shields.io/badge/Swift-5-orange?logo=swift)](https://swift.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Rendered by 3Dmol.js](https://img.shields.io/badge/rendered%20by-3Dmol.js-purple)](https://3dmol.csb.pitt.edu)
+[![Latest release](https://img.shields.io/github/v/release/ArioMoniri/QuickLookProtein?display_name=tag)](https://github.com/ArioMoniri/QuickLookProtein/releases)
+
+> 🔱 This is **[Ariorad Moniri](https://github.com/ArioMoniri)'s signed fork** of the original [QuickLookProtein by Jethro Hemmann](https://github.com/JethroHemmann/QuickLookProtein), distributed via [releases on this fork](https://github.com/ArioMoniri/QuickLookProtein/releases) and notarised under Apple Developer team `FF68N39FU5`. Looking for the upstream pull request? See [the PR branch](https://github.com/ArioMoniri/QuickLookProtein/tree/feature/3dmol-upgrade).
 
 QuickLookProtein integrates with macOS Quick Look so you can preview protein and small-molecule structures the same way you preview PDFs and images — just select a file in Finder and tap <kbd>Space</kbd>. Rendering is performed by [3Dmol.js](https://3dmol.csb.pitt.edu) inside a `WKWebView`, so previews are interactive (drag to rotate, scroll to zoom, click an atom to label it).
 
@@ -57,10 +60,10 @@ The bundled settings app lets you set the default atom style per format, color s
 
 ## 📦 Installation
 
-1. Download the latest release ZIP from the [Releases page](https://github.com/JethroHemmann/QuickLookProtein/releases).
+1. Download `QuickLookProtein-{version}.zip` from the [Releases page on this fork](https://github.com/ArioMoniri/QuickLookProtein/releases).
 2. Unzip and drag `QuickLookProtein.app` to `/Applications`.
-3. Open the app once. If macOS warns the app can't be verified, follow [Apple's instructions for opening apps from unidentified developers](https://support.apple.com/en-us/102445).
-4. The Quick Look + Thumbnail + Spotlight extensions are installed and activated automatically. You can verify them under **System Settings → General → Login Items & Extensions → Quick Look** (and similar for File Provider / Spotlight).
+3. Open the app once. The build is signed and notarised by Apple, so it should launch without a warning. If you ever see a "could not be verified" dialog (e.g. on a fresh Mac before notarisation propagates), follow [Apple's instructions for opening apps from unidentified developers](https://support.apple.com/en-us/102445).
+4. The Quick Look preview, Thumbnail, and Spotlight extensions are installed and activated automatically. Verify under **System Settings → General → Login Items & Extensions → Quick Look** (and similar for File Provider / Spotlight).
 
 ![Screenshot of System Preferences → Extensions → Quick Look](Screenshots/System_Preferences_Extensions.png "System Preferences → Extensions → Quick Look")
 
@@ -68,19 +71,34 @@ The bundled settings app lets you set the default atom style per format, color s
 
 **Requires macOS 11+** for the main app, Quick Look preview, and Thumbnail extension. **macOS 12+** for the Spotlight indexing extension (`CSImportExtension` is macOS 12+).
 
+### 🔄 Auto-update
+
+The app checks for new releases of this fork once per launch (debounced to once per 24h). When a new version is published you'll see a prompt with Download / Remind Me / Skip This Version. You can also trigger a check on demand from **QuickLookProtein menu → Check for Updates…** or from the *About* section in the settings window.
+
+The check uses the GitHub Releases API directly — no separate update server, no Sparkle infrastructure. If you'd like Sparkle's in-place install behaviour instead, see [docs/FUTURE_WORK.md](docs/FUTURE_WORK.md).
+
 ---
 
 ## 🛠️ Building from source
 
 ```bash
-git clone https://github.com/JethroHemmann/QuickLookProtein.git
+git clone https://github.com/ArioMoniri/QuickLookProtein.git
 cd QuickLookProtein
+git checkout feature/ario-signed   # signed-release branch
 open Xcode/QuickLookProtein.xcodeproj
 ```
 
 In Xcode → *Signing & Capabilities* for each of the four targets, pick your developer team and let Xcode regenerate signing identities.
 
 The Quick Look preview and main-app targets exist in the project. **The Thumbnail and Spotlight Indexer targets need to be added in Xcode** (~60 seconds each) — see [docs/TARGET_SETUP.md](docs/TARGET_SETUP.md) for the exact click-paths.
+
+### Notarised release build
+
+```bash
+./scripts/release.sh 2.0.0
+```
+
+See [docs/RELEASE.md](docs/RELEASE.md) for the full notarisation workflow (one-time keychain setup, per-release commands).
 
 After building, flush Quick Look's cache to pick up the new extension:
 
@@ -133,7 +151,11 @@ docs/
 
 - Original Quick Look extension authored by **[Jethro Hemmann](https://github.com/JethroHemmann)** (2021–2022).
 - 3D rendering by **[3Dmol.js](https://3dmol.csb.pitt.edu)** — Rego & Koes, *Bioinformatics* 2015.
-- Multi-format support, smart rendering, Finder thumbnails, Spotlight indexing, drag-and-drop, and reliability hardening contributed by **[Ariorad Moniri](https://github.com/ArioMoniri)** (2026).
+- Multi-format support, smart rendering, Finder thumbnails, Spotlight indexing, drag-and-drop, auto-updater, and reliability hardening by **[Ariorad Moniri](https://github.com/ArioMoniri)** (2026).
+
+### About the maintainer of this fork
+
+> I'm a dedicated medical student and research fellow passionate about bridging medicine and technology. With experience in both wet and dry lab environments and expertise in bioinformatics, I enjoy developing web and macOS applications that solve real-world problems.
 
 If you use QuickLookProtein in scientific work, please cite the underlying 3Dmol.js paper:
 
@@ -147,7 +169,7 @@ MIT — see [LICENSE](LICENSE). Bundled 3Dmol.js is BSD-3-Clause; the LICENSE fi
 
 ## 🐛 Reporting issues
 
-Please open an [issue on GitHub](https://github.com/JethroHemmann/QuickLookProtein/issues).
+Please open an [issue on this fork](https://github.com/ArioMoniri/QuickLookProtein/issues). For upstream issues unrelated to the fork-specific changes (auto-updater, notarisation), feel free to use [Jethro's tracker](https://github.com/JethroHemmann/QuickLookProtein/issues) as well.
 
 ## 🤝 Contributing
 

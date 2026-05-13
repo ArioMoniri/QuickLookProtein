@@ -123,15 +123,31 @@ struct ContentView: View {
                         Divider().padding(.vertical, 6)
 
                         Text("This build").font(.headline)
-                        Text("Extended in 2026 by Ario Moniri with multi-format support "
-                             + "(MOL2, XYZ, MOL, GRO, CUBE, PDBQT), smart protein-ligand "
-                             + "styling, surface rendering, drag-and-drop, Spotlight "
-                             + "indexing and per-file Finder thumbnails.")
+                        Text("Maintained by Ariorad Moniri — multi-format support "
+                             + "(MOL2, XYZ, MOL, GRO, CUBE, PDBQT), smart "
+                             + "protein-ligand styling, surface rendering, "
+                             + "click-to-label, drag-and-drop in the settings app, "
+                             + "per-file Finder thumbnails, Spotlight indexing, "
+                             + "and reliability hardening.")
                             .font(.callout)
                             .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
+
+                        Text("I'm a dedicated medical student and research "
+                             + "fellow passionate about bridging medicine and "
+                             + "technology. With experience in both wet and dry "
+                             + "lab environments and expertise in bioinformatics, "
+                             + "I enjoy developing web and macOS applications that "
+                             + "solve real-world problems.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 4)
+
                         Link("github.com/ArioMoniri/QuickLookProtein",
                              destination: URL(string: "https://github.com/ArioMoniri/QuickLookProtein")!)
                             .font(.callout)
+                            .padding(.top, 2)
 
                         if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
                             HStack(spacing: 8) {

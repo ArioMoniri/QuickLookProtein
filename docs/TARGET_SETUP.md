@@ -52,7 +52,7 @@ Source: [`Xcode/QLThumbnail/`](../Xcode/QLThumbnail)
     - `MACOSX_DEPLOYMENT_TARGET` → `11.0` (or whatever the host app uses)
 11. In **Signing & Capabilities** for `QLThumbnail`, add capability
     **App Groups** and tick the same group the main app uses
-    (`group.com.jethrohemmann.QuickLookProtein` — rename when you rebrand).
+    (`group.com.ariomoniri.QuickLookProtein` — rename when you rebrand).
 12. Build the host app scheme. Xcode embeds the new extension automatically.
 
 ## B. Spotlight indexing extension (`MDImporter`)
@@ -116,7 +116,7 @@ mdfind 'kMDItemKind == "Protein Data Bank file"'
 
 ## When you rebrand to your own team / bundle prefix
 
-Search-and-replace `W3SKSV7VPT` and `com.jethrohemmann` together across:
+Search-and-replace `FF68N39FU5` and `com.ariomoniri` together across:
 
 - `Xcode/Shared/Settings.swift`
 - `Xcode/*.entitlements` (all three)

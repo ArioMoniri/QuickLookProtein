@@ -473,7 +473,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"QuickLookProtein/Preview Content\"";
-				DEVELOPMENT_TEAM = W3SKSV7VPT;
+				DEVELOPMENT_TEAM = FF68N39FU5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = QuickLookProtein/Info.plist;
@@ -483,7 +483,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};
@@ -500,7 +500,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"QuickLookProtein/Preview Content\"";
-				DEVELOPMENT_TEAM = W3SKSV7VPT;
+				DEVELOPMENT_TEAM = FF68N39FU5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = QuickLookProtein/Info.plist;
@@ -510,7 +510,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};
@@ -523,7 +523,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = W3SKSV7VPT;
+				DEVELOPMENT_TEAM = FF68N39FU5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = QLExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -532,7 +532,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MARKETING_VERSION = 1.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein.QLExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
@@ -546,7 +546,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = W3SKSV7VPT;
+				DEVELOPMENT_TEAM = FF68N39FU5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = QLExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -555,7 +555,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MARKETING_VERSION = 1.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein.QLExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
