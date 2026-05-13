@@ -236,6 +236,76 @@
 				</array>
 			</dict>
 		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.pqr</string>
+			<key>UTTypeDescription</key>
+			<string>APBS / PDB2PQR file</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>pqr</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.prmtop</string>
+			<key>UTTypeDescription</key>
+			<string>AMBER topology file</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>prmtop</string>
+					<string>top</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.vasp</string>
+			<key>UTTypeDescription</key>
+			<string>VASP / POSCAR file</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>vasp</string>
+					<string>poscar</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.cdjson</string>
+			<key>UTTypeDescription</key>
+			<string>ChemDoodle JSON</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>cdjson</string>
+				</array>
+			</dict>
+		</dict>
 	</array>
 </dict>
 </plist>
