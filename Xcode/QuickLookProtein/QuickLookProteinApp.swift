@@ -27,10 +27,16 @@ struct QuickLookProteinApp: App {
                 .frame(width: 800, height: 600)
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
+                    Updater.shared.checkOnLaunchIfNeeded()
                 }
         }
         .commands {
             CommandGroup(replacing: .newItem, addition: {}) // remove File -> New Window from menu
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    Updater.shared.check(silent: false)
+                }
+            }
         }
     }
     

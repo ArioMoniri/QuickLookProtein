@@ -22,6 +22,7 @@ private let maxDropBytes: Int = 25 * 1024 * 1024
 struct ContentView: View {
 
     @StateObject private var userSettings = SettingsStorage()
+    @ObservedObject private var updater = Updater.shared
     /// File the user has dragged into the "Custom" tile.
     @State private var droppedFile: URL? = nil
     @State private var droppedFileError: String? = nil
@@ -113,26 +114,50 @@ struct ContentView: View {
                     // MARK: About
                     VStack(alignment: .leading) {
                         Text("About").font(.title).padding(.bottom, 4)
-                        Text("Developed 2021–2022 by Jethro Hemmann.")
-                        Link("https://github.com/JethroHemmann/QuickLookProtein",
+                        Text("Originally developed 2021–2022 by Jethro Hemmann.")
+                            .font(.callout)
+                        Link("Upstream: github.com/JethroHemmann/QuickLookProtein",
                              destination: URL(string: "https://github.com/JethroHemmann/QuickLookProtein")!)
+                            .font(.callout)
+
+                        Divider().padding(.vertical, 6)
+
+                        Text("This build").font(.headline)
+                        Text("Extended in 2026 by Ario Moniri with multi-format support "
+                             + "(MOL2, XYZ, MOL, GRO, CUBE, PDBQT), smart protein-ligand "
+                             + "styling, surface rendering, drag-and-drop, Spotlight "
+                             + "indexing and per-file Finder thumbnails.")
+                            .font(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Link("github.com/ArioMoniri/QuickLookProtein",
+                             destination: URL(string: "https://github.com/ArioMoniri/QuickLookProtein")!)
+                            .font(.callout)
 
                         if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                            Text("Installed version: " + appVersion).padding(.top, 4)
-                            let appVersionArr = appVersion.split(separator: ".")
-                            if appVersionArr.count >= 2,
-                               let appMajor = Int(appVersionArr[0]),
-                               let appMinor = Int(appVersionArr[1]),
-                               let mostRecentVersion = getNewestVersion() {
-                                if newerVersion(installedVersion: (major: appMajor, minor: appMinor),
-                                                mostRecentVersion: mostRecentVersion) {
-                                    HStack {
-                                        Text("New version \(mostRecentVersion.major).\(mostRecentVersion.minor) available.")
-                                        Link("Update", destination: URL(string: "https://github.com/JethroHemmann/QuickLookProtein/releases")!)
-                                    }
-                                } else {
-                                    Text("You are on the latest released version.")
+                            HStack(spacing: 8) {
+                                Text("Installed version: " + appVersion)
+                                if updater.isChecking {
+                                    ProgressView().controlSize(.small)
                                 }
+                                Button("Check for updates") {
+                                    updater.check(silent: false)
+                                }
+                                .controlSize(.small)
+                            }
+                            .padding(.top, 4)
+
+                            if let release = updater.latestRelease,
+                               release.tag != appVersion, release.tag != "v" + appVersion {
+                                HStack(spacing: 4) {
+                                    Text("Newer release \(release.tag) available.")
+                                    Link("Open", destination: release.url)
+                                }
+                                .font(.callout)
+                                .foregroundColor(.accentColor)
+                            }
+                            if let err = updater.lastError {
+                                Text("Update check error: \(err)")
+                                    .font(.caption2).foregroundColor(.red)
                             }
                         }
 
