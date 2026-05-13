@@ -4,6 +4,29 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.3] — 2026-05-14
+
+### 🪟 Windows
+
+- **All-in-one installer zip** — releases now ship a
+  `QuickLookProtein-Windows-Installer.zip` bundle containing
+  `install.bat`, `install.ps1`, the `.qlplugin`, and a plaintext
+  README. Users can download, unzip, and double-click `install.bat` —
+  no PowerShell command typing, no hunting for the right asset on the
+  release page.
+- **`install.bat` double-click wrapper** — friendly intro, runs
+  `install.ps1` with `-ExecutionPolicy Bypass`, prints status, waits
+  for a keypress on exit so the user can read the result.
+- **`install.ps1 -LocalPlugin` parameter + auto-detection** —
+  when a sibling `QuickLookProtein*.qlplugin` is present next to the
+  script (offline bundle case) the installer uses it directly instead
+  of fetching from GitHub. Standard one-liner behaviour is unchanged.
+- **README Windows section rewrite** — three clearly-numbered install
+  options (installer zip → PowerShell one-liner → fully manual) and an
+  explicit note that the `.qlplugin` file extension only works once
+  QuickLook is installed. The "Download for Windows" button now points
+  at the installer zip.
+
 ## [1.7.2] — 2026-05-14
 
 ### 🐛 Fixed

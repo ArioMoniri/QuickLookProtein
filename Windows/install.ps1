@@ -32,7 +32,14 @@ param(
     # Skip the QL-Win bootstrap even if the host isn't installed. Useful
     # when running the installer in headless contexts where you want to
     # fail loud if QL-Win is missing rather than fetch a multi-MB host.
-    [switch]$SkipQuickLookInstall
+    [switch]$SkipQuickLookInstall,
+    # Path to a local .qlplugin file. When set we skip the GitHub fetch
+    # and install this file. The offline-bundle .bat wrapper relies on
+    # this: it ships a sibling QuickLookProtein.qlplugin and tells the
+    # script to use it. If unset and a sibling .qlplugin lives next to
+    # the script (typical for the downloadable installer zip), we
+    # auto-detect it below.
+    [string]$LocalPlugin = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -97,15 +104,40 @@ function Get-PluginReleaseAsset {
     return @{ Asset = $asset; Tag = $rel.tag_name }
 }
 
-function Install-Plugin {
-    Write-Step "Fetching QuickLookProtein plugin..."
-    $r = Get-PluginReleaseAsset
-    $asset = $r.Asset
-    Write-Host "  Found $($asset.name) from release $($r.Tag)."
+function Resolve-LocalPluginPath {
+    if (-not [string]::IsNullOrWhiteSpace($LocalPlugin)) {
+        if (-not (Test-Path $LocalPlugin)) {
+            throw "-LocalPlugin '$LocalPlugin' does not exist."
+        }
+        return (Resolve-Path $LocalPlugin).Path
+    }
+    # Auto-detect: when this script ships inside the offline-bundle zip,
+    # the .qlplugin sits alongside it. Prefer that over fetching from GitHub.
+    $scriptDir = Split-Path -Parent $PSCommandPath
+    if (-not $scriptDir) { return $null }
+    $candidates = Get-ChildItem -Path $scriptDir -Filter "QuickLookProtein*.qlplugin" -File -ErrorAction SilentlyContinue
+    if ($candidates -and $candidates.Count -gt 0) {
+        return $candidates[0].FullName
+    }
+    return $null
+}
 
-    New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
-    $download = Join-Path $tempRoot $asset.name
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $download
+function Install-Plugin {
+    $local = Resolve-LocalPluginPath
+    if ($local) {
+        Write-Step "Using local plugin file"
+        Write-Host "  Source: $local"
+        $pluginPath = $local
+    } else {
+        Write-Step "Fetching QuickLookProtein plugin..."
+        $r = Get-PluginReleaseAsset
+        $asset = $r.Asset
+        Write-Host "  Found $($asset.name) from release $($r.Tag)."
+
+        New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+        $pluginPath = Join-Path $tempRoot $asset.name
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $pluginPath
+    }
 
     Write-Step "Installing plugin to $pluginDir"
     if (Test-Path $pluginDir) {
@@ -116,8 +148,9 @@ function Install-Plugin {
     # .qlplugin is a zip — Expand-Archive accepts any extension provided
     # we hand it a .zip-shaped temp copy. (Expand-Archive in older Windows
     # PowerShell refuses anything not literally named *.zip.)
-    $tmpZip = "$download.zip"
-    Copy-Item $download $tmpZip -Force
+    New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+    $tmpZip = Join-Path $tempRoot "QuickLookProtein-install.zip"
+    Copy-Item $pluginPath $tmpZip -Force
     Expand-Archive -Path $tmpZip -DestinationPath $pluginDir -Force
     Remove-Item $tmpZip -Force
 }

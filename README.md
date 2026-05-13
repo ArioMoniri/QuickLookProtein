@@ -13,22 +13,43 @@
 <p align="center">
   <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.dmg"><img src="docs/download-macos.svg" alt="Download QuickLookProtein for macOS" height="72"></a>
   &nbsp;
-  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.qlplugin"><img src="docs/download-windows.svg" alt="Download QuickLookProtein for Windows" height="72"></a>
+  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein-Windows-Installer-latest.zip"><img src="docs/download-windows.svg" alt="Download QuickLookProtein Windows installer" height="72"></a>
 </p>
 
-<p align="center"><sub>The macOS button downloads the signed DMG · The Windows button downloads the <code>.qlplugin</code> (drop it onto a running <a href="https://github.com/QL-Win/QuickLook/releases/latest">QuickLook</a> tray, or use the PowerShell one-liner below).</sub></p>
+<p align="center"><sub>macOS button → signed <code>.dmg</code> · Windows button → all-in-one installer zip (<code>install.bat</code> + <code>.qlplugin</code>). Just unzip and double-click <code>install.bat</code>.</sub></p>
 
 <p align="center">macOS · Developer-ID signed &amp; notarised &nbsp;|&nbsp; Windows · QL-Win plugin (unsigned)</p>
 
-**macOS:** unzip / open the disk image, drag **QuickLookProtein.app** into **Applications**, then hit <kbd>Space</kbd> on any `.pdb` / `.cif` / `.mol2` / etc. file in Finder.
+**macOS:** open the disk image, drag **QuickLookProtein.app** into **Applications**, then hit <kbd>Space</kbd> on any `.pdb` / `.cif` / `.mol2` / etc. file in Finder.
 
-**Windows (one-liner):** paste this into PowerShell — it installs [QuickLook](https://github.com/QL-Win/QuickLook) if you don't already have it, fetches the latest signed plugin, drops it into `%LocalAppData%\QuickLook\plugins\QuickLookProtein\`, and restarts the QuickLook tray app:
+### 🪟 Windows — three ways to install
+
+> The `.qlplugin` file only opens via **[QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest)** — the Windows-side host that registers the file extension. Each option below installs QuickLook for you if it's missing.
+
+**Option A — Installer zip (recommended, double-clickable):**
+
+1. Click the **Download for Windows** button above (or [grab the installer zip directly](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein-Windows-Installer-latest.zip)).
+2. Unzip anywhere.
+3. Double-click **`install.bat`**. SmartScreen will warn — click **More info → Run anyway**.
+4. Done. Press <kbd>Space</kbd> on a supported file in Explorer.
+
+**Option B — PowerShell one-liner (no download):**
 
 ```powershell
 irm https://raw.githubusercontent.com/ArioMoniri/QuickLookProtein/feature/ario-signed/Windows/install.ps1 | iex
 ```
 
-Prefer the manual route? Install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest), download the `.qlplugin` from the [latest release](https://github.com/ArioMoniri/QuickLookProtein/releases/latest), double-click it while QuickLook is running, restart QuickLook from the tray, then hit <kbd>Space</kbd> on a supported file in Explorer.
+Same effect as Option A but skips the manual download/unzip step. Both installers are safe to re-run for upgrades.
+
+**Option C — Fully manual:**
+
+1. Install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest) first — without it, Windows has no handler for `.qlplugin` files and double-clicking does nothing.
+2. Download [`QuickLookProtein.qlplugin`](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.qlplugin) from the latest release.
+3. With QuickLook running in the system tray, double-click the `.qlplugin` — QuickLook intercepts it and installs into `%LocalAppData%\QuickLook\plugins\`.
+4. Right-click the QuickLook tray icon → **Restart**.
+5. Press <kbd>Space</kbd> on a supported file in Explorer.
+
+⚠️ The Windows side is **unsigned** — SmartScreen will warn on first launch. The plugin itself runs *inside* QuickLook (not as a standalone exe), so the only signed-binary path on Windows is via QuickLook itself.
 
 > 🔱 This is **[Ariorad Moniri](https://github.com/ArioMoniri)'s signed fork** of the original [QuickLookProtein by Jethro Hemmann](https://github.com/JethroHemmann/QuickLookProtein), distributed via [releases on this fork](https://github.com/ArioMoniri/QuickLookProtein/releases) and notarised under Apple Developer team `FF68N39FU5`. Looking for the upstream pull request? See [the PR branch](https://github.com/ArioMoniri/QuickLookProtein/tree/feature/3dmol-upgrade).
 

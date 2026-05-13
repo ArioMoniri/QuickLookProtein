@@ -493,23 +493,30 @@ jobs:
 
           #### 🪟 Windows
 
-          **Option A — One-liner (recommended)** — paste into PowerShell:
+          The \`.qlplugin\` file is only meaningful to **[QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest)** — the Windows-side host that registers the file extension. Each option below installs QuickLook for you if it's missing.
+
+          **Option A — Installer zip (recommended, double-clickable)**
+
+          1. Download **[QuickLookProtein-Windows-Installer-latest.zip](https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/QuickLookProtein-Windows-Installer-latest.zip)** (or the versioned **QuickLookProtein-Windows-Installer.zip** from the Assets below).
+          2. Unzip anywhere.
+          3. Double-click \`install.bat\`. SmartScreen will warn — click **More info → Run anyway**.
+          4. Done. Press <kbd>Space</kbd> on a supported file in Explorer.
+
+          **Option B — PowerShell one-liner**
 
           \`\`\`powershell
           irm https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/feature/ario-signed/Windows/install.ps1 | iex
           \`\`\`
 
-          Installs [QuickLook](https://github.com/QL-Win/QuickLook) if missing, fetches the latest \`.qlplugin\`, drops it into \`%LocalAppData%\\QuickLook\\plugins\\QuickLookProtein\\\`, and restarts the QuickLook tray. No admin needed.
+          **Option C — Fully manual**
 
-          **Option B — Manual**
-
-          1. Install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest) (the Windows-side Quick Look daemon — free, GPL-3).
+          1. Install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest) first — without it, Windows has no handler for \`.qlplugin\` files and double-clicking does nothing.
           2. Download **QuickLookProtein-${VERSION}.qlplugin** from the Assets below.
-          3. Double-click the \`.qlplugin\` file while QuickLook is running (or extract it into \`%LocalAppData%\\QuickLook\\plugins\\\`).
-          4. Restart QuickLook from the system tray.
-          5. Hit <kbd>Space</kbd> on any supported file in Explorer.
+          3. With QuickLook running in the tray, double-click the \`.qlplugin\` — QuickLook intercepts it and installs.
+          4. Right-click the tray icon → **Restart**.
+          5. Press <kbd>Space</kbd> on a supported file in Explorer.
 
-          ⚠️ The Windows plugin is **not code-signed** yet — SmartScreen will show "Windows protected your PC" on first install. Click **More info → Run anyway**.
+          ⚠️ The Windows side is **unsigned** — SmartScreen will warn on first launch. The plugin itself runs inside QuickLook, not as a standalone exe.
 
           ### 📦 What's inside
 
@@ -709,6 +716,79 @@ jobs:
           "name=$qlpName"             | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "path=build/$qlpName"       | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
+      # ----------------------------------------------------------------
+      # Package the all-in-one Windows installer bundle. Ships the
+      # .qlplugin, install.ps1, install.bat (double-clickable wrapper),
+      # and a plaintext README so the user has everything they need
+      # offline. install.ps1 auto-detects the sibling .qlplugin and
+      # installs it locally instead of refetching from GitHub.
+      - name: Package Windows installer bundle
+        id: bundle
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $stage   = "build/win-installer-stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+          # Bundle a stable-name plugin so install.ps1 doesn't have to
+          # guess the version.
+          Copy-Item -Path "${{ steps.pkg.outputs.path }}" `
+                    -Destination "$stage/QuickLookProtein.qlplugin" -Force
+          Copy-Item -Path "Windows/install.ps1" `
+                    -Destination "$stage/install.ps1"               -Force
+          Copy-Item -Path "Windows/install.bat" `
+                    -Destination "$stage/install.bat"               -Force
+
+          @"
+          QuickLookProtein $version - Windows installer bundle
+          =====================================================
+
+          This zip contains everything you need to add 3D molecule
+          previews to Windows Explorer.
+
+          What's inside
+          -------------
+            install.bat                 Double-click this to install.
+            install.ps1                 PowerShell installer (called by .bat).
+            QuickLookProtein.qlplugin   The plugin itself.
+
+          What it does
+          ------------
+            1. Installs QuickLook (https://github.com/QL-Win/QuickLook)
+               if not already present. This is the Windows-side Quick
+               Look host that knows what to do with .qlplugin files.
+            2. Drops QuickLookProtein into your user profile at
+               %LocalAppData%\QuickLook\plugins\QuickLookProtein\.
+               No admin needed.
+            3. Restarts the QuickLook tray app so the plugin loads.
+
+          After install
+          -------------
+            Hit SPACE on any of these in Explorer:
+              .pdb .ent .cif .mmcif .sdf .mol .mol2 .xyz
+              .gro .cube .pqr .vasp .cdjson .mmtf
+
+          If SmartScreen warns
+          --------------------
+            Click "More info" then "Run anyway". The installer is
+            unsigned; the plugin itself runs inside QuickLook, not
+            as a standalone exe.
+
+          Uninstall
+          ---------
+            Delete %LocalAppData%\QuickLook\plugins\QuickLookProtein\
+
+          Source: https://github.com/${{ github.repository }}
+          "@ | Set-Content -Path "$stage/README.txt" -Encoding utf8
+
+          $zipName = "QuickLookProtein-Windows-Installer.zip"
+          $zipPath = "build/$zipName"
+          Compress-Archive -Path "$stage/*" -DestinationPath $zipPath -Force
+          Get-Item $zipPath | Format-List FullName, Length
+
+          "name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "path=$zipPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
       - name: Upload .qlplugin to the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -725,3 +805,10 @@ jobs:
           $alias = "build/QuickLookProtein.qlplugin"
           Copy-Item -Path "${{ steps.pkg.outputs.path }}" -Destination $alias -Force
           gh release upload "v$version" $alias --clobber
+
+          # All-in-one installer bundle. Versioned + stable alias so the
+          # README's "Download for Windows" button can use a permanent URL.
+          gh release upload "v$version" "${{ steps.bundle.outputs.path }}" --clobber
+          $bundleAlias = "build/QuickLookProtein-Windows-Installer-latest.zip"
+          Copy-Item -Path "${{ steps.bundle.outputs.path }}" -Destination $bundleAlias -Force
+          gh release upload "v$version" $bundleAlias --clobber
