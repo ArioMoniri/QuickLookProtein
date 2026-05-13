@@ -36,11 +36,13 @@ public sealed class Plugin : IViewer
     private MoleculePanel? _panel;
 
     /// QL-Win uses Priority to break ties when several plugins claim the
-    /// same file. 0 = default; positive numbers win. We sit at 5 so we
-    /// beat the built-in text/HTML viewers for .json / .top files (which
-    /// they'd otherwise grab as plain text), without aggressively
-    /// shadowing a user's higher-priority custom plugin.
-    public int Priority => 5;
+    /// same file. Higher wins. The bundled TextViewer plugin claims
+    /// "any text-like file" with `IsText(path)` heuristics and Priority
+    /// in the low single digits, so a Priority-5 PDB-handler-here lost
+    /// to the text viewer in practice and the user saw the raw ATOM
+    /// records instead of a 3D preview. Bump to 100 so we comfortably
+    /// outrank the text-fallback chain for the extensions we claim.
+    public int Priority => 100;
 
     public void Init()
     {

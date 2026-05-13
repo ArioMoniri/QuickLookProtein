@@ -283,6 +283,73 @@ function Try-StopQuickLook {
     return $false
 }
 
+function Register-ThumbnailHandler {
+    # Install the Windows Explorer thumbnail handler if the DLL is
+    # present in the plugin folder (Setup.exe / installer zip /
+    # one-liner all drop QuickLookProtein.Thumbnail.dll there at the
+    # same time as the .qlplugin contents).
+    #
+    # Registration is per-user under HKCU so we don't need admin.
+    # Each supported extension gets a shell-handler key pointing at
+    # our COM CLSID; the CLSID itself is registered with an
+    # InProcServer32 entry pointing at the DLL.
+    $thumbDll = Join-Path $pluginDir "QuickLookProtein.Thumbnail.dll"
+    if (-not (Test-Path $thumbDll)) {
+        Write-Host "  Thumbnail DLL not found at $thumbDll - skipping shell-handler registration."
+        return
+    }
+
+    Write-Step "Registering Explorer thumbnail handler..."
+
+    # Stable values - DO NOT change these between releases without
+    # also updating ThumbnailProvider.cs's [Guid] attribute.
+    $clsid     = "{B7E4A6F1-2D6E-4F58-9B1B-2E5A1F0B97A1}"
+    $thumbIid  = "{E357FCCD-A995-4576-B01F-234630154E96}"
+    $extensions = @(".pdb", ".ent", ".pdbqt", ".pqr", ".cif", ".mmcif",
+                    ".sdf", ".mol", ".mol2", ".xyz", ".gro",
+                    ".cube", ".cub", ".vasp", ".poscar", ".cdjson", ".mmtf")
+
+    # 1) Register the CLSID -> InProcServer32 (= our DLL).
+    #    mscoree.dll is the .NET Framework COM bridge; ThreadingModel
+    #    Both is the standard for managed in-proc COM servers.
+    $clsidKey = "HKCU:\Software\Classes\CLSID\$clsid"
+    New-Item -Path "$clsidKey"               -Force | Out-Null
+    Set-ItemProperty -Path "$clsidKey" -Name "(Default)" -Value "QuickLookProtein Thumbnail Provider"
+    Set-ItemProperty -Path "$clsidKey" -Name "DisableProcessIsolation" -Value 1 -Type DWord
+
+    $inproc = "$clsidKey\InProcServer32"
+    New-Item -Path $inproc -Force | Out-Null
+    Set-ItemProperty -Path $inproc -Name "(Default)"      -Value "mscoree.dll"
+    Set-ItemProperty -Path $inproc -Name "ThreadingModel" -Value "Both"
+    Set-ItemProperty -Path $inproc -Name "Class"          -Value "QuickLookProtein.Thumbnail.MoleculeThumbnailProvider"
+    Set-ItemProperty -Path $inproc -Name "Assembly"       -Value "QuickLookProtein.Thumbnail, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null"
+    Set-ItemProperty -Path $inproc -Name "RuntimeVersion" -Value "v4.0.30319"
+    Set-ItemProperty -Path $inproc -Name "CodeBase"       -Value ("file:///" + ($thumbDll -replace '\\','/'))
+
+    # 2) Per-extension shell-handler key. The default value under
+    #    HKCU\Software\Classes\<ext>\ShellEx\<IThumbnailProvider IID>
+    #    points at our CLSID; Explorer picks it up on next icon-cache
+    #    refresh.
+    foreach ($ext in $extensions) {
+        $shellExKey = "HKCU:\Software\Classes\$ext\ShellEx\$thumbIid"
+        New-Item -Path $shellExKey -Force | Out-Null
+        Set-ItemProperty -Path $shellExKey -Name "(Default)" -Value $clsid
+    }
+
+    Write-Host "  Registered $($extensions.Count) extensions to CLSID $clsid."
+
+    # 3) Nudge Explorer to invalidate cached thumbnails for those
+    #    extensions. ClearIconCache is the documented way; a hard
+    #    Explorer restart is the only fully reliable way but we
+    #    don't want to do that without asking - it's disruptive.
+    try {
+        & "$env:WinDir\system32\ie4uinit.exe" "-ClearIconCache" 2>$null | Out-Null
+        Write-Host "  Cleared Explorer icon cache (existing files may take a moment to refresh)."
+    } catch {
+        Write-Host "  (Icon cache clear failed - thumbnails will refresh as Explorer revisits files.)"
+    }
+}
+
 function Restart-QuickLookHost {
     # Active goal: have QuickLook running (with our plugin loaded) by
     # the time this function returns. NEVER fail the install if we
@@ -350,6 +417,16 @@ if (-not (Test-QuickLookInstalled)) {
 }
 
 Install-Plugin
+
+# Best-effort: register the Windows Explorer thumbnail handler. Same
+# rule as the QuickLook restart - never fail the install over this.
+# A missing thumbnail DLL just means no thumbnails in Explorer; the
+# Space-bar QuickLook preview still works.
+try { Register-ThumbnailHandler } catch {
+    Write-Host ""
+    Write-Host "  Could not register Explorer thumbnail handler: $($_.Exception.Message)"
+    Write-Host "  Space-bar QuickLook preview will still work."
+}
 
 # The plugin is now on disk - that's the install. Restarting
 # QuickLook is just the convenience step that picks it up

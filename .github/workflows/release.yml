@@ -681,6 +681,18 @@ jobs:
               -c Release `
               -o build/plugin
 
+      - name: Build thumbnail provider
+        shell: pwsh
+        # Separate output dir so the thumbnail DLL doesn't get lumped
+        # into the QuickLook plugin .qlplugin. The Package step below
+        # copies it into the .qlplugin alongside the plugin DLL on
+        # purpose - install.ps1 registers it as the Explorer thumbnail
+        # handler from the same install location.
+        run: |
+          dotnet build Windows/QuickLookProtein.Thumbnail/QuickLookProtein.Thumbnail.csproj `
+              -c Release `
+              -o build/thumbnail
+
       - name: Package .qlplugin
         id: pkg
         shell: pwsh
@@ -693,13 +705,30 @@ jobs:
           $stage = "build/qlplugin-stage"
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
-          # Copy DLL, deps json, and the runtime config
+          # Copy DLL, deps json, and the runtime config from the
+          # plugin build. WebView2Loader.dll (native bridge) gets
+          # pulled in here via the .csproj's CopyWebView2LoaderNative
+          # target - without it QL-Win silently fails to load the
+          # plugin and falls back to its text viewer.
           Get-ChildItem build/plugin -File `
               | Where-Object { $_.Extension -in '.dll','.json' } `
               | Copy-Item -Destination $stage
 
           # Copy the Resources/ folder (3Dmol.js + viewer.html)
           Copy-Item -Path "build/plugin/Resources" -Destination $stage -Recurse
+
+          # Bundle the thumbnail provider DLL (separate build output)
+          # into the same .qlplugin folder. install.ps1 finds it next
+          # to the plugin DLL and registers per-extension shell
+          # handlers so Explorer renders structure thumbnails in
+          # Icon / Tile / Gallery views.
+          if (Test-Path build/thumbnail/QuickLookProtein.Thumbnail.dll) {
+              Copy-Item -Path build/thumbnail/QuickLookProtein.Thumbnail.dll `
+                        -Destination $stage -Force
+              Write-Host "Bundled thumbnail provider DLL."
+          } else {
+              Write-Host "::warning::QuickLookProtein.Thumbnail.dll not found in build output; thumbnails will not be registered."
+          }
 
           $qlpName = "QuickLookProtein-$version.qlplugin"
           # PowerShell's Compress-Archive will produce a .zip; we rename

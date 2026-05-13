@@ -33,7 +33,38 @@
     <Nullable>enable</Nullable>
     <AssemblyName>QuickLook.Plugin.Protein</AssemblyName>
     <RootNamespace>QuickLookProtein.Plugin</RootNamespace>
+    <!--
+      Force x64 so WebView2Loader.dll resolution lands on the x64
+      native binary at runtime. QL-Win is an x64 process, so this
+      matches the host.
+    -->
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
+
+  <!--
+    The Microsoft.Web.WebView2 NuGet ships its native bridge
+    (WebView2Loader.dll) under runtimes/win-{arch}/native/. On .NET 6+
+    SDK these get auto-deployed to the output folder via the
+    `runtimes` build target. On .NET Framework projects (which is
+    what QL-Win requires us to target) that auto-deploy DOESN'T
+    happen, so the assembly loads but its first WebView2 call hits
+    DllNotFoundException(WebView2Loader.dll). QL-Win catches that
+    and silently drops our plugin, falling back to its built-in
+    text viewer - which is exactly what the user saw (raw .pdb
+    rendered as plain text after install).
+
+    Manually copy the right architecture's WebView2Loader.dll into
+    OutputPath as a post-build step.
+  -->
+  <Target Name="CopyWebView2LoaderNative" AfterTargets="Build">
+    <ItemGroup>
+      <_WebView2Native Include="$(NuGetPackageRoot)microsoft.web.webview2\1.0.2792.45\runtimes\win-x64\native\WebView2Loader.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WebView2Native)"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('%(_WebView2Native.Identity)')" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />

@@ -4,6 +4,52 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.13] — 2026-05-14
+
+### 🐛 Fixed
+
+- **The Space-bar preview actually works now.** Even after v1.7.11
+  retargeted the plugin to net472, QL-Win was still falling back to
+  its text viewer (the user saw raw ATOM records instead of a 3D
+  structure). Two root causes, both now fixed:
+  - **`WebView2Loader.dll` (native bridge)** wasn't being copied into
+    the `.qlplugin`. On .NET Core / .NET 5+, the SDK auto-deploys
+    runtime-specific natives from the NuGet package's
+    `runtimes/win-x64/native/` folder; on .NET Framework that
+    auto-deploy doesn't happen. QL-Win loaded the managed DLL fine
+    but the first WebView2 call hit `DllNotFoundException` and the
+    plugin got silently dropped. Added a `CopyWebView2LoaderNative`
+    MSBuild target that copies the x64 native loader into the output
+    folder; the package step picks it up automatically. The
+    `PlatformTarget=x64` line on the csproj makes sure we match
+    QL-Win's process bitness.
+  - **`Priority`** raised from 5 to 100. QL-Win's built-in TextViewer
+    plugin claims any "text-readable" file (which a .pdb obviously is)
+    with low single-digit priority. Priority 5 wasn't a comfortable
+    win over the text fallback in practice; 100 settles the order
+    unambiguously.
+
+### 🆕 Added
+
+- **Windows Explorer thumbnails!** New `QuickLookProtein.Thumbnail.dll`
+  shell extension renders depth-sorted CPK previews of `.pdb`, `.ent`,
+  `.pdbqt`, `.pqr`, `.cif`, `.mmcif`, `.sdf`, `.mol`, `.mol2`, `.xyz`,
+  `.gro`, `.cube`, `.cub`, `.vasp`, `.poscar`, `.cdjson`, and `.mmtf`
+  directly in Explorer's Icon / Tile / Gallery views. Mirrors the
+  macOS `QLThumbnail.appex` look (dark background, isometric pose,
+  Jmol CPK palette). Pure-managed renderer using System.Drawing - no
+  WebView2 cold-start cost, fast enough for Explorer's thumbnail
+  cache.
+  - Implements `IThumbnailProvider` + `IInitializeWithStream` via
+    hand-rolled COM interop (no SharpShell dependency).
+  - Per-user registration (HKCU) so the installer needs no admin
+    rights.
+  - Best-effort `ie4uinit.exe -ClearIconCache` after registration so
+    existing files start showing thumbnails without a reboot.
+  - Atom-count capped at 5,000 so a 100k-atom PDB doesn't stall the
+    thumbnail cache.
+  - Stable CLSID `B7E4A6F1-2D6E-4F58-9B1B-2E5A1F0B97A1`.
+
 ## [1.7.12] — 2026-05-14
 
 ### 🪟 Windows — installer feels less alarming
