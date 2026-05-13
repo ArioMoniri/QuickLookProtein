@@ -107,7 +107,12 @@
                     // === parse model =========================================
                     var format  = "{DATA_FORMAT}";
                     var addOpts = { keepH: true, multimodel: false };
-                    if (format === 'xyz') addOpts.assignBonds = true;
+                    // Formats that carry no bond table — without distance-based
+                    // bond perception, stick rendering shows invisible bond-caps
+                    // at each atom. Keep in sync with Shared/Assets/3Dmol_viewer.html.
+                    if (format === 'xyz' || format === 'vasp' || format === 'cube') {
+                        addOpts.assignBonds = true;
+                    }
                     try {
                         viewer.addModel(data, format, addOpts);
                     } catch (parseErr) {
