@@ -10,54 +10,81 @@ import SwiftUI
 
 class SettingsStorage: ObservableObject {
 
+    /// Shared preferences store, computed once at first access.
+    ///
+    /// We *try* the App Group container first so the main app and the
+    /// QL/Thumbnail/Spotlight extensions can read each other's settings.
+    /// On dev builds with auto-signing, App Group provisioning often
+    /// silently fails — cfprefsd then logs
+    /// `Using kCFPreferencesAnyUser with a container is only allowed
+    /// for System Containers, detaching from cfprefsd` and rejects
+    /// writes, which means @AppStorage Picker changes never persist
+    /// and the previews never update.
+    ///
+    /// To survive that, we round-trip a probe key. If the write+read
+    /// makes it back intact, the App Group is usable; otherwise we
+    /// fall back to `UserDefaults.standard`. The cost of the fallback
+    /// is that settings won't sync between main app and extensions
+    /// until the user adds the App Groups capability via Xcode UI —
+    /// but at least everything inside the host app works.
+    static let preferencesStore: UserDefaults = {
+        let groupID = "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"
+        guard let group = UserDefaults(suiteName: groupID) else { return .standard }
+        let probeKey = "_qlp_probe_v1"
+        group.set(true, forKey: probeKey)
+        let readBack = group.bool(forKey: probeKey)
+        group.removeObject(forKey: probeKey)
+        return readBack ? group : .standard
+    }()
+
     // MARK: - Per-format atom display style
-    @AppStorage("atomStyleCIF", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleCIF", store: SettingsStorage.preferencesStore)
     var atomStyleCIF: Settings.AtomStyle = .stick
-    @AppStorage("atomStylePDB", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStylePDB", store: SettingsStorage.preferencesStore)
     var atomStylePDB: Settings.AtomStyle = .cartoon
-    @AppStorage("atomStyleSDF", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleSDF", store: SettingsStorage.preferencesStore)
     var atomStyleSDF: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleMOL2", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleMOL2", store: SettingsStorage.preferencesStore)
     var atomStyleMOL2: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleXYZ", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleXYZ", store: SettingsStorage.preferencesStore)
     var atomStyleXYZ: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleMOL", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleMOL", store: SettingsStorage.preferencesStore)
     var atomStyleMOL: Settings.AtomStyle = .stick
-    @AppStorage("atomStyleGRO", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleGRO", store: SettingsStorage.preferencesStore)
     var atomStyleGRO: Settings.AtomStyle = .cartoon
-    @AppStorage("atomStyleCUBE", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("atomStyleCUBE", store: SettingsStorage.preferencesStore)
     var atomStyleCUBE: Settings.AtomStyle = .stick
 
     // MARK: - Global rendering
-    @AppStorage("rotationSpeed", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("rotationSpeed", store: SettingsStorage.preferencesStore)
     var rotationSpeed: Settings.RotationSpeed = .medium
-    @AppStorage("colorScheme", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("colorScheme", store: SettingsStorage.preferencesStore)
     var colorScheme: Settings.ColorScheme = .spectrum
-    @AppStorage("autoStyleHetero", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("autoStyleHetero", store: SettingsStorage.preferencesStore)
     var autoStyleHetero: Bool = true
-    @AppStorage("showSurface", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("showSurface", store: SettingsStorage.preferencesStore)
     var showSurface: Bool = false
-    @AppStorage("hideHydrogens", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("hideHydrogens", store: SettingsStorage.preferencesStore)
     var hideHydrogens: Bool = false
-    @AppStorage("showUnitCell", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("showUnitCell", store: SettingsStorage.preferencesStore)
     var showUnitCell: Bool = false
-    @AppStorage("showInfoOverlay", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("showInfoOverlay", store: SettingsStorage.preferencesStore)
     var showInfoOverlay: Bool = true
 
     /// Initial zoom factor applied after 3Dmol's `viewer.zoomTo()` auto-fit.
     /// Lets the user open Quick Look previews wider or tighter on the molecule
     /// without manually scrolling to zoom every time.
-    @AppStorage("defaultZoom", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("defaultZoom", store: SettingsStorage.preferencesStore)
     var defaultZoom: Settings.DefaultZoom = .auto
 
     // MARK: - Background color components
-    @AppStorage("bgColorRed", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("bgColorRed", store: SettingsStorage.preferencesStore)
     var bgColorRed: Double = 0.0
-    @AppStorage("bgColorGreen", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("bgColorGreen", store: SettingsStorage.preferencesStore)
     var bgColorGreen: Double = 0.0
-    @AppStorage("bgColorBlue", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("bgColorBlue", store: SettingsStorage.preferencesStore)
     var bgColorBlue: Double = 0.0
-    @AppStorage("bgColorOpacity", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    @AppStorage("bgColorOpacity", store: SettingsStorage.preferencesStore)
     var bgColorOpacity: Double = 0.0
 
     var bgColor: Color {

@@ -45,12 +45,13 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
     @Published var canCheck: Bool = true
     @Published var lastCheckStatus: String = ""
 
-    /// Implicitly unwrapped because we can't pass `self` to
-    /// `SPUStandardUpdaterController.init(updaterDelegate:)` until after
-    /// `super.init()` has run; Sparkle 2.x's `SPUUpdater.delegate` is
-    /// read-only so we have to set the delegate at construction time, not
-    /// afterwards.
-    private var controller: SPUStandardUpdaterController!
+    /// Optional because we only construct Sparkle when `SUPublicEDKey`
+    /// in Info.plist is a real key — not the `REPLACE_WITH_…` placeholder
+    /// the source ships with. Constructing `SPUStandardUpdaterController`
+    /// against the placeholder makes Sparkle log
+    ///     "Fatal updater error (1): The EdDSA public key is not valid"
+    /// on every app launch even before the user touches any UI.
+    private var controller: SPUStandardUpdaterController?
 
     /// Stable shared formatter — `Date.formatted(date:time:)` is macOS 12+,
     /// but the project's deployment target is 11. DateFormatter is fine on
@@ -64,14 +65,19 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
 
     override private init() {
         super.init()
-        // `startingUpdater: true` means Sparkle starts its scheduled-check
-        // timer immediately; the SUEnableAutomaticChecks /
-        // SUScheduledCheckInterval Info.plist keys control its cadence.
-        self.controller = SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: self,
-            userDriverDelegate: nil
-        )
+        // Only spin up Sparkle when we have a real public key to verify
+        // signatures against. Otherwise Sparkle errors on every launch.
+        if self.sparkleIsConfigured {
+            // `startingUpdater: true` means Sparkle starts its scheduled-
+            // check timer immediately; the SUEnableAutomaticChecks /
+            // SUScheduledCheckInterval Info.plist keys control its
+            // cadence.
+            self.controller = SPUStandardUpdaterController(
+                startingUpdater: true,
+                updaterDelegate: self,
+                userDriverDelegate: nil
+            )
+        }
     }
 
     /// Bundle.main URL for the public-on-github releases page — used as the
@@ -95,7 +101,7 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
 
     /// Wired to the "Check for Updates…" menu item and the About-panel button.
     func checkForUpdates() {
-        guard sparkleIsConfigured else {
+        guard let controller = controller else {
             lastCheckStatus = "Sparkle public key not set — opening release page in browser."
             NSWorkspace.shared.open(releasesURL)
             return
