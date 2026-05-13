@@ -72,8 +72,11 @@ final class ThumbnailProvider: QLThumbnailProvider {
         if let atoms = atoms, !atoms.isEmpty {
             os_log("parsed %{public}d atoms — rendering real molecule",
                    log: thumbLog, type: .info, atoms.count)
-            let reply = QLThumbnailReply(contextSize: size) { _ -> Bool in
-                Self.drawMolecule(atoms: atoms, ext: ext, in: NSRect(origin: .zero, size: size))
+            let reply = QLThumbnailReply(contextSize: size) { cgCtx -> Bool in
+                Self.withNSGraphicsContext(cgCtx) {
+                    Self.drawMolecule(atoms: atoms, ext: ext,
+                                      in: NSRect(origin: .zero, size: size))
+                }
                 return true
             }
             handler(reply, nil)
@@ -81,11 +84,29 @@ final class ThumbnailProvider: QLThumbnailProvider {
         }
 
         os_log("could not parse atoms — drawing glyph fallback", log: thumbLog, type: .info)
-        let reply = QLThumbnailReply(contextSize: size) { _ -> Bool in
-            Self.drawAtomGlyph(ext: ext, in: NSRect(origin: .zero, size: size))
+        let reply = QLThumbnailReply(contextSize: size) { cgCtx -> Bool in
+            Self.withNSGraphicsContext(cgCtx) {
+                Self.drawAtomGlyph(ext: ext, in: NSRect(origin: .zero, size: size))
+            }
             return true
         }
         handler(reply, nil)
+    }
+
+    /// QLThumbnailReply's drawing block receives a raw CGContext — it does
+    /// NOT push it into NSGraphicsContext.current the way -[NSImage
+    /// lockFocus] would. Our drawing routines use NSGradient / NSBezierPath
+    /// / NSAttributedString, all of which paint into the *current*
+    /// NSGraphicsContext; if that isn't set, the calls silently no-op and
+    /// the thumbnail ships as a 4–5 KB blank PNG (exactly what we saw).
+    /// Wrap the passed CGContext in an NSGraphicsContext, make it current
+    /// for the duration of the draw, then restore.
+    private static func withNSGraphicsContext(_ cgCtx: CGContext, _ body: () -> Void) {
+        let nsCtx = NSGraphicsContext(cgContext: cgCtx, flipped: false)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = nsCtx
+        body()
+        NSGraphicsContext.restoreGraphicsState()
     }
 
     // MARK: - Atom model
