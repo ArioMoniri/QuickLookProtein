@@ -4,6 +4,17 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.5] — 2026-05-14
+
+### 🪟 Windows
+
+- **Setup.exe is finally building.** v1.7.4 tried to produce it via
+  7-Zip's SFX module but `windows-latest` doesn't bundle the SFX
+  payload (`7zSD.sfx` / `7zS.sfx` live in the separately-downloadable
+  7-Zip Extras pack). Switched to Inno Setup, which is preinstalled
+  on every github-hosted Windows runner — same one-click outcome,
+  no external fetch needed.
+
 ## [1.7.4] — 2026-05-14
 
 ### 🪟 Windows
