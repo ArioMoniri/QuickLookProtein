@@ -33,9 +33,14 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
     var webView: WKWebView?
     private var pendingHandler: ((Error?) -> Void)?
 
-    // Note: @StateObject is a SwiftUI property wrapper that needs a View's lifecycle to
-    // publish changes — plain ownership is what we want on an NSViewController.
-    private let userSettings = SettingsStorage()
+    // Settings are intentionally NOT cached on the view controller. The
+    // Quick Look daemon keeps an extension process warm across many
+    // previews; if we initialised SettingsStorage once at load time, a
+    // toggle flipped in the main app afterwards (e.g. "Show molecular
+    // surface") would never propagate — the cached @Published values
+    // are only read from UserDefaults inside SettingsStorage.init().
+    // Re-instantiate on every preparePreviewOfFile so a fresh snapshot
+    // of the App-Group preferences is picked up each time.
 
     /// Anything above this is refused with an in-page message — Quick Look extensions
     /// have a small memory budget and parsing a 50 MB PDB inside WKWebView will get the
@@ -83,6 +88,7 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
             html = oversizedFileHTML(name: url.lastPathComponent,
                                      sizeMB: Double(size) / 1_048_576)
         } else {
+            let userSettings = SettingsStorage()
             let options = ViewerOptions.from(
                 userSettings,
                 fileExtension: fileExtension,

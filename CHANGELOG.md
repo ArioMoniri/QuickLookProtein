@@ -4,6 +4,30 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.2] — 2026-05-14
+
+### 🐛 Fixed
+
+- **Sparkle "An error occurred while launching the installer"** — sandboxed
+  app couldn't reach Sparkle's installer-launcher XPC service. The Sparkle SPM
+  target only embeds `Installer.xpc` / `Downloader.xpc` inside the framework;
+  macOS only honours mach-service lookups when those bundles live at
+  `Contents/XPCServices/` of the host app. The release workflow now promotes
+  them and re-signs with Developer ID, and the host's `mach-lookup` entitlement
+  uses the framework's stock identifiers (`org.sparkle-project.InstallerLauncher`
+  and `org.sparkle-project.DownloaderService`) instead of the
+  `$(PRODUCT_BUNDLE_IDENTIFIER)-sp*` aliases which nothing was renaming.
+- **Settings toggles not applying to the Quick Look preview** — the QL
+  extension cached `SettingsStorage` once at process launch. macOS keeps the
+  extension process warm across previews, so a toggle flipped in the main
+  app afterwards never propagated. `preparePreviewOfFile` now re-instantiates
+  `SettingsStorage` on every invocation to pick up a fresh snapshot of the
+  App-Group preferences.
+- **"Quick Look not updating?" card needed precise chevron clicks** —
+  replaced `DisclosureGroup` with a custom plain-style `Button` header so
+  the entire row (icon + title + subtitle + chevron) is the tap target,
+  with a rotating chevron animation.
+
 ## [1.7.1] — 2026-05-14
 
 ### 🎨 Changed

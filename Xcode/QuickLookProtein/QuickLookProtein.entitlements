@@ -14,28 +14,35 @@
 	<true/>
 
 	<!--
-	  Sparkle 2.x in a sandboxed app needs three things:
+	  Sparkle 2.x in a sandboxed app needs:
 
-	   1. Outbound network (already set above) to fetch the appcast.xml feed
-	      and the update artifact.
+	   1. Outbound network (already set above) to fetch the appcast.xml
+	      feed and the update artifact.
 
-	   2. Permission to look up the bundled XPC services Sparkle uses to
-	      download and install updates outside the sandbox. The service
-	      names below match what the Sparkle SPM target advertises; the
-	      `$(PRODUCT_BUNDLE_IDENTIFIER)` prefix scopes them to this app
-	      so two Sparkle-using apps don't collide.
+	   2. Permission to look up the XPC services Sparkle bundles for the
+	      download/install steps that have to happen *outside* the
+	      sandbox. The mach service names below MUST match the
+	      `CFBundleIdentifier` of the two `.xpc` bundles we copy into
+	      `Contents/XPCServices/` at release time (the release workflow
+	      promotes them from `Sparkle.framework/Versions/B/XPCServices/`
+	      and re-signs them with the rest of the app).
 
-	   3. Permission to send Apple Events to the installer helper so the
-	      app can be relaunched after the update is applied.
+	      Previously we used `$(PRODUCT_BUNDLE_IDENTIFIER)-spks` /
+	      `-spki` here. That naming required renaming the XPC service
+	      bundles at build time, and because nothing was actually doing
+	      that rename, Sparkle's installer-launcher couldn't find them
+	      at runtime — clicking "Install Update" surfaced
+	      "An error occurred while launching the installer." Switching
+	      to the framework's stock identifiers (org.sparkle-project.*)
+	      lets us ship the XPC services unchanged.
 
-	  See https://sparkle-project.org/documentation/sandboxing/ for the
-	  authoritative list — if a future Sparkle version renames the
-	  services, this is the place to update.
+	  See https://sparkle-project.org/documentation/sandboxing/ for
+	  background.
 	-->
 	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
 	<array>
-		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spks</string>
-		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spki</string>
+		<string>org.sparkle-project.InstallerLauncher</string>
+		<string>org.sparkle-project.DownloaderService</string>
 	</array>
 </dict>
 </plist>

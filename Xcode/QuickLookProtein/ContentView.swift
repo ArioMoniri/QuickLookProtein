@@ -29,6 +29,10 @@ struct ContentView: View {
     @State private var droppedFile: URL? = nil
     @State private var droppedFileError: String? = nil
     @State private var isDropTargeted: Bool = false
+    /// Whether the "Quick Look not updating?" card is expanded. Drives a
+    /// custom DisclosureGroup so the *entire* header row (icon + title +
+    /// subtitle + chevron) is the tap target, not just the chevron.
+    @State private var troubleshootingExpanded: Bool = false
 
     var body: some View {
         let htmlPath = Bundle.main.path(forResource: "3Dmol_viewer", ofType: "html")!
@@ -332,62 +336,86 @@ struct ContentView: View {
         }
     }
 
-    /// Bottom card — collapsible Quick Look troubleshooting. Most users won't
-    /// need it; collapse by default so it doesn't dominate the panel.
+    /// Bottom card — collapsible Quick Look troubleshooting. Most users
+    /// won't need it; collapse by default so it doesn't dominate the
+    /// panel. Custom header (plain Button + animated chevron) instead of
+    /// `DisclosureGroup` so the *entire* row — icon, title, subtitle,
+    /// chevron — is the hit area. SwiftUI's `DisclosureGroup` only makes
+    /// the chevron+label tappable; an empty area beside them swallows
+    /// the click silently.
     @ViewBuilder
     private var troubleshootingCard: some View {
         AboutCard {
-            DisclosureGroup {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("After installing a new version, macOS may still use a previously-installed extension. Two clicks to fix:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack(spacing: 8) {
-                        Button("Open Extensions settings") {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences") {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        .controlSize(.small)
-                        Button("Reveal /Applications") {
-                            NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
-                        }
-                        .controlSize(.small)
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        troubleshootingExpanded.toggle()
                     }
-
-                    Text("Then flush macOS's Quick Look caches from Terminal:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 6) {
-                        Text("qlmanage -r && qlmanage -r cache")
-                            .font(.system(.caption, design: .monospaced))
-                            .padding(.vertical, 4).padding(.horizontal, 6)
-                            .background(Color.secondary.opacity(0.12))
-                            .cornerRadius(4)
-                        Button("Copy") {
-                            let pb = NSPasteboard.general
-                            pb.clearContents()
-                            pb.setString("qlmanage -r && qlmanage -r cache", forType: .string)
+                } label: {
+                    HStack(spacing: 10) {
+                        CardIcon(systemName: "wrench.and.screwdriver.fill",
+                                 tint: .orange,
+                                 size: 32)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Quick Look not updating?")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Text("Reset macOS's Quick Look cache after upgrading.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        .controlSize(.small)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+                            .rotationEffect(.degrees(troubleshootingExpanded ? 90 : 0))
                     }
+                    .contentShape(Rectangle())   // make empty space tappable
                 }
-                .padding(.top, 6)
-            } label: {
-                HStack(spacing: 10) {
-                    CardIcon(systemName: "wrench.and.screwdriver.fill",
-                             tint: .orange,
-                             size: 32)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Quick Look not updating?")
-                            .font(.headline)
-                        Text("Reset macOS's Quick Look cache after upgrading.")
+                .buttonStyle(.plain)             // no default button chrome
+                .help(troubleshootingExpanded ? "Hide troubleshooting steps"
+                                              : "Show troubleshooting steps")
+
+                if troubleshootingExpanded {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("After installing a new version, macOS may still use a previously-installed extension. Two clicks to fix:")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        HStack(spacing: 8) {
+                            Button("Open Extensions settings") {
+                                if let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }
+                            .controlSize(.small)
+                            Button("Reveal /Applications") {
+                                NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+                            }
+                            .controlSize(.small)
+                        }
+
+                        Text("Then flush macOS's Quick Look caches from Terminal:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 6) {
+                            Text("qlmanage -r && qlmanage -r cache")
+                                .font(.system(.caption, design: .monospaced))
+                                .padding(.vertical, 4).padding(.horizontal, 6)
+                                .background(Color.secondary.opacity(0.12))
+                                .cornerRadius(4)
+                            Button("Copy") {
+                                let pb = NSPasteboard.general
+                                pb.clearContents()
+                                pb.setString("qlmanage -r && qlmanage -r cache", forType: .string)
+                            }
+                            .controlSize(.small)
+                        }
                     }
+                    .padding(.top, 10)
+                    .transition(.opacity)
                 }
             }
         }

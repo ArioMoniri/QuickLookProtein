@@ -181,11 +181,68 @@ jobs:
               -exportPath build/export \
               -exportOptionsPlist build/ExportOptions.plist
 
+      # ----------------------------------------------------------------
+      # Promote Sparkle's XPC services into Contents/XPCServices/.
+      #
+      # The Sparkle SPM target embeds Installer.xpc and Downloader.xpc
+      # inside Sparkle.framework/Versions/B/XPCServices/. macOS's sandbox
+      # only honours mach-service lookups when the XPC bundle lives at
+      # Contents/XPCServices/ of the *host* app — there's no fallback
+      # search path into a framework. Without this step, clicking
+      # "Install Update" on a sandboxed Sparkle 2.x build returns
+      # "An error occurred while launching the installer."
+      #
+      # We copy + re-sign the two services with the same Developer ID
+      # identity used by the main binary, then run a final --deep sign
+      # on the .app so the embedded XPC services are part of the
+      # parent's signed contents.
+      - name: Embed Sparkle XPC services
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP=build/export/QuickLookProtein.app
+          SRC="$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices"
+          DST="$APP/Contents/XPCServices"
+          if [ ! -d "$SRC" ]; then
+            echo "::warning::Sparkle.framework XPCServices/ not found — Sparkle dep may not be wired into the target. Skipping."
+            exit 0
+          fi
+          mkdir -p "$DST"
+          for svc in Installer.xpc Downloader.xpc; do
+            if [ -d "$SRC/$svc" ]; then
+              /usr/bin/ditto "$SRC/$svc" "$DST/$svc"
+            else
+              echo "::warning::$SRC/$svc missing; skipping."
+            fi
+          done
+          # Resolve the actual identity name from the keychain — manual
+          # signing in the export step writes "Developer ID Application"
+          # as the cert *type*, but the per-binary codesign call here
+          # needs the SHA1 or full common name.
+          IDENTITY=$(security find-identity -v -p codesigning \
+                     | awk '/Developer ID Application/ {print $2; exit}')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::Could not find Developer ID Application identity in keychain."
+            exit 1
+          fi
+          for svc in "$DST"/*.xpc; do
+            [ -d "$svc" ] || continue
+            codesign --force --options runtime --timestamp \
+                     --sign "$IDENTITY" "$svc"
+          done
+          # Re-sign the whole app so the parent's signature covers the
+          # XPC services we just added.
+          codesign --force --options runtime --timestamp \
+                   --entitlements Xcode/QuickLookProtein/QuickLookProtein.entitlements \
+                   --sign "$IDENTITY" "$APP"
+
       - name: Verify signature
         run: |
           APP=build/export/QuickLookProtein.app
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign -dvv "$APP" | head -20
+          # Confirm the XPC services landed where Sparkle expects them.
+          ls -la "$APP/Contents/XPCServices/" || true
 
       # ----------------------------------------------------------------
       - name: Package zip
