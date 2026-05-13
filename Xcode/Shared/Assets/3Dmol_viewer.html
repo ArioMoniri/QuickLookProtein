@@ -84,7 +84,12 @@
                     document.body.appendChild(e);
                 }
 
-                document.addEventListener('DOMContentLoaded', function () {
+                // Run on `window.load` rather than `DOMContentLoaded` so the
+                // bundled 3Dmol.js (loaded via a `<script src>` tag) is parsed
+                // and `$3Dmol` is on `window`. With DOMContentLoaded there's a
+                // small race where the host had finished parsing the document
+                // but 3Dmol.js's network/disk fetch hadn't completed yet.
+                window.addEventListener('load', function () {
                     try {
                         if (typeof $3Dmol === 'undefined') {
                             return showError('3Dmol.js failed to load');
@@ -278,9 +283,30 @@
                             labelEl.style.display = 'block';
                         });
 
-                        viewer.render();
-                        var spin = {ROTATION_SPEED};
-                        if (spin > 0) viewer.spin('y', spin);
+                        // Double requestAnimationFrame: the first commits layout,
+                        // the second is the first frame on which the WebGL
+                        // context is guaranteed to be alive — calling render()
+                        // there reliably paints something, even in sandboxed
+                        // WKWebViews where the GL context creation is async.
+                        requestAnimationFrame(function () {
+                            requestAnimationFrame(function () {
+                                viewer.render();
+                                var spin = {ROTATION_SPEED};
+                                if (spin > 0) viewer.spin('y', spin);
+                            });
+                        });
+
+                        // Keep the WebGL canvas in sync with the SwiftUI parent
+                        // — SwiftUI's NSViewRepresentable resizes the WKWebView
+                        // but 3Dmol's canvas doesn't re-attach on its own. The
+                        // resize() call re-reads container size and re-renders.
+                        var resizeTimer = null;
+                        window.addEventListener('resize', function () {
+                            if (resizeTimer) clearTimeout(resizeTimer);
+                            resizeTimer = setTimeout(function () {
+                                try { viewer.resize(); viewer.render(); } catch (e) {}
+                            }, 50);
+                        });
 
                         // Thumbnail bridge: when the viewer host (QLThumbnail
                         // extension) sets `{THUMBNAIL_MODE}` true, render once with a
