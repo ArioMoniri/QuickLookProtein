@@ -436,6 +436,16 @@ jobs:
 
           #### 🪟 Windows
 
+          **Option A — One-liner (recommended)** — paste into PowerShell:
+
+          \`\`\`powershell
+          irm https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/feature/ario-signed/Windows/install.ps1 | iex
+          \`\`\`
+
+          Installs [QuickLook](https://github.com/QL-Win/QuickLook) if missing, fetches the latest \`.qlplugin\`, drops it into \`%LocalAppData%\\QuickLook\\plugins\\QuickLookProtein\\\`, and restarts the QuickLook tray. No admin needed.
+
+          **Option B — Manual**
+
           1. Install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest) (the Windows-side Quick Look daemon — free, GPL-3).
           2. Download **QuickLookProtein-${VERSION}.qlplugin** from the Assets below.
           3. Double-click the \`.qlplugin\` file while QuickLook is running (or extract it into \`%LocalAppData%\\QuickLook\\plugins\\\`).
