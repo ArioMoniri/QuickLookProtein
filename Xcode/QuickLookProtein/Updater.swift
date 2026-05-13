@@ -85,19 +85,28 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
     /// public key, missing feed, etc.).
     private let releasesURL = URL(string: "https://github.com/ArioMoniri/QuickLookProtein/releases/latest")!
 
-    /// The Info.plist key ships with a placeholder string until the user runs
-    /// `scripts/generate-sparkle-keys.sh` and pastes the result. Before that
-    /// happens Sparkle will reject every update it sees because no signature
-    /// matches, so we route the "Check for Updates" button to the web instead
-    /// of letting Sparkle silently fail.
+    /// The Info.plist key ships with a well-formed but functionally bogus
+    /// zero-byte EdDSA placeholder until the user runs
+    /// `scripts/generate-sparkle-keys.sh` (or the release workflow injects
+    /// the real key from secrets). We detect both the zero-key placeholder
+    /// and the legacy `REPLACE_WITH_…` text placeholder so old Info.plists
+    /// still light up the fallback path. When a real key is present we let
+    /// Sparkle take over.
     private var sparkleIsConfigured: Bool {
         guard let key = Bundle.main.infoDictionary?["SUPublicEDKey"] as? String,
               !key.isEmpty,
-              !key.hasPrefix("REPLACE_WITH_") else {
+              !key.hasPrefix("REPLACE_WITH_"),
+              key != Self.zeroEdDSAPlaceholder else {
             return false
         }
         return true
     }
+
+    /// Base64 encoding of 32 zero bytes — the well-formed but functionally
+    /// bogus Ed25519 public key the source ships with. See Info.plist
+    /// comment for why we use a decodable placeholder rather than a
+    /// human-readable one.
+    private static let zeroEdDSAPlaceholder = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
     /// Wired to the "Check for Updates…" menu item and the About-panel button.
     func checkForUpdates() {

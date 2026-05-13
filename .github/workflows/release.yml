@@ -16,6 +16,12 @@ name: Release
 #   APPLE_TEAM_ID                 e.g. FF68N39FU5
 #   SPARKLE_ED_PRIVATE_KEY        base64 of the EdDSA private key from
 #                                 scripts/generate-sparkle-keys.sh
+#   SPARKLE_ED_PUBLIC_KEY         the base64-encoded EdDSA public key shown by
+#                                 generate_keys (the line after "Public key:"
+#                                 — a 44-char string ending in `=`). Injected
+#                                 into Info.plist:SUPublicEDKey at build time
+#                                 so installed clients can verify update
+#                                 signatures.
 
 on:
   push:
@@ -90,6 +96,24 @@ jobs:
               -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
 
           rm -f "$CERT_PATH"
+
+      # ----------------------------------------------------------------
+      # Inject the real Sparkle public key into Info.plist before archiving.
+      # The source tree ships a zero-key placeholder so dev builds don't
+      # crash on launch with "Fatal updater error (1)"; release builds need
+      # the real key so installed clients can verify update signatures.
+      - name: Inject Sparkle public key
+        env:
+          SPARKLE_ED_PUBLIC_KEY: ${{ secrets.SPARKLE_ED_PUBLIC_KEY }}
+        run: |
+          if [[ -z "$SPARKLE_ED_PUBLIC_KEY" ]]; then
+              echo "::error::SPARKLE_ED_PUBLIC_KEY secret is not set. Released builds would ship without a verifiable public key and Sparkle clients would refuse every update."
+              exit 1
+          fi
+          /usr/libexec/PlistBuddy \
+              -c "Set :SUPublicEDKey ${SPARKLE_ED_PUBLIC_KEY}" \
+              Xcode/QuickLookProtein/Info.plist
+          echo "Injected SUPublicEDKey into Info.plist."
 
       # ----------------------------------------------------------------
       # Build, archive, export. We embed the developer team and signing
