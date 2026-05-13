@@ -4,9 +4,17 @@
         <meta charset="utf-8">
         <script src="3Dmol.js"></script>
         <style>
-            html, body { margin: 0; padding: 0; height: 100%; overflow: hidden;
+            html, body { margin: 0; padding: 0; height: 100%; width: 100%;
+                         overflow: hidden;
                          font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
-            #3dviewer  { height: 100vh; width: 100%; position: relative; }
+            /* `position: absolute` with all-sides zero gives the WebGL container a
+               concrete pixel size derived from <body>, even when WebKit hasn't yet
+               resolved `100vh` against the WKWebView's viewport. Without this,
+               $3Dmol.createViewer() routinely reads offsetWidth/offsetHeight = 0 at
+               script-eval time inside a Quick Look extension's WKWebView and the
+               canvas it builds is invisible. */
+            #3dviewer  { position: absolute; inset: 0; }
+            #3dviewer canvas { display: block; width: 100% !important; height: 100% !important; }
             #info      { position: absolute; top: 8px; left: 8px; z-index: 10;
                          font-size: 11px; color: #555;
                          background: rgba(255,255,255,0.70);
@@ -90,7 +98,18 @@
 
                         var format = "{DATA_FORMAT}";
                         var element = document.getElementById('3dviewer');
-                        var viewer = $3Dmol.createViewer(element, { backgroundAlpha: {BG_ALPHA} });
+                        // Force a synchronous layout pass before $3Dmol reads the
+                        // container's offsetWidth/offsetHeight — without this the
+                        // WebGL canvas is sometimes built at 0×0 inside a sandboxed
+                        // Quick Look extension's WKWebView.
+                        void element.offsetWidth;
+                        // Passing the id string is the most version-stable form of
+                        // createViewer across 3Dmol releases.
+                        var viewer = $3Dmol.createViewer('3dviewer', { backgroundAlpha: {BG_ALPHA} });
+                        if (!viewer) {
+                            return showError('WebGL unavailable',
+                                             'Your system or this WKWebView does not support WebGL.');
+                        }
                         viewer.setBackgroundColor(0x{BG_COLOR}, {BG_ALPHA});
 
                         // XYZ files contain only coordinates — without `assignBonds`, 3Dmol
@@ -179,6 +198,13 @@
                         var styleType = requestedStyle;
                         if (styleType === 'cartoon' && !hasPolymer) styleType = 'stick';
 
+                        // Apply a base style to EVERY atom first as a safety net.
+                        // If any of the smart-style serial-array selectors below silently
+                        // matches nothing on a particular 3Dmol build, this guarantees
+                        // the model is still visible instead of rendering blank.
+                        var baseStyle = {}; baseStyle[styleType] = colorFor();
+                        viewer.setStyle({}, baseStyle);
+
                         if ({AUTO_STYLE_HETERO} && hasPolymer && (hasLigand || hasMetal)) {
                             // Polymer rendered with the user's chosen style; ligands as
                             // sticks; metal ions as VDW spheres (otherwise invisible);
@@ -189,15 +215,12 @@
                             viewer.setStyle({ serial: metalSerials }, { sphere: { colorscheme: 'Jmol', scale: 0.45 } });
                             viewer.setStyle({ serial: bufSerials   }, { line:   { colorscheme: 'Jmol' } });
                             viewer.setStyle({ serial: waterSerials }, {}); // hidden by default
-                        } else {
-                            var s = {}; s[styleType] = colorFor();
-                            viewer.setStyle({}, s);
-                            // Even without auto-styling, metals would be invisible without
-                            // spheres — always make them visible.
-                            if (hasMetal) {
-                                viewer.setStyle({ serial: metalSerials },
-                                                { sphere: { colorscheme: 'Jmol', scale: 0.45 } });
-                            }
+                        } else if (hasMetal) {
+                            // Without smart styling, baseStyle covers everything; metals
+                            // would still render as the baseStyle (sticks etc.) but
+                            // single-atom ions need explicit spheres to be visible.
+                            viewer.setStyle({ serial: metalSerials },
+                                            { sphere: { colorscheme: 'Jmol', scale: 0.45 } });
                         }
 
                         if ({HIDE_H}) {
