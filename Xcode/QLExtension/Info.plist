@@ -64,8 +64,12 @@
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.quicklook.preview</string>
+		<!-- Matches the @objc(QLPreviewPreviewViewController) attribute on the
+		     Swift class. Without the explicit Obj-C class name, PluginKit's
+		     NSClassFromString fails on Swift's mangled name and Quick Look
+		     silently shows the generic doc-icon preview. -->
 		<key>NSExtensionPrincipalClass</key>
-		<string>$(PRODUCT_MODULE_NAME).PreviewViewController</string>
+		<string>QLPreviewPreviewViewController</string>
 	</dict>
 </dict>
 </plist>

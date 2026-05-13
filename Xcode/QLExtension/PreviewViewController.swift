@@ -9,7 +9,25 @@ import Cocoa
 import Quartz
 import WebKit
 import SwiftUI
+import os.log
 
+/// Subsystem-tagged logger so the user can grep for our extension's messages via:
+///     log show --predicate 'subsystem == "com.ariomoniri.QuickLookProtein.QLExtension"' --info --last 2m
+/// Quick Look extensions run in their own process and stdout/NSLog output is
+/// otherwise hard to find. Use os_log so messages are stored in unified logging
+/// even if no Console viewer is open at the time.
+private let qlLog = OSLog(subsystem: "com.ariomoniri.QuickLookProtein.QLExtension",
+                          category: "preview")
+
+/// `@objc(QLPreviewPreviewViewController)` pins this class to an explicit
+/// Obj-C runtime name so PluginKit's `NSClassFromString(NSExtensionPrincipalClass)`
+/// lookup actually finds it. Without the attribute, Swift mangles the class name
+/// (e.g. `_TtC11QLExtension21PreviewViewController`) and macOS's PluginKit host
+/// silently can't instantiate the principal class — Quick Look then falls back
+/// to its generic blank document preview, which is exactly what we saw when
+/// `qlmanage -p` rendered a doc icon for both 6oc6.pdb and methane.pqr.
+/// Keep `NSExtensionPrincipalClass` in Info.plist in sync with the name below.
+@objc(QLPreviewPreviewViewController)
 class PreviewViewController: NSViewController, QLPreviewingController, WKNavigationDelegate, WKUIDelegate {
 
     var webView: WKWebView?
@@ -43,14 +61,19 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
     }
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
+        os_log("preparePreviewOfFile called for %{public}@", log: qlLog, type: .info, url.path)
+
         guard let htmlPath = Bundle.main.path(forResource: "3Dmol_viewer", ofType: "html") else {
+            os_log("Viewer template missing from bundle", log: qlLog, type: .error)
             handler(NSError(domain: "QuickLookProtein", code: 1,
                             userInfo: [NSLocalizedDescriptionKey: "Viewer template missing from bundle"]))
             return
         }
+        os_log("htmlPath = %{public}@", log: qlLog, type: .info, htmlPath)
 
         let fileExtension = url.pathExtension.lowercased()
         let dataFormat = Settings.dataFormat(forExtension: fileExtension) ?? "pdb"
+        os_log("ext=%{public}@ → format=%{public}@", log: qlLog, type: .info, fileExtension, dataFormat)
 
         let html: String
         if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int,
@@ -82,17 +105,21 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
 
         let baseUrl = URL(fileURLWithPath: htmlPath)
         self.pendingHandler = handler
+        os_log("loadHTMLString len=%{public}d baseURL=%{public}@",
+               log: qlLog, type: .info, html.count, baseUrl.path)
         self.webView?.loadHTMLString(html, baseURL: baseUrl)
     }
 
     // MARK: - WKNavigationDelegate
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        os_log("WKWebView didFinish", log: qlLog, type: .info)
         pendingHandler?(nil)
         pendingHandler = nil
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        os_log("WKWebView didFail: %{public}@", log: qlLog, type: .error, error.localizedDescription)
         // Even on failure, returning `nil` lets the (possibly partial) HTML show; a
         // non-nil error blanks the preview and the user sees nothing.
         pendingHandler?(nil)
@@ -101,6 +128,7 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
                  withError error: Error) {
+        os_log("WKWebView didFailProvisional: %{public}@", log: qlLog, type: .error, error.localizedDescription)
         pendingHandler?(nil)
         pendingHandler = nil
     }
