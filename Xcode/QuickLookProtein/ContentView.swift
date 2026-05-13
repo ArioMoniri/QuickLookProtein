@@ -146,6 +146,29 @@ struct ContentView: View {
                              destination: URL(string: "https://github.com/ArioMoniri/QuickLookProtein")!)
                             .font(.callout)
 
+                        // Prominent download CTA — opens the GitHub Releases
+                        // page so users running the dev build or a friend's
+                        // copy can grab the latest signed/notarised .zip.
+                        // The in-place Sparkle "Check for updates" path is
+                        // still below; this is a separate manual download
+                        // that always works even before SUPublicEDKey is
+                        // configured for the build.
+                        Button(action: {
+                            if let url = URL(string: "https://github.com/ArioMoniri/QuickLookProtein/releases/latest") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.down.circle.fill")
+                                Text("Download latest release")
+                            }
+                            .font(.callout)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                        }
+                        .padding(.top, 6)
+                        .help("Open the GitHub Releases page and download the latest QuickLookProtein.zip")
+
                         if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
                             HStack(spacing: 8) {
                                 Text("Installed version: \(appVersion)")
