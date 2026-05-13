@@ -45,19 +45,33 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
     @Published var canCheck: Bool = true
     @Published var lastCheckStatus: String = ""
 
-    private let controller: SPUStandardUpdaterController
+    /// Implicitly unwrapped because we can't pass `self` to
+    /// `SPUStandardUpdaterController.init(updaterDelegate:)` until after
+    /// `super.init()` has run; Sparkle 2.x's `SPUUpdater.delegate` is
+    /// read-only so we have to set the delegate at construction time, not
+    /// afterwards.
+    private var controller: SPUStandardUpdaterController!
+
+    /// Stable shared formatter — `Date.formatted(date:time:)` is macOS 12+,
+    /// but the project's deployment target is 11. DateFormatter is fine on
+    /// every supported version and cheap to keep alive as a singleton.
+    private static let lastCheckFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f
+    }()
 
     override private init() {
+        super.init()
         // `startingUpdater: true` means Sparkle starts its scheduled-check
         // timer immediately; the SUEnableAutomaticChecks /
         // SUScheduledCheckInterval Info.plist keys control its cadence.
         self.controller = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: self,
             userDriverDelegate: nil
         )
-        super.init()
-        self.controller.updater.delegate = self
     }
 
     /// Wired to the "Check for Updates…" menu item and the About-panel button.
@@ -70,11 +84,12 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
     nonisolated func updater(_ updater: SPUUpdater,
                              didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
                              error: Error?) {
+        let now = Date()
         Task { @MainActor in
             if let error = error {
                 self.lastCheckStatus = "Update check failed: \(error.localizedDescription)"
             } else {
-                self.lastCheckStatus = "Last check: \(Date().formatted(date: .abbreviated, time: .shortened))"
+                self.lastCheckStatus = "Last check: \(Updater.lastCheckFormatter.string(from: now))"
             }
         }
     }
