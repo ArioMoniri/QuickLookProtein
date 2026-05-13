@@ -26,6 +26,13 @@
 import Cocoa
 import QuickLookThumbnailing
 import WebKit
+import os.log
+
+/// Subsystem-tagged logger — paired with QLExtension's. Stream messages from
+/// both Quick Look surfaces with:
+///     log show --info --predicate 'subsystem BEGINSWITH "com.ariomoniri.QuickLookProtein"' --last 2m
+private let thumbLog = OSLog(subsystem: "com.ariomoniri.QuickLookProtein.QLThumbnail",
+                             category: "thumbnail")
 
 // The @objc attribute is load-bearing: NSExtensionPrincipalClass in our
 // Info.plist points at "QLThumbnail.ThumbnailProvider" and PluginKit looks
@@ -63,6 +70,10 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
                                    _ handler: @escaping (QLThumbnailReply?, Error?) -> Void) {
 
         let ext = request.fileURL.pathExtension.lowercased()
+        os_log("provideThumbnail called for %{public}@ (ext=%{public}@, size=%{public}.0fx%{public}.0f)",
+               log: thumbLog, type: .info,
+               request.fileURL.path, ext,
+               request.maximumSize.width, request.maximumSize.height)
 
         // CUBE files are volumetric — without an isosurface they'd render as
         // a sparse dust of nuclei, which makes a misleading icon. Decline and
@@ -119,6 +130,8 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
                                        dataFormat: dataFormat,
                                        fileName: request.fileURL.lastPathComponent)
 
+        os_log("rendering HTML len=%{public}d dataFormat=%{public}@",
+               log: thumbLog, type: .info, html.count, dataFormat)
         DispatchQueue.main.async { [weak self] in
             self?.startRender(html: html, baseURL: templateURL)
         }
@@ -184,6 +197,7 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
         guard !didReply else { return }
         didReply = true
         timeoutWorkItem?.cancel()
+        os_log("qlThumbnailReady fired (len=%{public}d)", log: thumbLog, type: .info, uri.count)
 
         // `data:image/png;base64,XXXX`. We don't try to be clever about
         // decoding malformed URIs — if it's not a clean PNG, fall back.
@@ -200,6 +214,8 @@ final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScri
     private func replyWithCurrentSnapshot() {
         guard !didReply else { return }
         didReply = true
+        os_log("render timeout — falling back to webView snapshot",
+               log: thumbLog, type: .error)
         webView?.takeSnapshot(with: nil) { [weak self] image, error in
             if let image = image {
                 self?.finishWith(image: image)

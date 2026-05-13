@@ -107,10 +107,12 @@
                     // === parse model =========================================
                     var format  = "{DATA_FORMAT}";
                     var addOpts = { keepH: true, multimodel: false };
-                    // Formats that carry no bond table — without distance-based
-                    // bond perception, stick rendering shows invisible bond-caps
-                    // at each atom. Keep in sync with Shared/Assets/3Dmol_viewer.html.
-                    if (format === 'xyz' || format === 'vasp' || format === 'cube') {
+                    // Formats whose bond table 3Dmol's parser doesn't reliably
+                    // produce — without distance-based bond perception, stick
+                    // rendering shows invisible bond-caps at each atom. Keep
+                    // in sync with Shared/Assets/3Dmol_viewer.html.
+                    if (format === 'xyz'    || format === 'vasp' ||
+                        format === 'cube'   || format === 'cdjson') {
                         addOpts.assignBonds = true;
                     }
                     try {
