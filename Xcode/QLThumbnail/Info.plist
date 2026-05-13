@@ -48,6 +48,7 @@
 				<string>com.ariomoniri.QuickLookProtein.prmtop</string>
 				<string>com.ariomoniri.QuickLookProtein.vasp</string>
 				<string>com.ariomoniri.QuickLookProtein.cdjson</string>
+				<string>com.ariomoniri.QuickLookProtein.mmtf</string>
 			</array>
 			<key>QLThumbnailMinimumSize</key>
 			<integer>16</integer>

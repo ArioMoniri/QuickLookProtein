@@ -316,6 +316,23 @@
 				</array>
 			</dict>
 		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.mmtf</string>
+			<key>UTTypeDescription</key>
+			<string>Macromolecular Transmission Format</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>mmtf</string>
+				</array>
+			</dict>
+		</dict>
 	</array>
 </dict>
 </plist>

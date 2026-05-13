@@ -151,8 +151,9 @@ class SettingsStorage: ObservableObject {
         case "gro":                  return atomStyleGRO
         case "cube", "cub":          return atomStyleCUBE
         case "pqr":                  return .stick   // PQR is PDB-shaped but typically small molecules
-        case "vasp", "poscar":       return .stick   // VASP/POSCAR crystals — sticks beat empty cartoon
+        case "vasp", "poscar":       return .sphere  // VASP/POSCAR crystals — atoms-as-balls is the convention and renders even without bonds
         case "cdjson", "json":       return .stick   // ChemDoodle JSON small molecules
+        case "mmtf":                 return .cartoon // MMTF is compressed PDB — same convention as PDB
         default:                     return .stick   // unknown small-molecule formats — better than empty
         }
     }
@@ -261,6 +262,10 @@ struct Settings {
 
     /// Maps a file extension to the format token that 3Dmol.js's `addModel` understands.
     /// Returns nil for unknown formats so the caller can surface an error.
+    /// The full list of 3Dmol-supported structural formats per its docs is:
+    /// pdb, sdf, mol2, xyz, cif, cdjson, mmtf, prmtop, gro, pqr, cube, vasp.
+    /// Every one of those is wired up below (mmtf is binary so it's hidden
+    /// behind the Custom drop-tile rather than getting its own demo).
     static func dataFormat(forExtension ext: String) -> String? {
         switch ext.lowercased() {
         case "pdb", "ent":     return "pdb"
@@ -276,6 +281,7 @@ struct Settings {
         case "cube", "cub":    return "cube"    // Gaussian volumetric
         case "vasp", "poscar": return "vasp"    // VASP / POSCAR
         case "cdjson", "json": return "cdjson"  // ChemDoodle JSON
+        case "mmtf":           return "mmtf"    // RCSB compressed binary PDB
         default:               return nil
         }
     }
