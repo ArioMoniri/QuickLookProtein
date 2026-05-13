@@ -27,14 +27,17 @@ struct QuickLookProteinApp: App {
                 .frame(width: 800, height: 600)
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
-                    Updater.shared.checkOnLaunchIfNeeded()
+                    // Sparkle's SPUStandardUpdaterController starts its scheduled-check
+                    // timer in its initializer (referenced via Updater.shared); we just
+                    // need to touch it to keep the singleton alive.
+                    _ = Updater.shared
                 }
         }
         .commands {
             CommandGroup(replacing: .newItem, addition: {}) // remove File -> New Window from menu
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
-                    Updater.shared.check(silent: false)
+                    Updater.shared.checkForUpdates()
                 }
             }
         }

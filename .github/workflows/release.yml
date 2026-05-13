@@ -1,0 +1,290 @@
+name: Release
+
+# Push a tag of the form `v1.2.3` to trigger a full automated release:
+# build → sign with your Developer ID → notarise → staple → sign with
+# Sparkle's EdDSA key → publish a GitHub Release with the .zip → update the
+# Sparkle appcast.xml on this branch so users' Sparkle clients pick it up
+# automatically.
+#
+# Required repository Secrets (Settings → Secrets and variables → Actions):
+#
+#   BUILD_CERTIFICATE_BASE64      base64 of your Developer ID Application .p12
+#   BUILD_CERTIFICATE_PASSWORD    password you set when exporting the .p12
+#   KEYCHAIN_PASSWORD             arbitrary; protects the temp keychain in CI
+#   APPLE_ID                      your Apple Developer ID (email)
+#   APPLE_APP_PASSWORD            app-specific password from appleid.apple.com
+#   APPLE_TEAM_ID                 e.g. FF68N39FU5
+#   SPARKLE_ED_PRIVATE_KEY        base64 of the EdDSA private key from
+#                                 scripts/generate-sparkle-keys.sh
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 2.0.0). If empty, taken from the tag.'
+        required: false
+
+permissions:
+  contents: write  # to push the updated appcast.xml back to the branch
+
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    steps:
+      # ----------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Required so the post-release commit (updating appcast.xml) can
+          # push back to the same branch.
+          persist-credentials: true
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [[ -n "${{ inputs.version }}" ]]; then
+              echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+              TAG="${GITHUB_REF#refs/tags/}"
+              echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      # ----------------------------------------------------------------
+      # Import the Developer ID Application certificate into a temporary
+      # keychain. We never write the .p12 to disk in its decoded form except
+      # for the duration of `security import`, and the keychain is deleted
+      # after the run completes (post: steps).
+      - name: Import signing certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          BUILD_CERTIFICATE_PASSWORD: ${{ secrets.BUILD_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain    -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          security import "$CERT_PATH" \
+              -P "$BUILD_CERTIFICATE_PASSWORD" \
+              -A -t cert -f pkcs12 \
+              -k "$KEYCHAIN"
+
+          # Make codesign find the cert without prompting.
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list \
+              -S apple-tool:,apple:,codesign: \
+              -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          rm -f "$CERT_PATH"
+
+      # ----------------------------------------------------------------
+      # Build, archive, export. We embed the developer team and signing
+      # identity via xcconfig overrides so the project file can keep its
+      # build settings clean.
+      - name: Archive
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          mkdir -p build
+          xcodebuild \
+              -project Xcode/QuickLookProtein.xcodeproj \
+              -scheme QuickLookProtein \
+              -configuration Release \
+              -archivePath build/QuickLookProtein.xcarchive \
+              -destination 'generic/platform=macOS' \
+              -allowProvisioningUpdates \
+              MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+              CURRENT_PROJECT_VERSION="${{ steps.version.outputs.version }}" \
+              DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+              CODE_SIGN_STYLE=Manual \
+              CODE_SIGN_IDENTITY="Developer ID Application" \
+              OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
+              archive
+
+      - name: Export signed .app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat > build/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key>             <string>developer-id</string>
+            <key>teamID</key>             <string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key>       <string>manual</string>
+            <key>signingCertificate</key> <string>Developer ID Application</string>
+          </dict></plist>
+          EOF
+
+          xcodebuild -exportArchive \
+              -archivePath build/QuickLookProtein.xcarchive \
+              -exportPath build/export \
+              -exportOptionsPlist build/ExportOptions.plist
+
+      - name: Verify signature
+        run: |
+          APP=build/export/QuickLookProtein.app
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dvv "$APP" | head -20
+
+      # ----------------------------------------------------------------
+      - name: Package zip
+        id: zip
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ZIP="build/QuickLookProtein-${VERSION}.zip"
+          ( cd build/export && /usr/bin/ditto -c -k --keepParent QuickLookProtein.app "../QuickLookProtein-${VERSION}.zip" )
+          echo "zip=$ZIP" >> $GITHUB_OUTPUT
+          echo "name=QuickLookProtein-${VERSION}.zip" >> $GITHUB_OUTPUT
+          du -h "$ZIP"
+
+      # ----------------------------------------------------------------
+      - name: Notarise
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool submit "${{ steps.zip.outputs.zip }}" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" \
+              --wait
+
+      - name: Staple notarisation ticket
+        run: |
+          APP=build/export/QuickLookProtein.app
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+
+      - name: Re-package stapled .app
+        run: |
+          ZIP="${{ steps.zip.outputs.zip }}"
+          rm -f "$ZIP"
+          ( cd build/export && /usr/bin/ditto -c -k --keepParent QuickLookProtein.app "../$(basename $ZIP)" )
+
+      # ----------------------------------------------------------------
+      # Sparkle signing. We pull a known-good Sparkle release for its
+      # `sign_update` binary, feed it the private key from secrets, and
+      # capture the resulting signature line. `sign_update` outputs in the
+      # form `sparkle:edSignature="…" length="…"` which slots directly into
+      # the appcast enclosure.
+      - name: Install Sparkle tools
+        env:
+          SPARKLE_VERSION: '2.6.4'
+        run: |
+          curl -fsSL -o sparkle.tar.xz \
+              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          mkdir -p sparkle
+          tar -xf sparkle.tar.xz -C sparkle
+          test -x sparkle/bin/sign_update
+
+      - name: Sign update with Sparkle EdDSA key
+        id: sparkle
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          # Sparkle's `sign_update -f <path>` reads the *raw* private key
+          # from a file. The secret stores it base64-encoded so it travels
+          # safely through GitHub's UI; decode here, then shred.
+          KEY_FILE="$RUNNER_TEMP/sparkle.key"
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | base64 --decode > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+
+          SIG_LINE=$(./sparkle/bin/sign_update -f "$KEY_FILE" "${{ steps.zip.outputs.zip }}")
+          rm -f "$KEY_FILE"
+
+          echo "Sparkle signature line: $SIG_LINE"
+          {
+              echo "signature_line<<__EOF__"
+              echo "$SIG_LINE"
+              echo "__EOF__"
+          } >> $GITHUB_OUTPUT
+
+          LENGTH=$(stat -f %z "${{ steps.zip.outputs.zip }}")
+          echo "length=$LENGTH" >> $GITHUB_OUTPUT
+
+      # ----------------------------------------------------------------
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="v${VERSION}"
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+              # Create release with auto-generated notes if available; fall
+              # back to a generic note if CHANGELOG isn't parsed cleanly.
+              gh release create "$TAG" \
+                  --title "QuickLookProtein $VERSION" \
+                  --generate-notes
+          fi
+
+          gh release upload "$TAG" "${{ steps.zip.outputs.zip }}" --clobber
+
+      # ----------------------------------------------------------------
+      # Append a new <item> to docs/appcast.xml and push it back. GitHub
+      # Pages (configured to serve from this branch /docs) will pick it up
+      # within a minute, and any installed Sparkle client will see the new
+      # release at the next check.
+      - name: Update appcast.xml
+        env:
+          APPCAST: docs/appcast.xml
+          VERSION: ${{ steps.version.outputs.version }}
+          SIGLINE: ${{ steps.sparkle.outputs.signature_line }}
+          LENGTH:  ${{ steps.sparkle.outputs.length }}
+        run: |
+          python3 scripts/update-appcast.py \
+              --appcast "$APPCAST" \
+              --version "$VERSION" \
+              --asset-url "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/${{ steps.zip.outputs.name }}" \
+              --signature-line "$SIGLINE" \
+              --length "$LENGTH" \
+              --release-url "https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
+
+      - name: Commit appcast back to the branch
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # The tag points at the historical commit; we want the commit on
+          # the branch (feature/ario-signed) that the tag was cut from, so
+          # we check out that branch by name and push there.
+          BRANCH="${GITHUB_REF_NAME}"
+          # When triggered by a tag push, GITHUB_REF_NAME is the tag, so
+          # we use a fallback. Adjust the branch name if you ever rename it.
+          if [[ "$BRANCH" == v* ]]; then BRANCH="feature/ario-signed"; fi
+
+          git fetch origin "$BRANCH"
+          git checkout "$BRANCH"
+          git add docs/appcast.xml
+          if git diff --cached --quiet; then
+              echo "appcast.xml unchanged; nothing to commit."
+              exit 0
+          fi
+          git commit -m "Release ${{ steps.version.outputs.version }}: appcast update [skip ci]"
+          git push origin "$BRANCH"
+
+      # ----------------------------------------------------------------
+      - name: Cleanup keychain
+        if: always()
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          security delete-keychain "$KEYCHAIN" 2>/dev/null || true

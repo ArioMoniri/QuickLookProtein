@@ -12,5 +12,30 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+
+	<!--
+	  Sparkle 2.x in a sandboxed app needs three things:
+
+	   1. Outbound network (already set above) to fetch the appcast.xml feed
+	      and the update artifact.
+
+	   2. Permission to look up the bundled XPC services Sparkle uses to
+	      download and install updates outside the sandbox. The service
+	      names below match what the Sparkle SPM target advertises; the
+	      `$(PRODUCT_BUNDLE_IDENTIFIER)` prefix scopes them to this app
+	      so two Sparkle-using apps don't collide.
+
+	   3. Permission to send Apple Events to the installer helper so the
+	      app can be relaunched after the update is applied.
+
+	  See https://sparkle-project.org/documentation/sandboxing/ for the
+	  authoritative list — if a future Sparkle version renames the
+	  services, this is the place to update.
+	-->
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spks</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spki</string>
+	</array>
 </dict>
 </plist>

@@ -152,28 +152,18 @@ struct ContentView: View {
                         if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
                             HStack(spacing: 8) {
                                 Text("Installed version: " + appVersion)
-                                if updater.isChecking {
-                                    ProgressView().controlSize(.small)
-                                }
                                 Button("Check for updates") {
-                                    updater.check(silent: false)
+                                    updater.checkForUpdates()
                                 }
                                 .controlSize(.small)
+                                .disabled(!updater.canCheck)
                             }
                             .padding(.top, 4)
 
-                            if let release = updater.latestRelease,
-                               release.tag != appVersion, release.tag != "v" + appVersion {
-                                HStack(spacing: 4) {
-                                    Text("Newer release \(release.tag) available.")
-                                    Link("Open", destination: release.url)
-                                }
-                                .font(.callout)
-                                .foregroundColor(.accentColor)
-                            }
-                            if let err = updater.lastError {
-                                Text("Update check error: \(err)")
-                                    .font(.caption2).foregroundColor(.red)
+                            if !updater.lastCheckStatus.isEmpty {
+                                Text(updater.lastCheckStatus)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
                             }
                         }
 

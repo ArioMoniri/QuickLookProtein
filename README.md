@@ -73,9 +73,11 @@ The bundled settings app lets you set the default atom style per format, color s
 
 ### 🔄 Auto-update
 
-The app checks for new releases of this fork once per launch (debounced to once per 24h). When a new version is published you'll see a prompt with Download / Remind Me / Skip This Version. You can also trigger a check on demand from **QuickLookProtein menu → Check for Updates…** or from the *About* section in the settings window.
+The app uses **[Sparkle](https://sparkle-project.org)** for in-place updates. When a new version is published you'll see a dialog with **Install Update** / **Remind Me Later** / **Skip This Version**. Clicking *Install Update* downloads the signed `.zip`, verifies the EdDSA signature, replaces the app in `/Applications`, and relaunches — no manual re-download or drag-to-Applications step required.
 
-The check uses the GitHub Releases API directly — no separate update server, no Sparkle infrastructure. If you'd like Sparkle's in-place install behaviour instead, see [docs/FUTURE_WORK.md](docs/FUTURE_WORK.md).
+Checks run automatically every 24 hours; trigger one on-demand from **QuickLookProtein menu → Check for Updates…** or from the About section in the settings window.
+
+Releases are signed by Apple (Developer ID `FF68N39FU5`, notarised) **and** by Sparkle's EdDSA key, so a man-in-the-middle on the update channel can't trick Sparkle into installing something I didn't sign.
 
 ---
 
@@ -92,13 +94,16 @@ In Xcode → *Signing & Capabilities* for each of the four targets, pick your de
 
 The Quick Look preview and main-app targets exist in the project. **The Thumbnail and Spotlight Indexer targets need to be added in Xcode** (~60 seconds each) — see [docs/TARGET_SETUP.md](docs/TARGET_SETUP.md) for the exact click-paths.
 
-### Notarised release build
+### Releasing a new version
+
+The release pipeline is **fully automated** via GitHub Actions:
 
 ```bash
-./scripts/release.sh 2.0.0
+git tag v2.1.0
+git push origin v2.1.0
 ```
 
-See [docs/RELEASE.md](docs/RELEASE.md) for the full notarisation workflow (one-time keychain setup, per-release commands).
+GitHub Actions then builds, signs with Developer ID, notarises with Apple, Sparkle-signs the zip, publishes a GitHub Release, and updates `docs/appcast.xml` so installed clients see the update automatically. See [docs/RELEASE.md](docs/RELEASE.md) and [docs/SPARKLE_SETUP.md](docs/SPARKLE_SETUP.md) for the one-time setup (certificate export, Sparkle key generation, GitHub Actions secrets).
 
 After building, flush Quick Look's cache to pick up the new extension:
 

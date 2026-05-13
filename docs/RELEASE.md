@@ -1,188 +1,124 @@
-# Release & notarisation workflow
+# Release workflow
 
-This document covers a full **build → sign → notarise → staple → publish** flow
-for the signed branch (`feature/ario-signed`), driven by
-[`scripts/release.sh`](../scripts/release.sh).
+> 📌 **Releases are fully automated via GitHub Actions.** The previous
+> local-script flow is preserved at [`scripts/release.sh`](../scripts/release.sh)
+> for emergency builds; the canonical path is to push a tag.
 
-If you've never notarised a macOS app before, the one-time setup section
-below will take about 15 minutes. Each subsequent release is then a single
-command.
-
----
-
-## What is notarisation, and why?
-
-Since macOS 10.15, every developer-distributed app needs to be **notarised**
-or Gatekeeper will block first-launch with "Apple could not verify […] is
-free of malware". Notarisation = you upload your signed app to Apple, their
-service scans it for known malware, and emits a **notary ticket**. You then
-**staple** that ticket to the app so it works offline.
-
-You need three things:
-
-1. A paid **Apple Developer Program** membership ($99/year).
-2. A **Developer ID Application** certificate (download/install into your
-   login keychain).
-3. An **app-specific password** for `notarytool` — your main Apple ID
-   password is *not* accepted by the API.
-
----
-
-## One-time setup (do this once on your build machine)
-
-### 1. Install the Developer ID Application certificate
-
-If you don't already have one:
-
-1. Open Xcode → *Settings → Accounts → Manage Certificates…* → `+` →
-   **Developer ID Application**.
-2. Xcode generates the cert and installs it in your login keychain.
-3. Verify with:
+## The 30-second version
 
 ```bash
-security find-identity -v -p codesigning | grep "Developer ID Application"
+git checkout feature/ario-signed
+git tag v2.0.0
+git push origin v2.0.0
+# Wait ~10 minutes. GitHub Release + appcast update happen automatically.
 ```
 
-You should see one line, ending in `(FF68N39FU5)`.
+For the one-time setup (cert export, Sparkle keygen, GitHub Actions
+secrets, GitHub Pages config), see [SPARKLE_SETUP.md](SPARKLE_SETUP.md).
 
-### 2. Create an app-specific password
+## What happens when you push a tag
 
-1. Go to <https://appleid.apple.com> → sign in → **App-Specific Passwords**.
-2. Click `+`, label it `QuickLookProtein notarytool`, copy the
-   16-character password Apple generates.
-3. Store it in the macOS keychain so the script never has to see the
-   plaintext:
+The [`.github/workflows/release.yml`](../.github/workflows/release.yml)
+workflow runs on `macos-14`:
+
+1. Imports your Developer ID Application certificate into a temporary,
+   throwaway keychain (cert provided as a base64-encoded `.p12` in
+   `BUILD_CERTIFICATE_BASE64`).
+2. Runs `xcodebuild archive` with manual signing using that certificate
+   and your team ID.
+3. Exports the signed `.app` with `xcodebuild -exportArchive`.
+4. Zips the `.app`.
+5. Submits to Apple's notary service via
+   `xcrun notarytool submit … --wait` and waits for the verdict.
+6. Staples the notarisation ticket to the `.app`.
+7. Re-zips the stapled `.app` (so the published artifact is the stapled
+   version).
+8. Downloads Sparkle's signed release tarball and runs `sign_update`
+   against the zip with `SPARKLE_ED_PRIVATE_KEY` from secrets — produces
+   the `sparkle:edSignature="…"` line.
+9. Creates a GitHub Release with auto-generated notes and attaches the
+   zip.
+10. Runs `scripts/update-appcast.py` to append a new `<item>` to
+    `docs/appcast.xml` (or replace the existing entry for that version).
+11. Commits and pushes the updated `appcast.xml` back to the branch with
+    `[skip ci]` so the push doesn't re-trigger the workflow.
+
+GitHub Pages serves `docs/appcast.xml` at
+`https://ariomoniri.github.io/QuickLookProtein/appcast.xml`. Sparkle
+clients in the wild see the new release at their next scheduled check (or
+immediately if the user clicks *Check for Updates…*).
+
+## What the user experiences
+
+1. They have version 2.0.0 installed. Sparkle's daily check fires.
+2. Sparkle fetches `appcast.xml` from GitHub Pages.
+3. It sees a `<sparkle:version>2.1.0</sparkle:version>` entry.
+4. Dialog: *"A new version of QuickLookProtein is available — would you
+   like to download it now?"* with options **Install Update** /
+   **Remind Me Later** / **Skip This Version**.
+5. User clicks **Install Update**. Sparkle downloads the zip in the
+   background, verifies the EdDSA signature, replaces the app on disk,
+   and relaunches.
+
+No manual redownload, no zip extraction, no drag-to-Applications. That's
+the whole point of switching from the GitHub-API checker.
+
+## Triggering a release without pushing a tag
+
+The workflow also supports `workflow_dispatch`:
+
+1. Go to **Actions → Release → Run workflow** on GitHub.
+2. Enter a version (e.g. `2.0.1`) and click *Run workflow*.
+3. The build runs but **does not** create a GitHub Release — that part is
+   gated on the tag. Useful for testing the build pipeline against the
+   real notarisation service before you commit to a tag.
+
+## Re-running a botched release
+
+Tags can be force-deleted and re-pushed:
 
 ```bash
-xcrun notarytool store-credentials notarytool-profile \
-    --apple-id    YOUR_APPLE_ID@example.com \
-    --team-id     FF68N39FU5 \
-    --password    abcd-efgh-ijkl-mnop
+gh release delete v2.0.0 --yes --cleanup-tag
+git tag -d v2.0.0
+git push --delete origin v2.0.0
+# Fix whatever was broken, then re-tag:
+git tag v2.0.0
+git push origin v2.0.0
 ```
 
-This stores the credentials under the profile name `notarytool-profile`,
-which is what `release.sh` reads by default.
+`update-appcast.py` is idempotent — if an entry for the same version
+already exists in `appcast.xml`, it's replaced (not duplicated).
 
-> ⚠️ **Never put the app-specific password into any file in this
-> repository.** It belongs only in your keychain. The script reads it by
-> profile name; you don't pass it as an argument.
+## Local fallback build
 
-### 3. Verify the credentials
+The original local-build script is still here:
 
 ```bash
-xcrun notarytool history --keychain-profile notarytool-profile | head
-```
-
-You should get a "No submissions found" response (success — the credentials
-authenticate).
-
----
-
-## Per-release workflow
-
-From a clean working tree on `feature/ario-signed`:
-
-```bash
-# Bump the version in Xcode → project → MARKETING_VERSION,
-# OR pass it on the command line:
 ./scripts/release.sh 2.0.0
 ```
 
-The script will:
-
-1. Archive the project at version `2.0.0` (this builds all 4 targets:
-   main app, QLExtension, QLThumbnail, MDImporter).
-2. Export a signed `.app` using your Developer ID Application identity.
-3. Verify the local code signature.
-4. ZIP the `.app` into `QuickLookProtein-2.0.0.zip`.
-5. Submit the ZIP to Apple's notary service and wait for the verdict
-   (2–10 minutes typically).
-6. Staple the notary ticket to the `.app` so it works offline.
-7. Re-zip the stapled `.app` so the published artifact is what users get.
-
-Final artifact: `build/release/QuickLookProtein-2.0.0.zip`.
-
-### Publish
-
-Either via the `gh` CLI:
-
-```bash
-gh release create v2.0.0 build/release/QuickLookProtein-2.0.0.zip \
-   --notes-file CHANGELOG.md \
-   --title "QuickLookProtein 2.0.0"
-```
-
-Or upload manually at <https://github.com/ArioMoniri/QuickLookProtein/releases/new>.
-
-As soon as the release is published, the in-app updater (`Updater.swift`)
-will pick it up on the next launch / check.
-
----
+It produces an unzipped, signed, notarised, stapled `.app` locally and a
+matching zip. **It does not Sparkle-sign or update the appcast** — that's
+intentional, because local builds shouldn't be able to push updates to
+your installed user base. Use this only for: smoke testing, debugging the
+notarisation pipeline, or producing a one-off build for someone who can't
+wait for the GitHub Actions run.
 
 ## Troubleshooting
 
-### "User interaction is not allowed" during `codesign`
+The bulk of the troubleshooting notes are in
+[SPARKLE_SETUP.md](SPARKLE_SETUP.md) under *Common failure modes*. The
+main ones recap:
 
-The keychain is locked. Unlock it:
-
-```bash
-security unlock-keychain ~/Library/Keychains/login.keychain-db
-```
-
-### Notarisation fails with "Code object is not signed at all"
-
-Usually a missing entitlement or a nested binary that wasn't re-signed.
-Check the log:
-
-```bash
-xcrun notarytool log <submission-uuid> --keychain-profile notarytool-profile
-```
-
-The log file (`.json`) lists exact paths inside the bundle that failed.
-
-### "The provided entity includes an unsigned framework"
-
-Means one of the extension `.appex` bundles isn't signed correctly. The
-script signs with `--deep --options runtime`; if you've added new
-extensions, make sure their *Hardened Runtime* checkbox is on under
-*Signing & Capabilities* in Xcode.
-
-### Gatekeeper still blocks the app after install
-
-Right-click the app → Open. If macOS still refuses, run:
-
-```bash
-spctl -a -t exec -vv /Applications/QuickLookProtein.app
-```
-
-A "source=Notarized Developer ID" response means notarisation worked; a
-"source=Unverified Developer" means the ticket wasn't stapled or hadn't
-propagated yet (give it a few minutes).
-
-### The Spotlight indexer isn't picking up files after install
-
-Spotlight caches importer plists. Force a re-import:
-
-```bash
-mdimport -r /Applications/QuickLookProtein.app/Contents/PlugIns/MDImporter.appex
-mdimport ~/some-test-file.pdb
-mdls ~/some-test-file.pdb | head -20
-```
-
----
-
-## What the GitHub auto-updater expects
-
-The updater (`Xcode/QuickLookProtein/Updater.swift`) calls
-`https://api.github.com/repos/ArioMoniri/QuickLookProtein/releases/latest`
-on launch. It only requires the GitHub Release object's `tag_name` field
-(parsed as `vX.Y.Z` or `X.Y.Z`) and `html_url`. Asset filenames don't
-matter for the check itself — the user clicks "Download" which opens the
-release page.
-
-You can tag releases as either `v2.0.0` or `2.0.0`; the parser handles
-both. Stick to one convention to keep the tags tidy.
-
-If you ever switch to Sparkle, this file becomes obsolete — the
-`appcast.xml` + `sign_update` flow replaces everything above. See
-[FUTURE_WORK.md](FUTURE_WORK.md).
+- **codesign auth prompt in CI:** the workflow handles this with
+  `security set-key-partition-list`. If you customise it, keep that step.
+- **Notarisation `Invalid`:** run `xcrun notarytool log <UUID>
+  --apple-id … --team-id … --password …` to get the per-file failure
+  list. Usually a nested binary needs `--options=runtime`.
+- **`edSignature verification failed` on client:** the public key in
+  Info.plist no longer matches the private key in
+  `SPARKLE_ED_PRIVATE_KEY`. Re-run `generate-sparkle-keys.sh` and update
+  both.
+- **GitHub Pages serves a stale appcast:** the CDN can lag ~5 minutes
+  behind a push. Visiting the page from Settings → Pages triggers a
+  refresh.
