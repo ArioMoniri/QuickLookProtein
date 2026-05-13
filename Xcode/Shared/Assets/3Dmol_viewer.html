@@ -107,11 +107,14 @@
                     // === parse model =========================================
                     var format  = "{DATA_FORMAT}";
                     var addOpts = { keepH: true, multimodel: false };
-                    // Formats that carry no bond table — 3Dmol parses positions
-                    // but no connectivity, so stick/line render as invisible
-                    // bond-caps at each atom. assignBonds runs a distance-based
-                    // perception pass so stick rendering actually shows bonds.
-                    if (format === 'xyz' || format === 'vasp' || format === 'cube') {
+                    // Formats whose bond table 3Dmol's parser doesn't reliably
+                    // produce — without distance-based bond perception, stick
+                    // rendering shows invisible bond-caps at each atom. xyz,
+                    // vasp, cube have no bond block at all; cdjson has one but
+                    // 3Dmol's parser doesn't always pick it up, so we let the
+                    // distance heuristic add bonds on top.
+                    if (format === 'xyz'    || format === 'vasp' ||
+                        format === 'cube'   || format === 'cdjson') {
                         addOpts.assignBonds = true;
                     }
                     try {
