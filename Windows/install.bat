@@ -2,28 +2,20 @@
 REM ============================================================
 REM QuickLookProtein - Windows installer (double-click wrapper)
 REM
+REM Two invocation modes:
+REM
+REM 1. Manual (user double-clicks this from the installer zip,
+REM    or from an unzipped folder): friendly intro + final "press
+REM    any key" so they can read the result.
+REM
+REM 2. Setup.exe context (Inno Setup's [Run] sets the env var
+REM    QLP_SETUP_EXE=1 and redirects stdout/stderr to a log file
+REM    in %TEMP%): no intro, no pauses, exit silently. The Inno
+REM    Setup wizard owns all the user-visible progress.
+REM
 REM Hands off to install.ps1 in the same folder. PowerShell's
-REM execution policy is bypassed for THIS process only so the
-REM user doesn't have to fiddle with `Set-ExecutionPolicy`
-REM beforehand.
-REM
-REM Behaves slightly differently depending on how it's invoked:
-REM
-REM   * As a child of QuickLookProtein-Setup.exe (Inno Setup
-REM     passes the env var QLP_SETUP_EXE=1 in [Run]):
-REM       - no "press any key to start" banner;
-REM     - on success, auto-close after a short delay so the
-REM       parent Inno Setup wizard can advance to "Finished".
-REM
-REM   * Run by a human (double-click from the installer zip,
-REM     or from an unzipped folder):
-REM       - friendly intro + final "press any key" so they can
-REM       read the result.
-REM
-REM Pause-then-block was the old behaviour even when invoked by
-REM Setup.exe; that's why earlier versions appeared to hang at
-REM "Finishing installation..." until the user noticed the
-REM hidden cmd window.
+REM execution policy is bypassed for THIS process only so the user
+REM doesn't have to fiddle with `Set-ExecutionPolicy` beforehand.
 REM ============================================================
 
 setlocal
@@ -50,24 +42,17 @@ pause >nul
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1"
 set RC=%ERRORLEVEL%
 
-echo.
-if "%RC%"=="0" (
-    echo Done. Press SPACE on a .pdb / .cif / .sdf / .mol2 / .xyz
-    echo file in Explorer to preview it.
-) else (
-    echo Installer exited with error code %RC%.
-)
-
-if defined QLP_SETUP_EXE (
-    REM Auto-close after a brief moment so the parent Setup.exe
-    REM wizard can advance to its "Finished" page. /NOBREAK
-    REM prevents the user accidentally aborting early.
+if not defined QLP_SETUP_EXE (
     echo.
-    echo Closing in 5 seconds...
-    timeout /t 5 /nobreak >nul
-) else (
+    if "%RC%"=="0" (
+        echo Done. Press SPACE on a .pdb / .cif / .sdf / .mol2 / .xyz
+        echo file in Explorer to preview it.
+    ) else (
+        echo Installer exited with error code %RC%.
+    )
     echo.
     pause
 )
+
 endlocal
 exit /b %RC%

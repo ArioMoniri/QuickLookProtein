@@ -4,6 +4,37 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.12] — 2026-05-14
+
+### 🪟 Windows — installer feels less alarming
+
+- **Setup.exe now bundles the QuickLook (QL-Win) installer.** Users
+  no longer see a second "Downloading 60 MB..." pause and a *second*
+  SmartScreen warning when the sub-installer runs. The release
+  workflow fetches the latest QL-Win release at build time, drops
+  the `.exe` into the Inno Setup payload, and `install.ps1`
+  auto-detects the sibling `QuickLook-*.exe` and installs from it
+  with no network. Setup.exe grows ~60 MB → ~62 MB but the install
+  is now offline-capable and visibly single-step.
+- **Cmd console hidden during Setup.exe install.** Inno Setup runs
+  install.bat with `runhidden` and pipes stdout/stderr to
+  `%TEMP%\QuickLookProtein-install.log` for post-hoc diagnostics.
+  The user sees only the Inno Setup wizard with a clear StatusMsg
+  ("Installing QuickLook host and the molecule plugin…") and its
+  built-in progress bar.
+- **install.bat skips its banner / pauses** when invoked via
+  Setup.exe (detected via `QLP_SETUP_EXE=1`). Standalone manual runs
+  still get the friendly intro and final keypress.
+- **install.ps1's spinner skipped** under Setup.exe too (no visible
+  console to render to anyway).
+
+### 📚 Docs
+
+- **`docs/FUTURE_WORK.md`** gained a Windows-thumbnails section
+  describing the work needed to add Explorer thumbnails (separate
+  `IThumbnailProvider` COM DLL, per-extension shell-handler
+  registration, icon-cache invalidation). Not in 1.7.x scope.
+
 ## [1.7.11] — 2026-05-14
 
 ### 🐛 Fixed

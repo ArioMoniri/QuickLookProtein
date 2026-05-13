@@ -71,18 +71,39 @@ function Test-QuickLookInstalled {
     return [bool](Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue)
 }
 
+function Find-LocalQuickLookInstaller {
+    # Same trick as the .qlplugin auto-detection - when this script
+    # ships next to a bundled QuickLook-X.Y.Z.exe (Setup.exe path), we
+    # use that local file and skip the network. Avoids a second
+    # SmartScreen prompt, makes the install offline-capable, and means
+    # the user sees no "Downloading 60 MB..." pause.
+    $scriptDir = Split-Path -Parent $PSCommandPath
+    if (-not $scriptDir) { return $null }
+    $candidates = Get-ChildItem -Path $scriptDir -Filter "QuickLook-*.exe" -File -ErrorAction SilentlyContinue
+    if ($candidates -and $candidates.Count -gt 0) {
+        return $candidates[0].FullName
+    }
+    return $null
+}
+
 function Install-QuickLookHost {
     Write-Step "Installing QL-Win (QuickLook) host..."
-    $api = "https://api.github.com/repos/QL-Win/QuickLook/releases/latest"
-    $rel = Invoke-RestMethod -Uri $api -Headers @{ "User-Agent" = "QLProtein-installer" }
-    $exe = $rel.assets | Where-Object { $_.name -like "QuickLook-*.exe" } | Select-Object -First 1
-    if (-not $exe) {
-        throw "Couldn't find a QuickLook installer .exe in the latest QL-Win release."
+
+    $installer = Find-LocalQuickLookInstaller
+    if ($installer) {
+        Write-Host "  Using bundled QuickLook installer: $installer"
+    } else {
+        $api = "https://api.github.com/repos/QL-Win/QuickLook/releases/latest"
+        $rel = Invoke-RestMethod -Uri $api -Headers @{ "User-Agent" = "QLProtein-installer" }
+        $exe = $rel.assets | Where-Object { $_.name -like "QuickLook-*.exe" } | Select-Object -First 1
+        if (-not $exe) {
+            throw "Couldn't find a QuickLook installer .exe in the latest QL-Win release."
+        }
+        New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+        $installer = Join-Path $tempRoot $exe.name
+        Write-Host "  Downloading $($exe.name) ($([math]::Round($exe.size / 1MB, 1)) MB)..."
+        Invoke-WebRequest -Uri $exe.browser_download_url -OutFile $installer
     }
-    New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
-    $installer = Join-Path $tempRoot $exe.name
-    Write-Host "  Downloading $($exe.name) ($([math]::Round($exe.size / 1MB, 1)) MB)..."
-    Invoke-WebRequest -Uri $exe.browser_download_url -OutFile $installer
 
     # Run the QL-Win installer in fully-silent mode.
     #  /VERYSILENT          - no wizard UI, no progress bar
@@ -101,18 +122,25 @@ function Install-QuickLookHost {
         -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS" `
         -PassThru
 
-    $spinner = @('|', '/', '-', '\')
-    $i = 0
-    $startedAt = Get-Date
-    while (-not $proc.HasExited) {
-        $elapsed = [int]((Get-Date) - $startedAt).TotalSeconds
-        Write-Host -NoNewline "`r  Working $($spinner[$i % 4])  ($elapsed s)   "
-        $i++
-        Start-Sleep -Milliseconds 250
+    # When the script runs under Setup.exe (cmd is hidden, stdout
+    # captured to a log file) the spinner is just noise - one
+    # "Working..." message and a -Wait is plenty. When run from a
+    # visible cmd (manual install.bat / one-liner), keep the spinner
+    # so the user can tell we're alive.
+    if ($env:QLP_SETUP_EXE -eq "1") {
+        $proc.WaitForExit()
+    } else {
+        $spinner = @('|', '/', '-', '\')
+        $i = 0
+        $startedAt = Get-Date
+        while (-not $proc.HasExited) {
+            $elapsed = [int]((Get-Date) - $startedAt).TotalSeconds
+            Write-Host -NoNewline "`r  Working $($spinner[$i % 4])  ($elapsed s)   "
+            $i++
+            Start-Sleep -Milliseconds 250
+        }
+        $proc.WaitForExit()
     }
-    # WaitForExit() is a no-op here (HasExited is already true) but
-    # guarantees ExitCode is populated before we read it.
-    $proc.WaitForExit()
     Write-Host "`r  QL-Win install finished (exit code $($proc.ExitCode)).                "
     if ($proc.ExitCode -ne 0) {
         throw "QuickLook installer returned a non-zero exit code ($($proc.ExitCode))."

@@ -745,14 +745,48 @@ jobs:
           }
           Write-Host "Using ISCC: $iscc"
 
-          # Stage the payload files. Same trio that the offline-bundle
-          # zip ships — install.bat → install.ps1 → .qlplugin — so the
-          # behaviour is identical no matter which path the user takes.
+          # Stage the payload files. install.bat -> install.ps1 ->
+          # .qlplugin is the trio every install path uses; for Setup.exe
+          # we ALSO bundle the QuickLook (QL-Win) installer so the user
+          # never sees a "Downloading 60 MB QuickLook..." pause and only
+          # sees ONE SmartScreen prompt instead of two. install.ps1's
+          # auto-detection picks up the sibling QuickLook-*.exe and
+          # installs from it instead of fetching from GitHub.
           $stage = "build/setup-stage"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item "${{ steps.pkg.outputs.path }}" "$stage/QuickLookProtein.qlplugin" -Force
           Copy-Item "Windows/install.ps1"           "$stage/install.ps1"               -Force
           Copy-Item "Windows/install.bat"           "$stage/install.bat"               -Force
+
+          # Pull the QuickLook installer from QL-Win's latest release.
+          # QL-Win is GPL-3; bundling the installer unmodified is fine
+          # because we point to their source repo in README and in the
+          # Inno Setup AppPublisherURL.
+          $env:GH_TOKEN = "${{ github.token }}"
+          $qlwinTag = gh release list --repo QL-Win/QuickLook `
+                                     --exclude-pre-releases --limit 1 `
+                                     --json tagName --jq '.[0].tagName'
+          if (-not $qlwinTag) { throw "Could not resolve QL-Win latest tag" }
+          # Some QL-Win releases prefix the asset filename with v, some
+          # don't. Try both forms.
+          $tagNoV = $qlwinTag -replace '^v',''
+          $tryNames = @("QuickLook-$tagNoV.exe", "QuickLook-$qlwinTag.exe")
+          $downloaded = $null
+          foreach ($n in $tryNames) {
+            $url = "https://github.com/QL-Win/QuickLook/releases/download/$qlwinTag/$n"
+            try {
+              Invoke-WebRequest -Uri $url -OutFile "$stage/$n" -ErrorAction Stop
+              $downloaded = $n
+              break
+            } catch {
+              Write-Host "  (asset $n not present, trying next)"
+            }
+          }
+          if (-not $downloaded) {
+            throw "Could not download QL-Win installer for $qlwinTag"
+          }
+          $size = (Get-Item "$stage/$downloaded").Length
+          Write-Host "Bundled QL-Win $qlwinTag installer as $downloaded ($([math]::Round($size/1MB,1)) MB)"
 
           # Resolve absolute paths up-front. ISCC interprets relative
           # `Source:` and `OutputDir` against its current working
@@ -799,15 +833,18 @@ jobs:
             "Source: ""$stageAbs\QuickLookProtein.qlplugin""; DestDir: ""{app}""; Flags: ignoreversion",
             "Source: ""$stageAbs\install.ps1"";               DestDir: ""{app}""; Flags: ignoreversion",
             "Source: ""$stageAbs\install.bat"";               DestDir: ""{app}""; Flags: ignoreversion",
+            "; Bundle every sibling QuickLook-*.exe staged above. install.ps1",
+            "; auto-detects them and installs without hitting the network.",
+            "Source: ""$stageAbs\QuickLook-*.exe"";            DestDir: ""{app}""; Flags: ignoreversion",
             '',
             '[Run]',
             '; Run install.bat with QLP_SETUP_EXE=1 set so the .bat skips its',
-            '; "press any key" prompts and auto-closes 5s after success. The',
-            '; cmd window stays visible so the user sees the spinner during',
-            '; the (potentially 60-second) QL-Win download/install step -',
-            '; otherwise the Inno Setup wizard sits at "Finishing..." and',
-            '; looks frozen.',
-            'Filename: "cmd.exe"; Parameters: "/C set QLP_SETUP_EXE=1 && ""{app}\install.bat"""; StatusMsg: "Installing QuickLook host and plugin (this can take up to a minute)..."; Flags: waituntilterminated'
+            '; "press any key" prompts and runs silently. We launch it hidden',
+            '; (no flashing cmd window): the Inno Setup wizard sits at our',
+            '; StatusMsg with its own progress bar, no second window to alt-tab.',
+            '; install.ps1 logs to %TEMP%\QuickLookProtein-install.log so a',
+            '; failure can still be diagnosed post-hoc.',
+            'Filename: "cmd.exe"; Parameters: "/C set QLP_SETUP_EXE=1 && ""{app}\install.bat"" > ""%TEMP%\QuickLookProtein-install.log"" 2>&1"; StatusMsg: "Installing QuickLook host and the molecule plugin (this can take up to a minute)..."; Flags: runhidden waituntilterminated'
           )
           $issPath = Join-Path $buildAbs "setup.iss"
           [System.IO.File]::WriteAllText(

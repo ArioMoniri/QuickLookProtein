@@ -57,6 +57,46 @@ EXPDTA, etc.) so the user can search `kind:pdb resolution:<2`.
 - Periodic check for upstream 3Dmol.js updates (the bundled copy is
   pinned)
 
+## Windows Explorer thumbnails
+
+The macOS side has `QLThumbnail.appex` — a `QLThumbnailProvider` that
+draws CPK / cartoon-ribbon thumbnails in Finder's Cover Flow and
+Gallery views. Windows currently has **no equivalent**: QL-Win only
+provides Space-bar preview, not Explorer file thumbnails.
+
+To add real Windows thumbnails we'd need a separate shell extension:
+
+1. **A new `Windows/QuickLookProtein.Thumbnail/` C# project** targeting
+   `net472`, implementing `IThumbnailProvider` and `IInitializeWithStream`
+   via COM interop. The DLL must be COM-visible (`ComVisible`, `Guid`
+   attribute on the class) so Explorer can `CoCreateInstance` it.
+
+2. **A pure-managed renderer**. The Mac thumbnail provider does the
+   parse + CPK render in 712 lines of Swift using Core Graphics; on
+   Windows the equivalent path is **SkiaSharp** or `System.Drawing`
+   producing a `Bitmap` / PNG. Using WebView2 to call 3Dmol.js would
+   work but adds a 100 ms cold-start per icon — unacceptable for a
+   thumbnail provider.
+
+3. **Per-extension registration** in `install.ps1` — for each of the
+   13 supported extensions, write to:
+   ```
+   HKCU\Software\Classes\.pdb\shellex\{e357fccd-a995-4576-b01f-234630154e96}
+   ```
+   pointing at the DLL's CLSID. The CLSID itself is registered under
+   `HKCU\Software\Classes\CLSID\{...}\InProcServer32`.
+
+4. **Cache invalidation** after install — `ie4uinit.exe -ClearIconCache`
+   plus `taskkill /F /IM explorer.exe && start explorer.exe` so the
+   shell picks up the new handler. (The taskkill-then-restart dance is
+   the only reliable trigger.)
+
+5. **Uninstall path** — deregister the COM CLSID and remove the
+   per-extension keys.
+
+Rough cost: ~800 lines new C# + the registration logic. Not a quick
+afternoon; punted out of the 1.7.x release line.
+
 ## Signing / App Group
 
 The App Group identifier `FF68N39FU5.group.com.ariomoniri.QuickLookProtein`
