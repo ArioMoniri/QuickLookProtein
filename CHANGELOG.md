@@ -4,6 +4,33 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.1] — 2026-05-14
+
+### 🎨 Changed
+
+- **About panel redesign** — replaced the right-column wall of text with three
+  card-style sections (Updates, Credits & Source, Quick Look troubleshooting),
+  each with a colored icon plate. "Check for Updates" is now a prominent blue
+  filled pill next to a quieter "Download from GitHub" fallback, instead of
+  the small right-aligned control we had before. Build number is shown
+  alongside the marketing version when they differ.
+- **Custom button styles** — `PrimaryPillButtonStyle` and
+  `SecondaryPillButtonStyle` so the new CTAs render consistently on macOS 11+
+  (Apple's `.borderedProminent` requires macOS 12).
+
+### 🪟 Windows
+
+- **One-line installer** — `Windows/install.ps1` bootstraps QL-Win if it's
+  missing, fetches the latest signed `.qlplugin` from GitHub, extracts to
+  `%LocalAppData%\QuickLook\plugins\QuickLookProtein\`, and restarts the
+  QuickLook tray. README features it as the recommended Windows path:
+  `irm <raw-url> | iex`.
+- **Branded splash overlay** in the WebView2 host — centered glyph +
+  filename shown until WebView2 fires `NavigationCompleted`, replacing the
+  ~150-400 ms black screen while the renderer warms.
+- **Friendlier error card** — supported-formats hint + contact link instead
+  of the single-line red banner.
+
 ## [Unreleased] — 2026
 
 ### 🆕 Added
