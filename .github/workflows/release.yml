@@ -263,40 +263,114 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           TAG="v${VERSION}"
 
-          # Build release notes from commit log since the previous tag.
-          # `gh release create --generate-notes` does this automatically,
-          # but we prepend a clear install section so non-technical users
-          # see "download → drag into /Applications" at the top, ahead of
-          # the auto-extracted change list.
+          # Find the previous tag so we can scope the commit list. If
+          # this is the very first release ever, fall back to the last
+          # 40 commits so the notes aren't empty.
           PREV_TAG=$(git tag --sort=-v:refname | grep -v "^$TAG\$" | head -1 || echo "")
           if [[ -n "$PREV_TAG" ]]; then
-              COMMITS=$(git log --no-merges --pretty=format:'- %s' "$PREV_TAG..HEAD")
+              RANGE="$PREV_TAG..HEAD"
+              RANGE_LABEL="$PREV_TAG..v$VERSION"
           else
-              COMMITS=$(git log --no-merges --pretty=format:'- %s' --max-count=30)
+              RANGE="HEAD~40..HEAD"
+              RANGE_LABEL="first 40 commits"
           fi
 
+          # Categorise commits by subject prefix into themed sections so
+          # the release notes read like a changelog and not a git log
+          # dump. Anything that doesn't match a category lands in 🔧 Other.
+          # Using a Python helper keeps the heredoc out of GitHub's YAML
+          # quoting hell.
+          python3 - "$RANGE" > "$RUNNER_TEMP/commits.md" <<'PY'
+          import subprocess, sys, re
+          rng = sys.argv[1]
+          out = subprocess.check_output(
+              ["git", "log", "--no-merges", "--pretty=format:%s", rng],
+              text=True).splitlines()
+          # Drop the merge / chore / "Release N" lines themselves so they
+          # don't appear in their own release.
+          out = [c for c in out if not c.lower().startswith("release ")]
+
+          # (regex, emoji, header)
+          CATS = [
+              (r"^(QLThumbnail|thumbnail)\b",                   "🖼️", "Thumbnails"),
+              (r"^(QLExtension|preview|ContentView|UI)\b",       "👁️", "Quick Look preview & UI"),
+              (r"^(viewer|3Dmol|render)\b",                     "🎨", "Renderer"),
+              (r"^(Settings|SettingsStorage|@AppStorage)\b",    "⚙️", "Settings"),
+              (r"^(Sparkle|update)\b",                          "🔄", "Auto-update"),
+              (r"^(workflow|release|CI|GitHub Actions|\.github)", "🚀", "Release / CI"),
+              (r"^(README|docs?:?|documentation)\b",             "📝", "Docs"),
+              (r"^(Add|Default|Per-format|MMTF|VASP|PQR|CDJSON|format)\b", "✨", "New formats & features"),
+              (r"^(Fix|fix:|silence|exclude|stop)\b",            "🐛", "Fixes"),
+          ]
+
+          buckets = {h: [] for _, _, h in CATS}
+          other = []
+          for c in out:
+              placed = False
+              for pat, _, h in CATS:
+                  if re.search(pat, c, re.IGNORECASE):
+                      buckets[h].append(c)
+                      placed = True
+                      break
+              if not placed:
+                  other.append(c)
+
+          for pat, emoji, h in CATS:
+              if buckets[h]:
+                  print(f"### {emoji} {h}\n")
+                  for line in buckets[h]:
+                      # First sentence only — fits a release-notes bullet.
+                      first = line.split(":")[-1] if ":" in line else line
+                      first = first.strip()
+                      print(f"- {first}")
+                  print()
+          if other:
+              print("### 🔧 Other\n")
+              for line in other:
+                  print(f"- {line}")
+              print()
+          PY
+          COMMITS=$(cat "$RUNNER_TEMP/commits.md")
+
           ZIPNAME=$(basename "${{ steps.zip.outputs.zip }}")
+          SHORTSHA=$(echo "$GITHUB_SHA" | cut -c1-7)
           NOTES_FILE="$RUNNER_TEMP/notes.md"
+
           cat > "$NOTES_FILE" <<EOF
-          ## Install
+          ## 🎉 QuickLookProtein ${VERSION}
+
+          A multi-format molecular Quick Look extension for macOS — press <kbd>Space</kbd> in Finder on a structure file, see the 3D molecule.
+
+          ### 📥 Install
 
           1. Download **${ZIPNAME}** from the Assets below.
           2. Unzip and drag **QuickLookProtein.app** into your **Applications** folder.
-          3. The first time you open a \`.pdb\` / \`.cif\` / \`.mol2\` / \`.xyz\` / etc. file, hit **Space** in Finder for the 3D preview, or switch to icon view to see molecular thumbnails.
+          3. Open any \`.pdb\` / \`.cif\` / \`.sdf\` / \`.mol\` / \`.mol2\` / \`.xyz\` / \`.gro\` / \`.cube\` / \`.pqr\` / \`.vasp\` / \`.cdjson\` / \`.mmtf\` file in Finder.
+          4. Hit <kbd>Space</kbd> for an interactive 3D preview, or switch to Icon View for molecular thumbnails.
 
-          The app is signed with Developer ID and notarised by Apple, so Gatekeeper will let it run without warning.
+          🔐 **Signed with Developer ID** and **notarised by Apple** — Gatekeeper will let it run without warning.
 
-          ## Changes since ${PREV_TAG:-the previous version}
+          ### 📦 What's inside
+
+          - 🧬 13 molecular file formats — PDB, CIF, mmCIF, SDF, MOL, MOL2, XYZ, GRO, CUBE, PDBQT, PQR, VASP, CDJSON, MMTF
+          - 🎨 3Dmol.js-powered preview with cartoon / stick / sphere / line / surface styles
+          - 🔄 Rotation, color schemes (spectrum / chain / element / secondary-structure / residue), background color, default zoom
+          - 🖼️ Native cartoon-ribbon thumbnails for proteins; CPK space-filling for small molecules
+          - 🪟 Lives in Quick Look (Space-bar) and in Finder icon view
+
+          ### 📋 Changes ($RANGE_LABEL)
 
           ${COMMITS}
 
           ---
-          *Built from \`${GITHUB_SHA::7}\` by the [release workflow](https://github.com/${GITHUB_REPOSITORY}/actions/workflows/release.yml).*
+          🧪 Built from commit [\`${SHORTSHA}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}) on $(date -u +'%Y-%m-%d') by the [release workflow](https://github.com/${GITHUB_REPOSITORY}/actions/workflows/release.yml).
+
+          🙏 Originally created by [Jethro Hemmann](https://github.com/JethroHemmann/QuickLookProtein) (2021–2022). Multi-format upgrade by [Ariorad Moniri](https://github.com/ArioMoniri) (2026). Rendering by [3Dmol.js](https://3dmol.csb.pitt.edu) (Rego & Koes, 2015).
           EOF
 
           if ! gh release view "$TAG" >/dev/null 2>&1; then
               gh release create "$TAG" \
-                  --title "QuickLookProtein $VERSION" \
+                  --title "🧬 QuickLookProtein $VERSION" \
                   --notes-file "$NOTES_FILE"
           else
               gh release edit "$TAG" --notes-file "$NOTES_FILE"
