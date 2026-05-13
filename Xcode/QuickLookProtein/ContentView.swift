@@ -80,14 +80,18 @@ struct ContentView: View {
                         // tiny chevron because .menuStyle stripped the default
                         // popup-button frame — use the standard control instead.
                         Form {
-                            Picker("PDB:",  selection: $userSettings.atomStylePDB)  { atomStyleOptions }
-                            Picker("CIF:",  selection: $userSettings.atomStyleCIF)  { atomStyleOptions }
-                            Picker("SDF:",  selection: $userSettings.atomStyleSDF)  { atomStyleOptions }
-                            Picker("MOL:",  selection: $userSettings.atomStyleMOL)  { atomStyleOptions }
-                            Picker("MOL2:", selection: $userSettings.atomStyleMOL2) { atomStyleOptions }
-                            Picker("XYZ:",  selection: $userSettings.atomStyleXYZ)  { atomStyleOptions }
-                            Picker("GRO:",  selection: $userSettings.atomStyleGRO)  { atomStyleOptions }
-                            Picker("CUBE:", selection: $userSettings.atomStyleCUBE) { atomStyleOptions }
+                            Picker("PDB:",    selection: $userSettings.atomStylePDB)    { atomStyleOptions }
+                            Picker("CIF:",    selection: $userSettings.atomStyleCIF)    { atomStyleOptions }
+                            Picker("SDF:",    selection: $userSettings.atomStyleSDF)    { atomStyleOptions }
+                            Picker("MOL:",    selection: $userSettings.atomStyleMOL)    { atomStyleOptions }
+                            Picker("MOL2:",   selection: $userSettings.atomStyleMOL2)   { atomStyleOptions }
+                            Picker("XYZ:",    selection: $userSettings.atomStyleXYZ)    { atomStyleOptions }
+                            Picker("GRO:",    selection: $userSettings.atomStyleGRO)    { atomStyleOptions }
+                            Picker("CUBE:",   selection: $userSettings.atomStyleCUBE)   { atomStyleOptions }
+                            Picker("PQR:",    selection: $userSettings.atomStylePQR)    { atomStyleOptions }
+                            Picker("VASP:",   selection: $userSettings.atomStyleVASP)   { atomStyleOptions }
+                            Picker("CDJSON:", selection: $userSettings.atomStyleCDJSON) { atomStyleOptions }
+                            Picker("MMTF:",   selection: $userSettings.atomStyleMMTF)   { atomStyleOptions }
                         }
                         .frame(maxWidth: 340)
 
