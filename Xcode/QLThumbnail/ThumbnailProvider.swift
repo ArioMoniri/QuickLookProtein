@@ -27,6 +27,15 @@ import Cocoa
 import QuickLookThumbnailing
 import WebKit
 
+// The @objc attribute is load-bearing: NSExtensionPrincipalClass in our
+// Info.plist points at "QLThumbnail.ThumbnailProvider" and PluginKit looks
+// the class up via NSClassFromString. Swift NSObject subclasses USUALLY get
+// @objc inferred for free, but in some build configurations (final class,
+// indirect NSObject inheritance via QLThumbnailProvider → NSExtension →
+// NSObject, Swift 5.10+ inference rules) the class doesn't end up in the
+// Obj-C runtime — confirmed via `nm` on the built executable. Without it
+// PluginKit silently fails to register the extension.
+@objc(QLThumbnailThumbnailProvider)
 final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScriptMessageHandler {
 
     // MARK: Tunables -----------------------------------------------------------
