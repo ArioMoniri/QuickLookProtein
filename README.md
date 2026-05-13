@@ -11,10 +11,12 @@
 ### 📥 Download
 
 <p align="center">
-  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest"><img src="docs/download-macos.svg" alt="Download for macOS" height="72"></a>
+  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.dmg"><img src="docs/download-macos.svg" alt="Download QuickLookProtein for macOS" height="72"></a>
   &nbsp;
-  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest"><img src="docs/download-windows.svg" alt="Download for Windows" height="72"></a>
+  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.qlplugin"><img src="docs/download-windows.svg" alt="Download QuickLookProtein for Windows" height="72"></a>
 </p>
+
+<p align="center"><sub>The macOS button downloads the signed DMG · The Windows button downloads the <code>.qlplugin</code> (drop it onto a running <a href="https://github.com/QL-Win/QuickLook/releases/latest">QuickLook</a> tray, or use the PowerShell one-liner below).</sub></p>
 
 <p align="center">macOS · Developer-ID signed &amp; notarised &nbsp;|&nbsp; Windows · QL-Win plugin (unsigned)</p>
 

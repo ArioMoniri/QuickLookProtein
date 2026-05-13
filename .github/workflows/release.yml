@@ -542,6 +542,16 @@ jobs:
               "${{ steps.dmg.outputs.dmg }}" \
               --clobber
 
+          # Also publish a versionless alias for the DMG so the README's
+          # macOS "Download" button can use a stable URL:
+          #   https://github.com/<repo>/releases/latest/download/QuickLookProtein.dmg
+          # GitHub's redirect resolves `releases/latest/download/<filename>`
+          # against the latest release's asset list — `<filename>` is matched
+          # literally, so we need the alias to exist.
+          ALIAS_DMG="build/QuickLookProtein.dmg"
+          cp "${{ steps.dmg.outputs.dmg }}" "$ALIAS_DMG"
+          gh release upload "$TAG" "$ALIAS_DMG" --clobber
+
       # ----------------------------------------------------------------
       # Append a new <item> to docs/appcast.xml and push it back. GitHub
       # Pages (configured to serve from this branch /docs) will pick it up
@@ -706,3 +716,12 @@ jobs:
         run: |
           $version = "${{ steps.version.outputs.version }}"
           gh release upload "v$version" "${{ steps.pkg.outputs.path }}" --clobber
+
+          # Stable versionless alias so the README's "Download for Windows"
+          # button can link straight to the .qlplugin:
+          #   https://github.com/<repo>/releases/latest/download/QuickLookProtein.qlplugin
+          # GitHub matches the asset name literally, so we need a copy named
+          # without the version suffix on every release.
+          $alias = "build/QuickLookProtein.qlplugin"
+          Copy-Item -Path "${{ steps.pkg.outputs.path }}" -Destination $alias -Force
+          gh release upload "v$version" $alias --clobber
