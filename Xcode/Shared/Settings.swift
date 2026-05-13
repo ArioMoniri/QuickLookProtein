@@ -44,6 +44,12 @@ class SettingsStorage: ObservableObject {
     @AppStorage("showInfoOverlay", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
     var showInfoOverlay: Bool = true
 
+    /// Initial zoom factor applied after 3Dmol's `viewer.zoomTo()` auto-fit.
+    /// Lets the user open Quick Look previews wider or tighter on the molecule
+    /// without manually scrolling to zoom every time.
+    @AppStorage("defaultZoom", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
+    var defaultZoom: Settings.DefaultZoom = .auto
+
     // MARK: - Background color components
     @AppStorage("bgColorRed", store: UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"))
     var bgColorRed: Double = 0.0
@@ -131,6 +137,36 @@ struct Settings {
             case .element:  return "element"
             case .ssJmol:   return "ssJmol"
             case .residue:  return "residue"
+            }
+        }
+    }
+
+    /// Initial zoom factor applied *after* 3Dmol's auto-fit `zoomTo()`. A value
+    /// > 1 zooms in (closer to the molecule); < 1 zooms out. `auto` skips the
+    /// extra zoom call so 3Dmol's fitting heuristic decides framing alone.
+    enum DefaultZoom: String, CaseIterable, Identifiable {
+        case auto      = "Auto-fit"
+        case zoom50    = "50%"
+        case zoom75    = "75%"
+        case zoom100   = "100%"
+        case zoom125   = "125%"
+        case zoom150   = "150%"
+        case zoom200   = "200%"
+
+        var id: DefaultZoom { return self }
+
+        /// Numeric factor passed to `viewer.zoom(factor)` in the viewer
+        /// template. `auto` returns 1.0 but the template skips the call
+        /// entirely on that token; see {ZOOM_FACTOR} substitution.
+        var factor: Double {
+            switch self {
+            case .auto:    return 1.0
+            case .zoom50:  return 0.5
+            case .zoom75:  return 0.75
+            case .zoom100: return 1.0
+            case .zoom125: return 1.25
+            case .zoom150: return 1.5
+            case .zoom200: return 2.0
             }
         }
     }

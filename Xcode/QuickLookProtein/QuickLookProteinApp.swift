@@ -10,7 +10,27 @@ import AppKit
 
 // https://stackoverflow.com/questions/65743619/close-swiftui-application-when-last-window-is-closed
 class AppDelegate: NSObject, NSApplicationDelegate {
-    
+
+    /// Default content size the window opens at on every launch. SwiftUI's
+    /// `.frame(idealWidth:idealHeight:)` is just a hint and macOS frequently
+    /// restores a previously-resized frame from `NSWindow` saved state, which
+    /// is why the user kept seeing the app open near-fullscreen. We override
+    /// here so every launch starts from the same compact size.
+    private let defaultWindowSize = NSSize(width: 940, height: 720)
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Wait one runloop turn so SwiftUI has time to create the window.
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self,
+                  let window = NSApp.windows.first(where: { $0.contentView != nil }) else { return }
+            // Disable frame autosave so a previous user-resize doesn't
+            // override the default size on the next launch.
+            window.setFrameAutosaveName("")
+            window.setContentSize(self.defaultWindowSize)
+            window.center()
+        }
+    }
+
     // close app completely after window has been closed
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
          return true
@@ -24,12 +44,11 @@ struct QuickLookProteinApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                // Open at a comfortable laptop-friendly size, not maximised.
-                // Three-column preview grid + side-by-side settings/about
-                // fits at ~900×680 with everything visible. The user can grow
-                // the window from there — content is in a ScrollView, so
-                // smaller is fine too.
-                .frame(minWidth: 760, idealWidth: 940, minHeight: 600, idealHeight: 720)
+                // Content min-size only — the actual launch window size is
+                // forced by AppDelegate.applicationDidFinishLaunching so saved
+                // frame state can't grow the window. Without a maxWidth/Height,
+                // the user can still resize freely.
+                .frame(minWidth: 720, minHeight: 560)
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
                     // Sparkle's SPUStandardUpdaterController starts its scheduled-check

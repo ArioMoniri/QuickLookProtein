@@ -19,6 +19,7 @@ struct ViewerOptions {
     var hideHydrogens: Bool
     var showUnitCell: Bool
     var showInfoOverlay: Bool
+    var defaultZoom: Settings.DefaultZoom
     var fileName: String
 
     static func from(_ s: SettingsStorage, fileExtension ext: String, fileName: String) -> ViewerOptions {
@@ -32,6 +33,7 @@ struct ViewerOptions {
             hideHydrogens:   s.hideHydrogens,
             showUnitCell:    s.showUnitCell,
             showInfoOverlay: s.showInfoOverlay,
+            defaultZoom:     s.defaultZoom,
             fileName:        fileName
         )
     }
@@ -86,6 +88,8 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{SHOW_UNIT_CELL}",    with: options.showUnitCell     ? "true" : "false")
     html = html.replacingOccurrences(of: "{SHOW_INFO}",         with: options.showInfoOverlay  ? "true" : "false")
     html = html.replacingOccurrences(of: "{FILE_NAME}",         with: escapeForHTMLAttribute(options.fileName))
+    html = html.replacingOccurrences(of: "{ZOOM_FACTOR}",       with: String(options.defaultZoom.factor))
+    html = html.replacingOccurrences(of: "{ZOOM_IS_AUTO}",      with: options.defaultZoom == .auto ? "true" : "false")
     html = html.replacingOccurrences(of: "{THUMBNAIL_MODE}",    with: thumbnailMode ? "true" : "false")
     html = html.replacingOccurrences(of: "{MOL_DATA}",          with: safeData)
     return html
