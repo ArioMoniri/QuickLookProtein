@@ -42,9 +42,13 @@ struct ContentView: View {
         let htmlSDF  = previewHTML(htmlPath: htmlPath, filePath: sdfPath,  ext: "sdf")
         let htmlMOL2 = previewHTML(htmlPath: htmlPath, filePath: mol2Path, ext: "mol2")
 
-        GeometryReader { _ in
-            VStack {
-                HStack(alignment: .firstTextBaseline) {
+        VStack(spacing: 0) {
+            // Top — settings + about, scrollable so it never starves the previews.
+            // The settings column genuinely doesn't fit in <360 px once all
+            // toggles + the "Additional formats" disclosure expand; rather than
+            // shoving them off-screen we let the column scroll.
+            ScrollView(.vertical, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 16) {
 
                     // MARK: Settings
                     VStack(alignment: .leading) {
@@ -137,10 +141,48 @@ struct ContentView: View {
                             .padding(.top, 2)
                         }
 
+                        if !updater.lastCheckStatus.isEmpty {
+                            Text(updater.lastCheckStatus)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+
                         Text("Tip: click any atom in a preview to see its residue and chain.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .padding(.top, 4)
+
+                        // Quick Look troubleshooting — common after upgrading from
+                        // upstream because the old extension's bundle ID differs
+                        // and macOS keeps both registered until the old app is
+                        // deleted + caches cleared.
+                        DisclosureGroup("Quick Look not updating?") {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Run this in Terminal to flush macOS's Quick Look caches and re-register the new extension:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                HStack {
+                                    Text("qlmanage -r && qlmanage -r cache")
+                                        .font(.system(.caption, design: .monospaced))
+                                        .padding(.vertical, 4).padding(.horizontal, 6)
+                                        .background(Color.secondary.opacity(0.12))
+                                        .cornerRadius(4)
+                                    Button("Copy") {
+                                        let pb = NSPasteboard.general
+                                        pb.clearContents()
+                                        pb.setString("qlmanage -r && qlmanage -r cache", forType: .string)
+                                    }
+                                    .controlSize(.small)
+                                }
+                                Text("If the wrong preview still appears, delete the previously installed QuickLookProtein.app from /Applications and rebuild.")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .font(.caption)
+                        .padding(.top, 6)
 
                         Spacer(minLength: 0)
 
@@ -154,37 +196,38 @@ struct ContentView: View {
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .fixedSize(horizontal: false, vertical: true)
-                // ↑ Pins the top settings/about row to its natural height so the
-                //   preview HStack below gets every leftover pixel.
-
-                Divider()
-
-                // MARK: Live previews (rotate by default at the user's chosen rotation
-                // speed — same as the original app's vibe).
-                HStack(spacing: 8) {
-                    previewTile(html: htmlPDB,  base: baseUrl,
-                                title: "PDB",
-                                caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
-
-                    previewTile(html: htmlCIF,  base: baseUrl,
-                                title: "CIF",
-                                caption: { Text("Bioinspired Fe complex (1565673)") })
-
-                    previewTile(html: htmlSDF,  base: baseUrl,
-                                title: "SDF",
-                                caption: { Text("Pyrroloquinoline quinone (CID 1024)") })
-
-                    previewTile(html: htmlMOL2, base: baseUrl,
-                                title: "MOL2",
-                                caption: { Text("Caffeine") })
-
-                    customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
-                }
-                .frame(maxHeight: .infinity)
                 .padding(.horizontal, 8)
-                .padding(.bottom, 8)
             }
+            .frame(maxHeight: 360)   // hard cap so the previews always get 360+ px
+
+            Divider()
+
+            // MARK: Live previews — WebGL canvases that spin at the user's chosen
+            //       rotation speed. Min-height ensures the canvases have enough
+            //       pixels to render even on small windows; without this the
+            //       molecules don't show even though 3Dmol parses them.
+            HStack(spacing: 8) {
+                previewTile(html: htmlPDB,  base: baseUrl,
+                            title: "PDB",
+                            caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
+
+                previewTile(html: htmlCIF,  base: baseUrl,
+                            title: "CIF",
+                            caption: { Text("Bioinspired Fe complex (1565673)") })
+
+                previewTile(html: htmlSDF,  base: baseUrl,
+                            title: "SDF",
+                            caption: { Text("Pyrroloquinoline quinone (CID 1024)") })
+
+                previewTile(html: htmlMOL2, base: baseUrl,
+                            title: "MOL2",
+                            caption: { Text("Caffeine") })
+
+                customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
+            }
+            .frame(minHeight: 320, maxHeight: .infinity)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         }
     }
 
@@ -193,15 +236,13 @@ struct ContentView: View {
     /// through Finder + Quick Look.
     @ViewBuilder
     private func customDropTile(htmlPath: String, baseUrl: URL) -> some View {
-        VStack {
+        VStack(spacing: 4) {
             ZStack {
                 if let droppedFile = droppedFile {
                     WebView(html: previewHTML(htmlPath: htmlPath,
                                               filePath: droppedFile.path,
                                               ext: droppedFile.pathExtension),
                             baseUrl: baseUrl)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .ignoresSafeArea()
                 } else {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
@@ -209,14 +250,14 @@ struct ContentView: View {
                         .overlay(
                             VStack(spacing: 6) {
                                 Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 28))
-                                Text("Drop a structure file")
-                                    .font(.callout)
-                                Text("PDB, CIF, SDF, MOL, MOL2, XYZ, GRO, CUBE")
+                                    .font(.system(size: 26))
+                                Text("Drop a structure file").font(.callout)
+                                Text("PDB · CIF · SDF · MOL · MOL2\nXYZ · GRO · CUBE · PDBQT")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                             }
-                            .padding()
+                            .padding(8)
                         )
                 }
             }
@@ -225,8 +266,10 @@ struct ContentView: View {
                 handleDrop(providers: providers)
             }
 
+            // Caption row — clear button for the dropped file, error message if any.
             HStack(spacing: 4) {
-                Text(droppedFile?.lastPathComponent ?? "Custom").lineLimit(1).truncationMode(.middle)
+                Text(droppedFile?.lastPathComponent ?? "Custom")
+                    .font(.callout).lineLimit(1).truncationMode(.middle)
                 if droppedFile != nil {
                     Button(action: { droppedFile = nil; droppedFileError = nil }) {
                         Image(systemName: "xmark.circle.fill")
@@ -235,13 +278,19 @@ struct ContentView: View {
                     .help("Clear dropped file")
                 }
             }
-            if let err = droppedFileError {
-                Text(err).font(.caption2).foregroundColor(.red).lineLimit(1)
-            } else if droppedFile == nil {
-                Text("Drag to preview your own file").font(.caption).padding(.bottom)
-            } else {
-                Text("Dropped file").font(.caption).padding(.bottom)
+            Group {
+                if let err = droppedFileError {
+                    Text(err).foregroundColor(.red)
+                } else if droppedFile == nil {
+                    Text("Drag to preview your own file")
+                } else {
+                    Text("Dropped file")
+                }
             }
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .lineLimit(1)
+            .padding(.bottom, 4)
         }
     }
 

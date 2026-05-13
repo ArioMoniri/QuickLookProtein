@@ -24,11 +24,11 @@ struct QuickLookProteinApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                // Original was 800×600 with 3 tiles + a short About. We now have
-                // 5 tiles in a row and a richer About panel; 1100×720 keeps each
-                // tile roughly the same on-screen size as the upstream app while
-                // leaving the About column readable.
-                .frame(minWidth: 1100, idealWidth: 1100, minHeight: 720, idealHeight: 720)
+                // Scrollable settings column up top (capped at 360 px) +
+                // previews row with a 320 px minimum + a divider + padding.
+                // 1100×760 gives everything natural room; the user can grow
+                // the window from there.
+                .frame(minWidth: 1080, idealWidth: 1180, minHeight: 740, idealHeight: 780)
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
                     // Sparkle's SPUStandardUpdaterController starts its scheduled-check

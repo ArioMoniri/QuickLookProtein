@@ -74,8 +74,33 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
         )
     }
 
+    /// Bundle.main URL for the public-on-github releases page — used as the
+    /// fallback when Sparkle is unusable in the current build (placeholder
+    /// public key, missing feed, etc.).
+    private let releasesURL = URL(string: "https://github.com/ArioMoniri/QuickLookProtein/releases/latest")!
+
+    /// The Info.plist key ships with a placeholder string until the user runs
+    /// `scripts/generate-sparkle-keys.sh` and pastes the result. Before that
+    /// happens Sparkle will reject every update it sees because no signature
+    /// matches, so we route the "Check for Updates" button to the web instead
+    /// of letting Sparkle silently fail.
+    private var sparkleIsConfigured: Bool {
+        guard let key = Bundle.main.infoDictionary?["SUPublicEDKey"] as? String,
+              !key.isEmpty,
+              !key.hasPrefix("REPLACE_WITH_") else {
+            return false
+        }
+        return true
+    }
+
     /// Wired to the "Check for Updates…" menu item and the About-panel button.
     func checkForUpdates() {
+        guard sparkleIsConfigured else {
+            lastCheckStatus = "Sparkle public key not set — opening release page in browser."
+            NSWorkspace.shared.open(releasesURL)
+            return
+        }
+        lastCheckStatus = "Checking…"
         controller.checkForUpdates(nil)
     }
 
