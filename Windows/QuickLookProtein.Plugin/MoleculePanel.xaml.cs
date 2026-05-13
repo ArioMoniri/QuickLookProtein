@@ -80,8 +80,12 @@ public partial class MoleculePanel : UserControl, IDisposable
             throw new FileNotFoundException(
                 $"viewer.html missing from plugin install at {resourcesDir}");
 
-        var template = await File.ReadAllTextAsync(templatePath);
-        var moleculeData = await File.ReadAllTextAsync(path);
+        // File.ReadAllTextAsync is .NET Core only - we target .NET
+        // Framework 4.7.2 to match QL-Win's CLR, so fall back to
+        // Task.Run + the sync version to keep this method's signature
+        // and not block the UI thread on disk I/O.
+        var template     = await Task.Run(() => File.ReadAllText(templatePath));
+        var moleculeData = await Task.Run(() => File.ReadAllText(path));
         var ext = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
         var html = FillTemplate(template, ext,
                                 Path.GetFileName(path),

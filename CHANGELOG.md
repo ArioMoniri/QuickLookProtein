@@ -4,6 +4,28 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.11] — 2026-05-14
+
+### 🐛 Fixed
+
+- **The Windows plugin never actually loaded.** v1.7.0 → v1.7.10 all
+  shipped a `.qlplugin` targeting `net8.0-windows`. QL-Win is a
+  .NET Framework 4.7.2 application — its CLR cannot load .NET Core /
+  .NET 5+ assemblies, so QL-Win logged a silent `TypeLoadException`
+  at startup and dropped our plugin. From the user's side: installer
+  ran, plugin file landed in `%LocalAppData%\QuickLook\plugins\…`,
+  QuickLook ran, and pressing Space on a `.pdb` did **nothing**.
+  Retargeted `QuickLookProtein.Plugin.csproj` to `net472` (with
+  `LangVersion=10.0` to keep file-scoped namespaces and nullable
+  reference types working). Replaced `File.ReadAllTextAsync` (a
+  .NET Core only API) with `Task.Run(() => File.ReadAllText(...))`
+  to keep the call sites async.
+
+  This is the root cause of the entire "Space does nothing" Windows
+  experience. Everything else — the installer, the file association,
+  the plugin folder layout — was fine. The DLL itself just wasn't
+  compatible with the CLR loading it.
+
 ## [1.7.10] — 2026-05-14
 
 ### 🐛 Fixed

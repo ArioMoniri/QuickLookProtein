@@ -12,20 +12,27 @@
     host (WebView2 inside WPF) differs.
   -->
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!--
+      MUST target .NET Framework, not .NET 8. QL-Win itself is a
+      .NET Framework 4.7.2 application; its CLR cannot load .NET
+      Core / .NET 5+ assemblies. A net8.0-windows plugin builds fine
+      against QuickLook.Common.dll's API surface but silently fails
+      to load at runtime — exactly the symptom the user reported:
+      "plugin installs, QuickLook runs, but Space on a .pdb does
+      nothing." That's QL-Win logging a TypeLoadException at startup
+      and dropping our DLL, with no user-visible feedback.
+
+      LangVersion 10.0 keeps us on file-scoped namespaces and
+      nullable-reference-types without needing the .NET 6+ SDK
+      target framework — same source compiles cleanly.
+    -->
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>10.0</LangVersion>
     <UseWPF>true</UseWPF>
     <OutputType>Library</OutputType>
     <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>QuickLook.Plugin.Protein</AssemblyName>
     <RootNamespace>QuickLookProtein.Plugin</RootNamespace>
-    <!--
-      QL-Win loads plugin DLLs from disk and resolves their dependencies
-      from the plugin's own folder. Don't copy WebView2 host runtime
-      assemblies into the plugin output — they'd shadow the host's copy.
-      We let the host runtime provide WebView2 at load time.
-    -->
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
