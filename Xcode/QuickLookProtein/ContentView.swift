@@ -41,9 +41,13 @@ struct ContentView: View {
         let htmlSDF  = previewHTML(htmlPath: htmlPath, filePath: sdfPath,  ext: "sdf")
         let htmlMOL2 = previewHTML(htmlPath: htmlPath, filePath: mol2Path, ext: "mol2")
 
-        GeometryReader { _ in
-            VStack {
-                HStack(alignment: .firstTextBaseline) {
+        VStack(spacing: 0) {
+            // Top — settings + about, scrollable so it never starves the previews.
+            // The settings column genuinely doesn't fit in <360 px once all
+            // toggles + the "Additional formats" disclosure expand; rather than
+            // shoving them off-screen we let the column scroll.
+            ScrollView(.vertical, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 16) {
 
                     // MARK: Settings
                     VStack(alignment: .leading) {
@@ -152,38 +156,40 @@ struct ContentView: View {
                              destination: URL(string: "https://3dmol.csb.pitt.edu")!)
                     }
                     .padding()
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                // Pin the top settings/about row to its natural height so the
-                // previews HStack below claims every leftover pixel — without
-                // this, the WebView tiles get squeezed to ~0 px and look blank.
-                .fixedSize(horizontal: false, vertical: true)
-
-                Divider()
-
-                // MARK: Live previews (rotate at the user's chosen rotation speed)
-                HStack(spacing: 8) {
-                    previewTile(html: htmlPDB,  base: baseUrl,
-                                title: "PDB",
-                                caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
-
-                    previewTile(html: htmlCIF,  base: baseUrl,
-                                title: "CIF",
-                                caption: { Text("Bioinspired Fe complex (1565673)") })
-
-                    previewTile(html: htmlSDF,  base: baseUrl,
-                                title: "SDF",
-                                caption: { Text("Pyrroloquinoline quinone (CID 1024)") })
-
-                    previewTile(html: htmlMOL2, base: baseUrl,
-                                title: "MOL2",
-                                caption: { Text("Caffeine") })
-
-                    customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
-                }
-                .frame(maxHeight: .infinity)
                 .padding(.horizontal, 8)
-                .padding(.bottom, 8)
             }
+            .frame(maxHeight: 360)   // hard cap so the previews always get 360+ px
+
+            Divider()
+
+            // MARK: Live previews — WebGL canvases that spin at the user's chosen
+            //       rotation speed. Min-height ensures the canvases have enough
+            //       pixels to render even on small windows; without this the
+            //       molecules don't show even though 3Dmol parses them.
+            HStack(spacing: 8) {
+                previewTile(html: htmlPDB,  base: baseUrl,
+                            title: "PDB",
+                            caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
+
+                previewTile(html: htmlCIF,  base: baseUrl,
+                            title: "CIF",
+                            caption: { Text("Bioinspired Fe complex (1565673)") })
+
+                previewTile(html: htmlSDF,  base: baseUrl,
+                            title: "SDF",
+                            caption: { Text("Pyrroloquinoline quinone (CID 1024)") })
+
+                previewTile(html: htmlMOL2, base: baseUrl,
+                            title: "MOL2",
+                            caption: { Text("Caffeine") })
+
+                customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
+            }
+            .frame(minHeight: 320, maxHeight: .infinity)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         }
     }
 
@@ -192,15 +198,13 @@ struct ContentView: View {
     /// through Finder + Quick Look.
     @ViewBuilder
     private func customDropTile(htmlPath: String, baseUrl: URL) -> some View {
-        VStack {
+        VStack(spacing: 4) {
             ZStack {
                 if let droppedFile = droppedFile {
                     WebView(html: previewHTML(htmlPath: htmlPath,
                                               filePath: droppedFile.path,
                                               ext: droppedFile.pathExtension),
                             baseUrl: baseUrl)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .ignoresSafeArea()
                 } else {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
@@ -208,14 +212,14 @@ struct ContentView: View {
                         .overlay(
                             VStack(spacing: 6) {
                                 Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 28))
-                                Text("Drop a structure file")
-                                    .font(.callout)
-                                Text("PDB, CIF, SDF, MOL, MOL2, XYZ, GRO, CUBE")
+                                    .font(.system(size: 26))
+                                Text("Drop a structure file").font(.callout)
+                                Text("PDB · CIF · SDF · MOL · MOL2\nXYZ · GRO · CUBE · PDBQT")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                             }
-                            .padding()
+                            .padding(8)
                         )
                 }
             }
@@ -225,7 +229,8 @@ struct ContentView: View {
             }
 
             HStack(spacing: 4) {
-                Text(droppedFile?.lastPathComponent ?? "Custom").lineLimit(1).truncationMode(.middle)
+                Text(droppedFile?.lastPathComponent ?? "Custom")
+                    .font(.callout).lineLimit(1).truncationMode(.middle)
                 if droppedFile != nil {
                     Button(action: { droppedFile = nil; droppedFileError = nil }) {
                         Image(systemName: "xmark.circle.fill")
@@ -234,13 +239,19 @@ struct ContentView: View {
                     .help("Clear dropped file")
                 }
             }
-            if let err = droppedFileError {
-                Text(err).font(.caption2).foregroundColor(.red).lineLimit(1)
-            } else if droppedFile == nil {
-                Text("Drag to preview your own file").font(.caption).padding(.bottom)
-            } else {
-                Text("Dropped file").font(.caption).padding(.bottom)
+            Group {
+                if let err = droppedFileError {
+                    Text(err).foregroundColor(.red)
+                } else if droppedFile == nil {
+                    Text("Drag to preview your own file")
+                } else {
+                    Text("Dropped file")
+                }
             }
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .lineLimit(1)
+            .padding(.bottom, 4)
         }
     }
 
