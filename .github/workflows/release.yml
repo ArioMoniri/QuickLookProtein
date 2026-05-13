@@ -224,6 +224,68 @@ jobs:
           ( cd build/export && /usr/bin/ditto -c -k --keepParent QuickLookProtein.app "../$(basename $ZIP)" )
 
       # ----------------------------------------------------------------
+      # DMG packaging — produces the polished drag-to-/Applications
+      # window users expect on macOS. The .app inside is already
+      # notarised + stapled; the DMG itself needs its own notarisation
+      # so Gatekeeper trusts the image at first mount without a network
+      # ticket lookup.
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build DMG
+        id: dmg
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG="build/QuickLookProtein-${VERSION}.dmg"
+          mkdir -p build/dmg-stage
+          # Stage just the .app so the DMG window has exactly one app
+          # icon and the /Applications symlink (added by create-dmg).
+          /usr/bin/ditto build/export/QuickLookProtein.app build/dmg-stage/QuickLookProtein.app
+
+          create-dmg \
+              --volname "QuickLookProtein ${VERSION}" \
+              --window-pos 200 120 \
+              --window-size 640 400 \
+              --icon-size 110 \
+              --icon "QuickLookProtein.app" 170 200 \
+              --hide-extension "QuickLookProtein.app" \
+              --app-drop-link 460 200 \
+              --no-internet-enable \
+              "$DMG" \
+              "build/dmg-stage/"
+
+          echo "dmg=$DMG" >> $GITHUB_OUTPUT
+          echo "name=QuickLookProtein-${VERSION}.dmg" >> $GITHUB_OUTPUT
+          ls -la "$DMG"
+
+      - name: Sign DMG
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          codesign --sign "Developer ID Application" \
+                   --timestamp \
+                   --options runtime \
+                   "${{ steps.dmg.outputs.dmg }}"
+          codesign --verify --verbose=2 "${{ steps.dmg.outputs.dmg }}"
+
+      - name: Notarise DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool submit "${{ steps.dmg.outputs.dmg }}" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" \
+              --wait
+
+      - name: Staple DMG
+        run: |
+          xcrun stapler staple "${{ steps.dmg.outputs.dmg }}"
+          xcrun stapler validate "${{ steps.dmg.outputs.dmg }}"
+
+      # ----------------------------------------------------------------
       # Sparkle signing. We pull a known-good Sparkle release for its
       # `sign_update` binary, feed it the private key from secrets, and
       # capture the resulting signature line. `sign_update` outputs in the
@@ -344,6 +406,7 @@ jobs:
           COMMITS=$(cat "$RUNNER_TEMP/commits.md")
 
           ZIPNAME=$(basename "${{ steps.zip.outputs.zip }}")
+          DMGNAME=$(basename "${{ steps.dmg.outputs.dmg }}")
           SHORTSHA=$(echo "$GITHUB_SHA" | cut -c1-7)
           NOTES_FILE="$RUNNER_TEMP/notes.md"
 
@@ -354,10 +417,18 @@ jobs:
 
           ### 📥 Install
 
+          **Option A — Disk image (recommended)**
+
+          1. Download **${DMGNAME}** from the Assets below.
+          2. Open it and drag **QuickLookProtein** onto the **Applications** shortcut.
+          3. Eject the disk image.
+
+          **Option B — Zip**
+
           1. Download **${ZIPNAME}** from the Assets below.
           2. Unzip and drag **QuickLookProtein.app** into your **Applications** folder.
-          3. Open any \`.pdb\` / \`.cif\` / \`.sdf\` / \`.mol\` / \`.mol2\` / \`.xyz\` / \`.gro\` / \`.cube\` / \`.pqr\` / \`.vasp\` / \`.cdjson\` / \`.mmtf\` file in Finder.
-          4. Hit <kbd>Space</kbd> for an interactive 3D preview, or switch to Icon View for molecular thumbnails.
+
+          Either way: open any \`.pdb\` / \`.cif\` / \`.sdf\` / \`.mol\` / \`.mol2\` / \`.xyz\` / \`.gro\` / \`.cube\` / \`.pqr\` / \`.vasp\` / \`.cdjson\` / \`.mmtf\` file in Finder, hit <kbd>Space</kbd> for the interactive 3D preview, or switch to Icon View for molecular thumbnails.
 
           🔐 **Signed with Developer ID** and **notarised by Apple** — Gatekeeper will let it run without warning.
 
@@ -387,7 +458,10 @@ jobs:
               gh release edit "$TAG" --notes-file "$NOTES_FILE"
           fi
 
-          gh release upload "$TAG" "${{ steps.zip.outputs.zip }}" --clobber
+          gh release upload "$TAG" \
+              "${{ steps.zip.outputs.zip }}" \
+              "${{ steps.dmg.outputs.dmg }}" \
+              --clobber
 
       # ----------------------------------------------------------------
       # Append a new <item> to docs/appcast.xml and push it back. GitHub
