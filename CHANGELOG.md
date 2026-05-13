@@ -4,6 +4,21 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.4] — 2026-05-14
+
+### 🪟 Windows
+
+- **`QuickLookProtein-Setup.exe`** — true one-click installer for
+  Windows. A 7-Zip self-extracting `.exe` that bundles the
+  `.qlplugin`, `install.ps1`, and `install.bat`, prompts the user
+  for confirmation, and auto-runs `install.bat` after extraction.
+  Replaces the previous "download zip → unzip → double-click .bat"
+  three-step flow with a single double-click.
+- README's **Download for Windows** button now points at
+  `releases/latest/download/QuickLookProtein-Setup.exe` instead of
+  the installer zip. The zip and the plain `.qlplugin` are still
+  uploaded as fallbacks (advanced / fully-manual installs).
+
 ## [1.7.3] — 2026-05-14
 
 ### 🪟 Windows

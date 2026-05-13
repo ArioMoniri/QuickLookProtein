@@ -491,32 +491,26 @@ jobs:
 
           🔐 macOS build is **signed with Developer ID** and **notarised by Apple** — Gatekeeper runs it without warning.
 
-          #### 🪟 Windows
+          #### 🪟 Windows — one click
 
-          The \`.qlplugin\` file is only meaningful to **[QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest)** — the Windows-side host that registers the file extension. Each option below installs QuickLook for you if it's missing.
-
-          **Option A — Installer zip (recommended, double-clickable)**
-
-          1. Download **[QuickLookProtein-Windows-Installer-latest.zip](https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/QuickLookProtein-Windows-Installer-latest.zip)** (or the versioned **QuickLookProtein-Windows-Installer.zip** from the Assets below).
-          2. Unzip anywhere.
-          3. Double-click \`install.bat\`. SmartScreen will warn — click **More info → Run anyway**.
-          4. Done. Press <kbd>Space</kbd> on a supported file in Explorer.
-
-          **Option B — PowerShell one-liner**
-
-          \`\`\`powershell
-          irm https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/feature/ario-signed/Windows/install.ps1 | iex
-          \`\`\`
-
-          **Option C — Fully manual**
-
-          1. Install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest) first — without it, Windows has no handler for \`.qlplugin\` files and double-clicking does nothing.
-          2. Download **QuickLookProtein-${VERSION}.qlplugin** from the Assets below.
-          3. With QuickLook running in the tray, double-click the \`.qlplugin\` — QuickLook intercepts it and installs.
-          4. Right-click the tray icon → **Restart**.
+          1. Download **[QuickLookProtein-Setup.exe](https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/QuickLookProtein-Setup.exe)** from the Assets below.
+          2. Double-click it. SmartScreen warns — click **More info → Run anyway**.
+          3. Confirm the *"Install QuickLookProtein…"* prompt → **Yes**.
+          4. Setup installs [QuickLook](https://github.com/QL-Win/QuickLook) if missing, drops the plugin in your user profile, restarts the tray.
           5. Press <kbd>Space</kbd> on a supported file in Explorer.
 
-          ⚠️ The Windows side is **unsigned** — SmartScreen will warn on first launch. The plugin itself runs inside QuickLook, not as a standalone exe.
+          No admin, no PowerShell, no unzip.
+
+          <details>
+          <summary>Other install options</summary>
+
+          - **PowerShell one-liner** — \`irm https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/feature/ario-signed/Windows/install.ps1 | iex\`
+          - **Installer zip** — unpack \`QuickLookProtein-Windows-Installer.zip\`, double-click \`install.bat\`.
+          - **Manual** — install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest), download \`QuickLookProtein-${VERSION}.qlplugin\`, double-click it while QuickLook is running.
+
+          </details>
+
+          ⚠️ The Windows installer is **unsigned** — SmartScreen will warn on first launch. The plugin runs inside QuickLook (not as a standalone exe).
 
           ### 📦 What's inside
 
@@ -717,6 +711,87 @@ jobs:
           "path=build/$qlpName"       | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       # ----------------------------------------------------------------
+      # Build the one-click installer .exe.
+      #
+      # Why a self-extracting .exe rather than the zip-of-files bundle:
+      # the zip works, but it's two clicks (unzip → run .bat) and
+      # Windows users have learned that "real" installers are single
+      # .exe files. 7-Zip's SFX module turns our bundle into exactly
+      # that — a single double-clickable Setup.exe that, after a
+      # standard "Do you want to install?" prompt, extracts to %TEMP%
+      # and auto-runs install.bat. Same logic as the manual flow,
+      # zero extra steps for the user.
+      #
+      # 7-Zip is preinstalled on `windows-latest`. We use the 7zSD.sfx
+      # module (the GUI variant with the prompt + progress bar); the
+      # silent 7zS.sfx variant would also work but the explicit prompt
+      # gives the user a chance to cancel and matches what they'd
+      # expect from a third-party installer.
+      - name: Build self-extracting Setup.exe
+        id: setupexe
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $sevenZip = "C:\Program Files\7-Zip\7z.exe"
+          $sfxModule = "C:\Program Files\7-Zip\7zSD.sfx"
+          if (-not (Test-Path $sevenZip)) {
+            throw "7-Zip not found on runner — can't build SFX installer."
+          }
+          if (-not (Test-Path $sfxModule)) {
+            # Fall back to the non-GUI sfx if the GUI one is missing on
+            # a future runner image. Both ship in the standard 7-Zip
+            # install.
+            $sfxModule = "C:\Program Files\7-Zip\7zS.sfx"
+            if (-not (Test-Path $sfxModule)) {
+              throw "Neither 7zSD.sfx nor 7zS.sfx found on runner."
+            }
+          }
+
+          # Stage the payload files. Use the SAME files the zip bundle
+          # ships so the offline-bundle path stays a single source of
+          # truth.
+          $stage = "build/setup-stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item "${{ steps.pkg.outputs.path }}" "$stage/QuickLookProtein.qlplugin" -Force
+          Copy-Item "Windows/install.ps1"           "$stage/install.ps1"               -Force
+          Copy-Item "Windows/install.bat"           "$stage/install.bat"               -Force
+
+          # Compress with 7z's solid LZMA. -m switches give us a small
+          # output (~1.3x base size); we don't need to tune further.
+          $payload = "build/setup-payload.7z"
+          & $sevenZip a -t7z -mx=9 $payload "$stage\*" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "7z archive failed ($LASTEXITCODE)" }
+
+          # SFX config block. UTF-8 BOM is REQUIRED by 7zSD.sfx — write
+          # with [System.IO.File]::WriteAllText so the BOM is preserved.
+          $config = @"
+          ;!@Install@!UTF-8!
+          Title="QuickLookProtein $version Setup"
+          BeginPrompt="Install QuickLookProtein 3D molecule preview for Windows Explorer?\n\nThis will also install QuickLook (https://github.com/QL-Win/QuickLook) if it isn't already on your machine."
+          RunProgram="install.bat"
+          ;!@InstallEnd@!
+          "@
+          $configPath = "build/sfx-config.txt"
+          [System.IO.File]::WriteAllText(
+            (Resolve-Path -LiteralPath (Split-Path $configPath -Parent)).Path + "\" + (Split-Path $configPath -Leaf),
+            $config,
+            (New-Object System.Text.UTF8Encoding $true))
+
+          # Concatenate sfx-module + config + archive into Setup.exe.
+          $setupExe = "build/QuickLookProtein-Setup.exe"
+          $out = [System.IO.File]::Create($setupExe)
+          foreach ($part in @($sfxModule, $configPath, $payload)) {
+            $in = [System.IO.File]::OpenRead($part)
+            $in.CopyTo($out)
+            $in.Close()
+          }
+          $out.Close()
+
+          Get-Item $setupExe | Format-List FullName, Length
+          "name=QuickLookProtein-Setup.exe"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "path=$setupExe"                    | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      # ----------------------------------------------------------------
       # Package the all-in-one Windows installer bundle. Ships the
       # .qlplugin, install.ps1, install.bat (double-clickable wrapper),
       # and a plaintext README so the user has everything they need
@@ -812,3 +887,12 @@ jobs:
           $bundleAlias = "build/QuickLookProtein-Windows-Installer-latest.zip"
           Copy-Item -Path "${{ steps.bundle.outputs.path }}" -Destination $bundleAlias -Force
           gh release upload "v$version" $bundleAlias --clobber
+
+          # One-click self-extracting installer. Upload the versioned
+          # file plus a stable "QuickLookProtein-Setup.exe" alias the
+          # README button can point at.
+          gh release upload "v$version" "${{ steps.setupexe.outputs.path }}" --clobber
+          # The "${{ steps.setupexe.outputs.path }}" file is already named
+          # QuickLookProtein-Setup.exe (no version in the name) so no
+          # separate alias copy is needed — the upload above doubles as
+          # the stable URL target.
