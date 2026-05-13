@@ -4,28 +4,40 @@
 //
 //  Generates per-file Finder thumbnails for molecular structure files.
 //
-//  Why this file is fully self-contained (no `import` of shared types,
-//  no `Settings` / `ViewerOptions` / `prepare3DmolHTML` references):
+//  Why this is pure Cocoa drawing (no WKWebView, no 3Dmol.js):
 //
-//      Xcode's QLThumbnail target was added via the wizard with a
-//      `PBXFileSystemSynchronizedRootGroup`, which auto-includes
-//      everything inside `QLThumbnail/` but nothing outside. Adding the
-//      Shared/ Swift files to the target's membership requires four
-//      click-throughs in Xcode's UI per file — a friction point we
-//      avoid by inlining the small amount of logic we need.
+//      The original implementation hosted a WKWebView inside an off-screen
+//      NSWindow and snapshotted its WebGL canvas after 3Dmol.js finished
+//      rendering. That worked on macOS 11–13, but macOS 14+ sandboxed
+//      thumbnail extensions are blocked from talking to `com.apple.dock.
+//      fullscreen` and `com.apple.windowmanager.server` — the os_log dump
+//      from a hung request shows
+//          denied lookup: name = com.apple.dock.fullscreen ... error = 159
+//          PageClientImpl isViewVisible(): viewWindow 0x0, window occluded 1
+//      WebKit then refuses to paint the layer tree because there's no
+//      visible window, 3Dmol never finishes initialising, the 5.5 s
+//      timeout fires, and Finder shows the generic doc icon.
 //
-//      We do NOT duplicate `3Dmol.js` or `3Dmol_viewer.html` though —
-//      those live in the host app's Resources directory (already added
-//      as resources of the main app target). At runtime we compute the
-//      host bundle URL from our `.appex` location (great-grandparent of
-//      `Bundle.main.bundleURL`) and pass it as the WKWebView's baseURL.
-//      Apple's sandbox grants app extensions read access to the host
-//      app's bundle resources, so this works in shipped + signed builds.
+//      Workarounds we tried that don't work: alphaValue=0.01 windows
+//      (still need window-server access to make-key), CALayer-only render
+//      pipelines (WebKit's compositor short-circuits on occluded windows),
+//      `WKSnapshotConfiguration(afterScreenUpdates: false)` (Web process
+//      hasn't even allocated a backing store).
+//
+//      Pragmatic fix: skip WebView for thumbnails. Draw a static "atom"
+//      glyph + format label entirely with Core Graphics — sandbox-safe,
+//      runs in <10 ms, never times out. The actual 3D molecule is still
+//      rendered for *previews* (Space-bar / right-pane), which use the
+//      QLPreviewingController code path where the WebView lives inside
+//      the system-provided preview window and the sandbox lets WebKit
+//      paint normally.
+//
+//      Bonus: we no longer need to bundle 3Dmol.js (~1.8 MB) or the
+//      viewer template inside the .appex.
 //
 
 import Cocoa
 import QuickLookThumbnailing
-import WebKit
 import os.log
 
 /// Subsystem-tagged logger — paired with QLExtension's. Stream messages from
@@ -35,350 +47,188 @@ private let thumbLog = OSLog(subsystem: "com.ariomoniri.QuickLookProtein.QLThumb
                              category: "thumbnail")
 
 // The @objc attribute is load-bearing: NSExtensionPrincipalClass in our
-// Info.plist points at "QLThumbnail.ThumbnailProvider" and PluginKit looks
-// the class up via NSClassFromString. Swift NSObject subclasses USUALLY get
-// @objc inferred for free, but in some build configurations (final class,
-// indirect NSObject inheritance via QLThumbnailProvider → NSExtension →
-// NSObject, Swift 5.10+ inference rules) the class doesn't end up in the
-// Obj-C runtime — confirmed via `nm` on the built executable. Without it
-// PluginKit silently fails to register the extension.
+// Info.plist points at "QLThumbnailThumbnailProvider" and PluginKit looks
+// the class up via NSClassFromString. Without it the Swift name gets
+// mangled (e.g. _TtC11QLThumbnail17ThumbnailProvider) and PluginKit
+// silently fails to register the extension.
 @objc(QLThumbnailThumbnailProvider)
-final class ThumbnailProvider: QLThumbnailProvider, WKNavigationDelegate, WKScriptMessageHandler {
-
-    // MARK: Tunables -----------------------------------------------------------
-
-    /// Skip files larger than this — a 100 MB PDB would jetsam the
-    /// thumbnail extension before we got anywhere near rendering it.
-    private let maxBytes = 25 * 1024 * 1024
-
-    /// macOS kills thumbnail extensions after ~8 s. Stop earlier so we have
-    /// time to package a snapshot reply on the way out.
-    private let renderTimeout: TimeInterval = 5.5
-
-    // MARK: Per-request state --------------------------------------------------
-
-    private var window: NSWindow?
-    private var webView: WKWebView?
-    private var handler: ((QLThumbnailReply?, Error?) -> Void)?
-    private var timeoutWorkItem: DispatchWorkItem?
-    private var size: CGSize = .zero
-    private var didReply = false
-
-    // MARK: QLThumbnailProvider -----------------------------------------------
+final class ThumbnailProvider: QLThumbnailProvider {
 
     override func provideThumbnail(for request: QLFileThumbnailRequest,
                                    _ handler: @escaping (QLThumbnailReply?, Error?) -> Void) {
 
         let ext = request.fileURL.pathExtension.lowercased()
+        let size = request.maximumSize
         os_log("provideThumbnail called for %{public}@ (ext=%{public}@, size=%{public}.0fx%{public}.0f)",
-               log: thumbLog, type: .info,
-               request.fileURL.path, ext,
-               request.maximumSize.width, request.maximumSize.height)
+               log: thumbLog, type: .info, request.fileURL.path, ext, size.width, size.height)
 
-        // CUBE files are volumetric — without an isosurface they'd render as
-        // a sparse dust of nuclei, which makes a misleading icon. Decline and
-        // let Finder use the system default.
-        if ext == "cube" || ext == "cub" {
+        // We don't actually need to read the file — the drawn icon is the
+        // same per-format. Validating the extension is enough; an unknown
+        // extension shouldn't have routed to us, but if it did we hand it
+        // back so Finder picks a default.
+        guard Self.supportedExtensions.contains(ext) else {
+            os_log("Unsupported extension .%{public}@ — declining", log: thumbLog, type: .info, ext)
             handler(nil, nil)
             return
         }
 
-        guard let dataFormat = self.formatToken(for: ext) else {
-            handler(nil, self.error(code: 1, message: "Unsupported file type: .\(ext)"))
-            return
-        }
-
-        // Size cap — checked before reading the file.
-        if let attrSize = (try? FileManager.default.attributesOfItem(atPath: request.fileURL.path))?[.size] as? Int,
-           attrSize > self.maxBytes {
-            handler(nil, self.error(code: 2, message: "File too large for thumbnail (\(attrSize / 1_048_576) MB)"))
-            return
-        }
-
-        // Read the file. Latin-1 fallback covers CIFs with non-ASCII author
-        // names; without it we'd reject files an ASCII-only UTF-8 parser
-        // wouldn't have rejected either.
-        let data: String
-        do {
-            data = try Self.readText(at: request.fileURL)
-        } catch {
-            handler(nil, error)
-            return
-        }
-
-        // Viewer template + 3Dmol.js are bundled INSIDE this extension's own
-        // .appex (copied into QLThumbnail/ so the synchronised file-system
-        // group picks them up automatically). Earlier versions tried to read
-        // them from the host app's Resources directory but the sandboxed
-        // WebContent process can't follow file:// URLs across the
-        // .appex → host bundle boundary reliably, which made the WebView
-        // hang while 3Dmol.js silently failed to load. Self-bundling
-        // duplicates ~4 MB but is the only sandbox-safe path.
-        guard let templateURL = Bundle.main.url(forResource: "3Dmol_viewer", withExtension: "html"),
-              let template = try? String(contentsOf: templateURL, encoding: .utf8) else {
-            handler(nil, self.error(code: 3, message: "Viewer template not found in extension bundle"))
-            return
-        }
-
-        // Hand the resolved values off to the renderer.
-        self.handler = handler
-        self.size = request.maximumSize
-        self.didReply = false
-
-        let html = self.renderTemplate(template,
-                                       moleculeData: data,
-                                       dataFormat: dataFormat,
-                                       fileName: request.fileURL.lastPathComponent)
-
-        os_log("rendering HTML len=%{public}d dataFormat=%{public}@",
-               log: thumbLog, type: .info, html.count, dataFormat)
-        DispatchQueue.main.async { [weak self] in
-            self?.startRender(html: html, baseURL: templateURL)
-        }
-    }
-
-    // MARK: Render ------------------------------------------------------------
-
-    private func startRender(html: String, baseURL: URL) {
-        // Off-screen NSWindow with `alphaValue: 0.01` is the load-bearing
-        // trick for headless WebGL — a fully transparent (0.0) window is
-        // skipped by the compositor and `WKWebView` then renders a blank
-        // canvas; 0.01 keeps it in the scene graph.
-        let frame = NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height)
-        let window = NSWindow(contentRect: frame, styleMask: .borderless,
-                              backing: .buffered, defer: false)
-        window.alphaValue = 0.01
-        window.isOpaque = false
-        window.hasShadow = false
-        window.ignoresMouseEvents = true
-        window.makeKeyAndOrderFront(nil)
-
-        let config = WKWebViewConfiguration()
-        config.userContentController.add(self, name: "qlThumbnailReady")
-
-        let webView = WKWebView(frame: NSRect(origin: .zero, size: size), configuration: config)
-        webView.wantsLayer = true
-        webView.setValue(false, forKey: "drawsBackground")
-        webView.navigationDelegate = self
-        window.contentView = webView
-
-        self.window = window
-        self.webView = webView
-
-        // Fail-safe — if the JS never signals ready (broken file, WebGL
-        // disabled, parse error) we still return *something* to Finder.
-        let timeout = DispatchWorkItem { [weak self] in
-            self?.replyWithCurrentSnapshot()
-        }
-        self.timeoutWorkItem = timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + renderTimeout, execute: timeout)
-
-        webView.loadHTMLString(html, baseURL: baseURL)
-    }
-
-    // MARK: Bridge & reply paths ----------------------------------------------
-
-    func userContentController(_ controller: WKUserContentController,
-                               didReceive message: WKScriptMessage) {
-        guard message.name == "qlThumbnailReady",
-              let dataURI = message.body as? String else { return }
-        replyWithDataURI(dataURI)
-    }
-
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        replyWithError(error)
-    }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
-                 withError error: Error) {
-        replyWithError(error)
-    }
-
-    private func replyWithDataURI(_ uri: String) {
-        guard !didReply else { return }
-        didReply = true
-        timeoutWorkItem?.cancel()
-        os_log("qlThumbnailReady fired (len=%{public}d)", log: thumbLog, type: .info, uri.count)
-
-        // `data:image/png;base64,XXXX`. We don't try to be clever about
-        // decoding malformed URIs — if it's not a clean PNG, fall back.
-        guard let comma = uri.firstIndex(of: ","),
-              let pngData = Data(base64Encoded: String(uri[uri.index(after: comma)...]),
-                                 options: .ignoreUnknownCharacters),
-              let image = NSImage(data: pngData) else {
-            replyWithError(self.error(code: 4, message: "Could not decode rendered image"))
-            return
-        }
-        finishWith(image: image)
-    }
-
-    private func replyWithCurrentSnapshot() {
-        guard !didReply else { return }
-        didReply = true
-        os_log("render timeout — falling back to webView snapshot",
-               log: thumbLog, type: .error)
-        webView?.takeSnapshot(with: nil) { [weak self] image, error in
-            if let image = image {
-                self?.finishWith(image: image)
-            } else {
-                self?.handler?(nil, error)
-                self?.cleanup()
-            }
-        }
-    }
-
-    private func replyWithError(_ error: Error) {
-        guard !didReply else { return }
-        didReply = true
-        timeoutWorkItem?.cancel()
-        handler?(nil, error)
-        cleanup()
-    }
-
-    private func finishWith(image: NSImage) {
-        let size = self.size
         let reply = QLThumbnailReply(contextSize: size) { _ -> Bool in
-            // Aspect-preserving fit so the rendered protein never stretches.
-            let imgSize = image.size
-            let scale = min(size.width / imgSize.width, size.height / imgSize.height)
-            let drawW = imgSize.width * scale
-            let drawH = imgSize.height * scale
-            let rect = NSRect(x: (size.width  - drawW) / 2,
-                              y: (size.height - drawH) / 2,
-                              width: drawW, height: drawH)
-            image.draw(in: rect)
+            Self.drawAtomGlyph(ext: ext, in: NSRect(origin: .zero, size: size))
             return true
         }
-        handler?(reply, nil)
-        cleanup()
+        os_log("returning drawn thumbnail (ext=%{public}@)", log: thumbLog, type: .info, ext)
+        handler(reply, nil)
     }
 
-    private func cleanup() {
-        timeoutWorkItem?.cancel()
-        timeoutWorkItem = nil
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "qlThumbnailReady")
-        webView?.stopLoading()
-        webView = nil
-        window?.close()
-        window = nil
-        handler = nil
-    }
+    // MARK: - Static configuration
 
-    // MARK: Helpers — file I/O & format ---------------------------------------
+    /// The set of extensions our QL extension handles. Matches the UTI list
+    /// in our Info.plist's QLSupportedContentTypes; if the system routes a
+    /// file with a different extension to us, we decline cleanly rather
+    /// than draw a misleading icon.
+    private static let supportedExtensions: Set<String> = [
+        "pdb", "ent", "pdbqt", "pqr",
+        "cif", "mmcif",
+        "sdf", "mol", "mol2",
+        "xyz",
+        "gro",
+        "cube", "cub",
+        "vasp", "poscar",
+        "cdjson", "json",
+        "mmtf",
+        "prmtop", "top"
+    ]
 
-    private static func readText(at url: URL) throws -> String {
-        let data = try Data(contentsOf: url)
-        if let s = String(data: data, encoding: .utf8)     { return s }
-        if let s = String(data: data, encoding: .isoLatin1) { return s }
-        throw NSError(domain: "QuickLookProtein.Thumbnail", code: 5,
-                      userInfo: [NSLocalizedDescriptionKey:
-                                    "File is not text in a recognised encoding"])
-    }
+    /// Per-format ribbon colour. Picked so PDB/CIF (proteins) read as
+    /// "protein-y" blue/purple, small molecules as warm tones, and crystal
+    /// formats as cool greens — easy to skim in a Finder column at a glance.
+    private static let formatColors: [String: NSColor] = [
+        "pdb":    .systemBlue,    "ent":    .systemBlue,    "pdbqt":  .systemTeal,
+        "pqr":    .systemIndigo,
+        "cif":    .systemPurple,  "mmcif":  .systemPurple,
+        "sdf":    .systemOrange,
+        "mol":    .systemOrange,  "mol2":   .systemRed,
+        "xyz":    .systemYellow,
+        "gro":    .systemMint,
+        "cube":   .systemGray,    "cub":    .systemGray,
+        "vasp":   .systemGreen,   "poscar": .systemGreen,
+        "cdjson": .systemBrown,   "json":   .systemBrown,
+        "mmtf":   .systemBlue,
+        "prmtop": .systemPink,    "top":    .systemPink
+    ]
 
-    /// Map a file extension to the 3Dmol.js `addModel` format token. Mirrors
-    /// `Settings.dataFormat(forExtension:)` in the shared code — kept here so
-    /// this extension doesn't depend on Shared/.
-    private func formatToken(for ext: String) -> String? {
-        switch ext {
-        case "pdb", "ent":     return "pdb"
-        case "pdbqt":          return "pdbqt"
-        case "pqr":            return "pqr"     // PDB + per-atom charge/radius (APBS/PDB2PQR)
-        case "cif", "mmcif":   return "cif"
-        case "sdf":            return "sdf"
-        case "mol":            return "sdf"     // 3Dmol parses single MOL via the SDF parser
-        case "mol2":           return "mol2"
-        case "xyz":            return "xyz"
-        case "gro":            return "gro"
-        case "prmtop", "top":  return "prmtop"  // AMBER topology
-        case "cube", "cub":    return "cube"    // declined above; included for completeness
-        case "vasp", "poscar": return "vasp"
-        case "cdjson", "json": return "cdjson"  // ChemDoodle JSON (3Dmol native)
-        default:               return nil
-        }
-    }
+    // MARK: - Drawing
 
-    // MARK: Helpers — viewer-template substitution ----------------------------
+    /// Draw an atom-and-bonds glyph plus the format label centred in the
+    /// given rect. Designed to look readable at every Finder icon size from
+    /// 16×16 (list view) up to 512×512 (icon-view large).
+    private static func drawAtomGlyph(ext: String, in rect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
 
-    /// Hand-rolled minimal version of the shared `prepare3DmolHTML` — fills in
-    /// every placeholder the bundled `3Dmol_viewer.html` recognises, using
-    /// thumbnail-appropriate defaults (rotation off, info overlay off,
-    /// thumbnail mode on so the JS posts a PNG back via the message bridge).
-    private func renderTemplate(_ template: String,
-                                moleculeData: String,
-                                dataFormat: String,
-                                fileName: String) -> String {
-        let safeData = self.sanitizeForScriptBlock(moleculeData)
-        let safeName = self.escapeForHTMLAttribute(fileName)
+        let w = rect.width
+        let h = rect.height
+        let s = min(w, h)
+        let cx = rect.midX
+        let cy = rect.midY + s * 0.06  // shift glyph up to leave room for label
 
-        // For PDB / CIF / mmCIF the default style is cartoon (the viewer
-        // template's smart-styling auto-promotes to surface in thumbnail mode
-        // for proteins). For small-molecule formats stick is the only
-        // sensible default at icon size.
-        let atomStyle = (dataFormat == "pdb" || dataFormat == "cif") ? "cartoon" : "stick"
+        // Dark background — readable against both light and dark Finder
+        // chrome. Use a subtle gradient so the icon doesn't read as flat.
+        let bg = NSGradient(starting: NSColor(white: 0.15, alpha: 1.0),
+                            ending:   NSColor(white: 0.08, alpha: 1.0))
+        bg?.draw(in: rect, angle: -90)
 
-        var html = template
-        let pairs: [(String, String)] = [
-            ("{ATOM_STYLE}",        atomStyle),
-            ("{COLOR_SCHEME}",      "spectrum"),
-            ("{BG_COLOR}",          "000000"),
-            ("{BG_ALPHA}",          "0.0"),
-            ("{ROTATION_SPEED}",    "0"),
-            ("{DATA_FORMAT}",       dataFormat),
-            ("{AUTO_STYLE_HETERO}", "true"),
-            ("{SHOW_SURFACE}",      "false"),  // viewer auto-forces surface for proteins in thumbnail mode
-            ("{HIDE_H}",            "false"),
-            ("{SHOW_UNIT_CELL}",    "false"),
-            ("{SHOW_INFO}",         "false"),
-            ("{FILE_NAME}",         safeName),
-            ("{ZOOM_FACTOR}",       "1.0"),
-            ("{ZOOM_IS_AUTO}",      "true"),
-            ("{THUMBNAIL_MODE}",    "true"),
-            // Data block must be substituted *last* so an `{ATOM_STYLE}`
-            // appearing inside the molecule file (unlikely but possible)
-            // can't get replaced a second time.
-            ("{MOL_DATA}",          safeData),
+        // Central atom + three peripheral atoms. Bond lines drawn first so
+        // the spheres overlap them.
+        let centerR = s * 0.14
+        let outerR  = s * 0.085
+        let bondLen = s * 0.26
+
+        let accent = formatColors[ext] ?? .systemBlue
+        let peripherals: [(angle: CGFloat, color: NSColor)] = [
+            (.pi *  0.40, accent),
+            (.pi *  1.10, .white),
+            (.pi *  1.75, accent.blended(withFraction: 0.4, of: .white) ?? accent)
         ]
-        for (placeholder, value) in pairs {
-            html = html.replacingOccurrences(of: placeholder, with: value)
+
+        // Bonds — soft white cylinders with rounded caps so they read as
+        // stick bonds rather than wireframe lines.
+        ctx.setStrokeColor(NSColor(white: 0.75, alpha: 1.0).cgColor)
+        ctx.setLineWidth(s * 0.055)
+        ctx.setLineCap(.round)
+        for p in peripherals {
+            let px = cx + cos(p.angle) * bondLen
+            let py = cy + sin(p.angle) * bondLen
+            ctx.move(to: CGPoint(x: cx, y: cy))
+            ctx.addLine(to: CGPoint(x: px, y: py))
         }
-        return html
+        ctx.strokePath()
+
+        // Peripheral atoms
+        for p in peripherals {
+            let px = cx + cos(p.angle) * bondLen
+            let py = cy + sin(p.angle) * bondLen
+            let r = outerR
+            drawSphere(ctx: ctx, center: CGPoint(x: px, y: py), radius: r,
+                       baseColor: p.color)
+        }
+
+        // Central atom — slightly larger, accent-tinted so the user can
+        // tell the formats apart in column view.
+        drawSphere(ctx: ctx, center: CGPoint(x: cx, y: cy), radius: centerR,
+                   baseColor: accent)
+
+        // Format label — bottom-centred. Only drawn at sizes where the text
+        // would actually be legible.
+        if s >= 64 {
+            let label = ext.uppercased() as NSString
+            let fontSize = max(s * 0.13, 9)
+            let font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: NSColor.white,
+                .kern: fontSize * 0.04
+            ]
+            let textSize = label.size(withAttributes: attrs)
+            let textOrigin = NSPoint(x: (w - textSize.width) / 2,
+                                     y: rect.minY + s * 0.06)
+            label.draw(at: textOrigin, withAttributes: attrs)
+        }
     }
 
-    /// Neutralise the only sequence that can break out of a
-    /// `<script type="text/plain">` element. Also strips NULs and a leading
-    /// UTF-8 BOM because 3Dmol's text parsers don't tolerate either.
-    private func sanitizeForScriptBlock(_ s: String) -> String {
-        var out = s
-        if out.hasPrefix("\u{FEFF}") { out.removeFirst() }
-        out = out.replacingOccurrences(of: "\u{0000}", with: "")
-        out = out.replacingOccurrences(of: "</script",
-                                       with: "<\\/script",
-                                       options: .caseInsensitive)
-        out = out.replacingOccurrences(of: "<!--", with: "<\\!--")
-        out = out.replacingOccurrences(of: "-->",  with: "--\\>")
-        return out
-    }
+    /// Draw a sphere with a soft highlight so the atom reads as 3D at a
+    /// glance. Cheaper than a real shaded render and looks identical at
+    /// thumbnail resolution.
+    private static func drawSphere(ctx: CGContext, center: CGPoint, radius: CGFloat,
+                                   baseColor: NSColor) {
+        let rect = CGRect(x: center.x - radius, y: center.y - radius,
+                          width: radius * 2, height: radius * 2)
 
-    /// Filename ends up inside a JS string literal in the template; strip
-    /// characters that could break out (and curly braces to prevent any
-    /// stray `{TOKEN}` in the filename from colliding with our substitutions).
-    private func escapeForHTMLAttribute(_ s: String) -> String {
-        var out = s
-        out = out.replacingOccurrences(of: "\\", with: "\\\\")
-        out = out.replacingOccurrences(of: "\"", with: "\\\"")
-        out = out.replacingOccurrences(of: "'",  with: "\\'")
-        out = out.replacingOccurrences(of: "<",  with: "&lt;")
-        out = out.replacingOccurrences(of: ">",  with: "&gt;")
-        out = out.replacingOccurrences(of: "{",  with: "&#123;")
-        out = out.replacingOccurrences(of: "}",  with: "&#125;")
-        out = out.replacingOccurrences(of: "\n", with: " ")
-        out = out.replacingOccurrences(of: "\r", with: " ")
-        return out
-    }
+        // Base fill — slight gradient (darker on the lower-right, brighter
+        // upper-left) so the sphere has depth without needing real lighting.
+        let dark   = baseColor.blended(withFraction: 0.35, of: .black) ?? baseColor
+        let bright = baseColor.blended(withFraction: 0.25, of: .white) ?? baseColor
+        let gradient = NSGradient(starting: bright, ending: dark)
+        ctx.saveGState()
+        ctx.addEllipse(in: rect)
+        ctx.clip()
+        gradient?.draw(in: rect, angle: -45)
+        ctx.restoreGState()
 
-    // MARK: Helpers — misc -----------------------------------------------------
-
-    private func error(code: Int, message: String) -> NSError {
-        NSError(domain: "QuickLookProtein.Thumbnail", code: code,
-                userInfo: [NSLocalizedDescriptionKey: message])
+        // Specular highlight — small offset white blob in the upper-left.
+        ctx.saveGState()
+        ctx.addEllipse(in: rect)
+        ctx.clip()
+        let hiR = radius * 0.45
+        let hiRect = CGRect(x: center.x - radius * 0.4,
+                            y: center.y + radius * 0.15,
+                            width: hiR * 2, height: hiR * 2)
+        let hiGradient = NSGradient(
+            starting: NSColor(white: 1.0, alpha: 0.55),
+            ending:   NSColor(white: 1.0, alpha: 0.0)
+        )
+        hiGradient?.draw(in: hiRect, relativeCenterPosition: .zero)
+        ctx.restoreGState()
     }
 }
