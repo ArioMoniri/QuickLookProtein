@@ -30,6 +30,10 @@
 		4BED22A42821CD6D003F66A0 /* 3Dmol.js in Resources */ = {isa = PBXBuildFile; fileRef = 4BED22A22821CD6D003F66A0 /* 3Dmol.js */; };
 		A1AR10AA1A2B3C4D00000001 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AR10AA1A2B3C4D00000002 /* Updater.swift */; };
 		A1CAF1E01A2B3C4D00000001 /* caffeine.mol2 in Resources */ = {isa = PBXBuildFile; fileRef = A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */; };
+		A1ME74A1E1A2B3C4D00000001 /* methane.mol in Resources */ = {isa = PBXBuildFile; fileRef = A1ME74A1E1A2B3C4D00000002 /* methane.mol */; };
+		A1BE7Z1E2A2B3C4D00000001 /* benzene.xyz in Resources */ = {isa = PBXBuildFile; fileRef = A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */; };
+		A1WA7G1E3A2B3C4D00000001 /* water.gro in Resources */ = {isa = PBXBuildFile; fileRef = A1WA7G1E3A2B3C4D00000002 /* water.gro */; };
+		A1WA7C1E4A2B3C4D00000001 /* water.cube in Resources */ = {isa = PBXBuildFile; fileRef = A1WA7C1E4A2B3C4D00000002 /* water.cube */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,6 +84,10 @@
 		4BED22A22821CD6D003F66A0 /* 3Dmol.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = 3Dmol.js; sourceTree = "<group>"; };
 		A1AR10AA1A2B3C4D00000002 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = caffeine.mol2; sourceTree = "<group>"; };
+		A1ME74A1E1A2B3C4D00000002 /* methane.mol */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.mol; sourceTree = "<group>"; };
+		A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = benzene.xyz; sourceTree = "<group>"; };
+		A1WA7G1E3A2B3C4D00000002 /* water.gro */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = water.gro; sourceTree = "<group>"; };
+		A1WA7C1E4A2B3C4D00000002 /* water.cube */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = water.cube; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,6 +117,10 @@
 				4BE18E01281F38D900034BE4 /* PQQ.sdf */,
 				4BE18E03281F3B4900034BE4 /* 1565673.cif */,
 				A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */,
+				A1ME74A1E1A2B3C4D00000002 /* methane.mol */,
+				A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */,
+				A1WA7G1E3A2B3C4D00000002 /* water.gro */,
+				A1WA7C1E4A2B3C4D00000002 /* water.cube */,
 			);
 			path = Assets;
 			sourceTree = "<group>";
@@ -286,6 +298,10 @@
 				4BE18E04281F3B4900034BE4 /* 1565673.cif in Resources */,
 				4B20116F26D2D43B00B77CEF /* 3Dmol_viewer.html in Resources */,
 				A1CAF1E01A2B3C4D00000001 /* caffeine.mol2 in Resources */,
+				A1ME74A1E1A2B3C4D00000001 /* methane.mol in Resources */,
+				A1BE7Z1E2A2B3C4D00000001 /* benzene.xyz in Resources */,
+				A1WA7G1E3A2B3C4D00000001 /* water.gro in Resources */,
+				A1WA7C1E4A2B3C4D00000001 /* water.cube in Resources */,
 				4B0FDF8326C9A32100C94DDE /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

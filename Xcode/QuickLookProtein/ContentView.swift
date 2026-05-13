@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import AppKit
 import UniformTypeIdentifiers
 
 /// Extensions we know 3Dmol can render — used by the drag-and-drop tile.
@@ -33,14 +34,22 @@ struct ContentView: View {
         let pdbPath  = Bundle.main.path(forResource: "6oc6",          ofType: "pdb")!
         let cifPath  = Bundle.main.path(forResource: "1565673",       ofType: "cif")!
         let sdfPath  = Bundle.main.path(forResource: "PQQ",           ofType: "sdf")!
+        let molPath  = Bundle.main.path(forResource: "methane",       ofType: "mol")!
         let mol2Path = Bundle.main.path(forResource: "caffeine",      ofType: "mol2")!
+        let xyzPath  = Bundle.main.path(forResource: "benzene",       ofType: "xyz")!
+        let groPath  = Bundle.main.path(forResource: "water",         ofType: "gro")!
+        let cubePath = Bundle.main.path(forResource: "water",         ofType: "cube")!
 
         let baseUrl = URL(fileURLWithPath: htmlPath)
 
         let htmlPDB  = previewHTML(htmlPath: htmlPath, filePath: pdbPath,  ext: "pdb")
         let htmlCIF  = previewHTML(htmlPath: htmlPath, filePath: cifPath,  ext: "cif")
         let htmlSDF  = previewHTML(htmlPath: htmlPath, filePath: sdfPath,  ext: "sdf")
+        let htmlMOL  = previewHTML(htmlPath: htmlPath, filePath: molPath,  ext: "mol")
         let htmlMOL2 = previewHTML(htmlPath: htmlPath, filePath: mol2Path, ext: "mol2")
+        let htmlXYZ  = previewHTML(htmlPath: htmlPath, filePath: xyzPath,  ext: "xyz")
+        let htmlGRO  = previewHTML(htmlPath: htmlPath, filePath: groPath,  ext: "gro")
+        let htmlCUBE = previewHTML(htmlPath: htmlPath, filePath: cubePath, ext: "cube")
 
         // Single scrollable page — settings + about at the top, previews below.
         // No fixed split, no clamped scroll region. The whole thing scrolls if
@@ -205,32 +214,45 @@ struct ContentView: View {
                 Divider()
                     .padding(.horizontal, 8)
 
-                // MARK: Live previews — WebGL canvases that rotate at the user's
-                //       chosen speed. Aspect-ratio constraint keeps each tile a
-                //       roughly 1:1 square as the window grows or shrinks, and
-                //       a 180 px floor means they never disappear in narrow
-                //       windows. They scale up freely when the window grows.
-                HStack(spacing: 10) {
+                // MARK: Live previews — one tile per supported format, plus the
+                //       custom drag/click-to-upload tile. 3-column LazyVGrid so
+                //       all nine fit in a reasonably-sized window without
+                //       shrinking individual tiles below readability.
+                let previewColumns: [GridItem] = [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ]
+                LazyVGrid(columns: previewColumns, spacing: 12) {
                     previewTile(html: htmlPDB,  base: baseUrl,
                                 title: "PDB",
                                 caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
-
                     previewTile(html: htmlCIF,  base: baseUrl,
                                 title: "CIF",
                                 caption: { Text("Bioinspired Fe complex (1565673)") })
-
                     previewTile(html: htmlSDF,  base: baseUrl,
                                 title: "SDF",
                                 caption: { Text("Pyrroloquinoline quinone (CID 1024)") })
 
+                    previewTile(html: htmlMOL,  base: baseUrl,
+                                title: "MOL",
+                                caption: { Text("Methane (V2000)") })
                     previewTile(html: htmlMOL2, base: baseUrl,
                                 title: "MOL2",
                                 caption: { Text("Caffeine") })
+                    previewTile(html: htmlXYZ,  base: baseUrl,
+                                title: "XYZ",
+                                caption: { Text("Benzene (XMol XYZ)") })
+
+                    previewTile(html: htmlGRO,  base: baseUrl,
+                                title: "GRO",
+                                caption: { Text("Water (GROMACS)") })
+                    previewTile(html: htmlCUBE, base: baseUrl,
+                                title: "CUBE",
+                                caption: { Text("Water (Gaussian Cube)") })
 
                     customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
                 }
-                .frame(minHeight: 180, idealHeight: 280)
-                .aspectRatio(4.2, contentMode: .fit)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 16)
             }
@@ -243,9 +265,9 @@ struct ContentView: View {
         ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue).tag($0) }
     }
 
-    /// Fifth tile that accepts a dragged file and renders it live with the current
-    /// settings — useful for previewing your own structures without round-tripping
-    /// through Finder + Quick Look.
+    /// Ninth tile — accepts a drag-and-drop *or* a click to open an
+    /// NSOpenPanel for picking a file, and renders the chosen file live with
+    /// the current settings. Same WebView wiring as the other tiles.
     @ViewBuilder
     private func customDropTile(htmlPath: String, baseUrl: URL) -> some View {
         VStack(spacing: 4) {
@@ -256,24 +278,30 @@ struct ContentView: View {
                                               ext: droppedFile.pathExtension),
                             baseUrl: baseUrl)
                 } else {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                        .foregroundColor(isDropTargeted ? .accentColor : .secondary)
-                        .overlay(
-                            VStack(spacing: 6) {
-                                Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 26))
-                                Text("Drop a structure file").font(.callout)
-                                Text("PDB · CIF · SDF · MOL · MOL2\nXYZ · GRO · CUBE · PDBQT")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding(8)
-                        )
+                    Button {
+                        showOpenPanel()
+                    } label: {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                            .foregroundColor(isDropTargeted ? .accentColor : .secondary)
+                            .overlay(
+                                VStack(spacing: 6) {
+                                    Image(systemName: "square.and.arrow.down")
+                                        .font(.system(size: 26))
+                                    Text("Drop or click to choose").font(.callout)
+                                    Text("PDB · CIF · SDF · MOL · MOL2\nXYZ · GRO · CUBE · PDBQT")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .multilineTextAlignment(.center)
+                                }
+                                .padding(8)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Click to choose a structure file, or drag one here")
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, idealHeight: 200, maxHeight: .infinity)
             .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
                 handleDrop(providers: providers)
             }
@@ -294,9 +322,9 @@ struct ContentView: View {
                 if let err = droppedFileError {
                     Text(err).foregroundColor(.red)
                 } else if droppedFile == nil {
-                    Text("Drag to preview your own file")
+                    Text("Drag or click")
                 } else {
-                    Text("Dropped file")
+                    Text("Custom preview")
                 }
             }
             .font(.caption)
@@ -304,6 +332,46 @@ struct ContentView: View {
             .lineLimit(1)
             .padding(.bottom, 4)
         }
+    }
+
+    /// Open an NSOpenPanel restricted to the file types we know how to render.
+    /// The user has the same path as drag-and-drop: same validation, same
+    /// 25 MB size cap, same error reporting.
+    private func showOpenPanel() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.message = "Choose a structure file to preview"
+        panel.prompt = "Preview"
+        panel.allowedContentTypes = supportedExtensions.compactMap {
+            UTType(filenameExtension: $0)
+        }
+        panel.allowedFileTypes = Array(supportedExtensions)   // belt-and-braces for older macOS
+        if panel.runModal() == .OK, let url = panel.url {
+            acceptCandidateURL(url)
+        }
+    }
+
+    /// Shared validation used by both the drag-and-drop and click-to-pick code
+    /// paths. Lives here so both surfaces enforce the same extension allowlist,
+    /// the same 25 MB cap, and produce the same error messages.
+    private func acceptCandidateURL(_ url: URL) {
+        let ext = url.pathExtension.lowercased()
+        if !supportedExtensions.contains(ext) {
+            self.droppedFileError = "Unsupported file type: .\(ext)"
+            self.droppedFile = nil
+            return
+        }
+        if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int,
+           size > maxDropBytes {
+            let mb = String(format: "%.0f", Double(size) / 1_048_576)
+            self.droppedFileError = "File too large for preview (\(mb) MB)"
+            self.droppedFile = nil
+            return
+        }
+        self.droppedFileError = nil
+        self.droppedFile = url
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
@@ -314,23 +382,7 @@ struct ContentView: View {
                     self.droppedFileError = "Could not read dropped item"
                     return
                 }
-                let ext = url.pathExtension.lowercased()
-                if !supportedExtensions.contains(ext) {
-                    self.droppedFileError = "Unsupported file type: .\(ext)"
-                    self.droppedFile = nil
-                    return
-                }
-                // Size-cap the drop path so a 1 GB PDB doesn't hang the UI while it's
-                // parsed synchronously inside `prepare3DmolHTML` on the main thread.
-                if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int,
-                   size > maxDropBytes {
-                    let mb = String(format: "%.0f", Double(size) / 1_048_576)
-                    self.droppedFileError = "File too large for preview (\(mb) MB)"
-                    self.droppedFile = nil
-                    return
-                }
-                self.droppedFileError = nil
-                self.droppedFile = url
+                self.acceptCandidateURL(url)
             }
         }
         return true
@@ -352,13 +404,18 @@ struct ContentView: View {
     @ViewBuilder
     private func previewTile<C: View>(html: String, base: URL, title: String,
                                       @ViewBuilder caption: () -> C) -> some View {
-        VStack {
+        // Fixed-height tile so the 3-column grid lays out as a uniform 3x3.
+        // The WebView fills the body of the tile; the title + caption sit
+        // beneath with consistent typography.
+        VStack(spacing: 4) {
             WebView(html: html, baseUrl: base)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea()
-            Text(title)
-            caption().font(.caption).padding(.bottom)
+            Text(title).font(.callout)
+            caption().font(.caption).foregroundColor(.secondary)
+                .lineLimit(1).truncationMode(.middle)
         }
+        .frame(height: 240)
+        .padding(4)
     }
 
     private func resetColor() {
