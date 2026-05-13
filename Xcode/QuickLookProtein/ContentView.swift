@@ -111,84 +111,58 @@ struct ContentView: View {
                     }
                     .padding()
 
-                    // MARK: About
-                    VStack(alignment: .leading) {
-                        Text("About").font(.title).padding(.bottom, 4)
-                        Text("Originally developed 2021–2022 by Jethro Hemmann.")
-                            .font(.callout)
-                        Link("Upstream: github.com/JethroHemmann/QuickLookProtein",
-                             destination: URL(string: "https://github.com/JethroHemmann/QuickLookProtein")!)
-                            .font(.callout)
+                    // MARK: About — kept compact so the live previews below have room
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("About").font(.title).padding(.bottom, 2)
 
-                        Divider().padding(.vertical, 6)
-
-                        Text("This build").font(.headline)
-                        Text("Maintained by Ariorad Moniri — multi-format support "
-                             + "(MOL2, XYZ, MOL, GRO, CUBE, PDBQT), smart "
-                             + "protein-ligand styling, surface rendering, "
-                             + "click-to-label, drag-and-drop in the settings app, "
-                             + "per-file Finder thumbnails, Spotlight indexing, "
-                             + "and reliability hardening.")
+                        Text("Originally by Jethro Hemmann (2021–2022).")
                             .font(.callout)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 2)
-
-                        Text("I'm a dedicated medical student and research "
-                             + "fellow passionate about bridging medicine and "
-                             + "technology. With experience in both wet and dry "
-                             + "lab environments and expertise in bioinformatics, "
-                             + "I enjoy developing web and macOS applications that "
-                             + "solve real-world problems.")
+                        Text("Extended by Ariorad Moniri (2026) — multi-format, smart styling, surface, thumbnails, Spotlight, auto-update.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 4)
 
                         Link("github.com/ArioMoniri/QuickLookProtein",
                              destination: URL(string: "https://github.com/ArioMoniri/QuickLookProtein")!)
                             .font(.callout)
-                            .padding(.top, 2)
 
                         if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
                             HStack(spacing: 8) {
-                                Text("Installed version: " + appVersion)
-                                Button("Check for updates") {
-                                    updater.checkForUpdates()
-                                }
-                                .controlSize(.small)
-                                .disabled(!updater.canCheck)
+                                Text("Installed version: \(appVersion)")
+                                    .font(.callout)
+                                Button("Check for updates") { updater.checkForUpdates() }
+                                    .controlSize(.small)
+                                    .disabled(!updater.canCheck)
                             }
-                            .padding(.top, 4)
-
-                            if !updater.lastCheckStatus.isEmpty {
-                                Text(updater.lastCheckStatus)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
+                            .padding(.top, 2)
                         }
 
-                        Text("Supported formats").font(.headline).padding(.top, 12)
-                        Text("PDB · CIF / mmCIF · SDF · MOL · MOL2 · XYZ · GRO · CUBE")
-                            .font(.callout)
+                        Text("Tip: click any atom in a preview to see its residue and chain.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 4)
 
-                        Text("Tip").font(.headline).padding(.top, 12)
-                        Text("Click any atom in a preview to see its identity (residue, chain, atom name).")
-                            .font(.callout)
-                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
 
-                        Text("Credits — 3Dmol.js").font(.title2).padding(.top, 12)
-                        Text("Rendering is performed by the 3Dmol.js library by Nicholas Rego and David Koes.")
-                            .fixedSize(horizontal: false, vertical: true)
-                        Link("https://3dmol.csb.pitt.edu",
+                        Text("Rendered by 3Dmol.js (Rego & Koes, 2015).")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Link("3dmol.csb.pitt.edu",
                              destination: URL(string: "https://3dmol.csb.pitt.edu")!)
+                            .font(.caption2)
                     }
                     .padding()
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
+                .fixedSize(horizontal: false, vertical: true)
+                // ↑ Pins the top settings/about row to its natural height so the
+                //   preview HStack below gets every leftover pixel.
 
                 Divider()
 
-                // MARK: Live previews
-                HStack {
+                // MARK: Live previews (rotate by default at the user's chosen rotation
+                // speed — same as the original app's vibe).
+                HStack(spacing: 8) {
                     previewTile(html: htmlPDB,  base: baseUrl,
                                 title: "PDB",
                                 caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
@@ -207,6 +181,9 @@ struct ContentView: View {
 
                     customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
                 }
+                .frame(maxHeight: .infinity)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
             }
         }
     }
