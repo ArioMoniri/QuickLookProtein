@@ -23,10 +23,15 @@ using System.Runtime.InteropServices.ComTypes;
 
 namespace QuickLookProtein.Thumbnail;
 
+// Public because the COM class below references these types in its
+// public method signatures. C# would otherwise complain about
+// "inconsistent accessibility". COM consumers don't see the C#
+// accessibility level anyway - it's a compile-time constraint only.
+
 [ComImport]
 [Guid("e357fccd-a995-4576-b01f-234630154e96")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IThumbnailProvider
+public interface IThumbnailProvider
 {
     void GetThumbnail(uint cx, out IntPtr hBitmap, out WTS_ALPHATYPE pdwAlpha);
 }
@@ -34,12 +39,12 @@ internal interface IThumbnailProvider
 [ComImport]
 [Guid("b824b49d-22ac-4161-ac8a-9916e8fa3f7f")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IInitializeWithStream
+public interface IInitializeWithStream
 {
     void Initialize(IStream stream, uint grfMode);
 }
 
-internal enum WTS_ALPHATYPE : uint
+public enum WTS_ALPHATYPE : uint
 {
     WTSAT_UNKNOWN = 0,
     WTSAT_RGB     = 1,
