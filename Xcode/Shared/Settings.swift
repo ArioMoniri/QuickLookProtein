@@ -136,6 +136,15 @@ class SettingsStorage: ObservableObject {
     // documented biological assembly.
     @Published var bioAssembly:     Bool { didSet { Self.preferencesStore.set(bioAssembly,     forKey: "bioAssembly") } }
 
+    // Cryo-EM density isosurface (1.7.32+). When ON, .ccp4/.mrc/.map
+    // files render as a volumetric isosurface (the user-set sigma
+    // level below) instead of failing to open. Default ON.
+    @Published var cryoEMRender:    Bool   { didSet { Self.preferencesStore.set(cryoEMRender, forKey: "cryoEMRender") } }
+    /// Isosurface level in units of the map's σ (one standard
+    /// deviation above the mean grid value). EMDB recommends σ ≈ 2.5
+    /// for typical maps; users can override.
+    @Published var cryoEMSigma:     Double { didSet { Self.preferencesStore.set(cryoEMSigma,  forKey: "cryoEMSigma") } }
+
     // MARK: - Multi-file Quick Look behaviour
     //
     // Persisted preference for what to do when the user spacebars
@@ -205,6 +214,8 @@ class SettingsStorage: ObservableObject {
         self.autoOrient       = store.object(forKey: "autoOrient")       as? Bool ?? false
         self.cubeIsosurface   = store.object(forKey: "cubeIsosurface")   as? Bool ?? false
         self.bioAssembly      = store.object(forKey: "bioAssembly")      as? Bool ?? true
+        self.cryoEMRender     = store.object(forKey: "cryoEMRender")     as? Bool ?? true
+        self.cryoEMSigma      = (store.object(forKey: "cryoEMSigma")     as? Double) ?? 2.5
 
         self.multiFilePreviewMode = Self.read(forKey: "multiFilePreviewMode", default: .separate)
 
@@ -416,6 +427,15 @@ struct Settings {
         case "vasp", "poscar": return "vasp"    // VASP / POSCAR
         case "cdjson", "json": return "cdjson"  // ChemDoodle JSON
         case "mmtf":           return "mmtf"    // RCSB compressed binary PDB
+        // Comp-chem outputs/inputs (1.7.30+) get pre-parsed to XYZ
+        // in SharedFunctions; the dispatch here is a sentinel so
+        // CanHandle returns true. The actual viewer-side format
+        // becomes "xyz" after the pre-parse.
+        case "gjf", "com":     return "xyz"
+        case "orcaout", "gauout", "qchemout": return "xyz"
+        // Cryo-EM density (1.7.32+) - rerouted to cube text in
+        // prepare3DmolHTML via convertCCP4ToCube.
+        case "ccp4", "mrc", "map": return "cube"
         default:               return nil
         }
     }

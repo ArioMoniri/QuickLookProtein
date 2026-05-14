@@ -51,6 +51,8 @@ struct ViewerOptions {
     var autoOrient:      Bool
     var cubeIsosurface:  Bool
     var bioAssembly:     Bool
+    var cryoEMRender:    Bool
+    var cryoEMSigma:     Double
 
     static func from(_ s: SettingsStorage, fileExtension ext: String, fileName: String) -> ViewerOptions {
         ViewerOptions(
@@ -86,9 +88,181 @@ struct ViewerOptions {
             outlineShading:  s.outlineShading,
             autoOrient:      s.autoOrient,
             cubeIsosurface:  s.cubeIsosurface,
-            bioAssembly:     s.bioAssembly
+            bioAssembly:     s.bioAssembly,
+            cryoEMRender:    s.cryoEMRender,
+            cryoEMSigma:     s.cryoEMSigma
         )
     }
+}
+
+// MARK: - Cryo-EM density maps (1.7.32+)
+//
+// CCP4 / MRC / MAP files are the standard cryo-EM density format.
+// All three are the same on-disk layout: a 1024-byte fixed-width
+// header (56 fields plus 800 bytes of label space), then a flat
+// array of voxel values in row-major order. The viewer side already
+// understands Gaussian Cube via 3Dmol's `VolumeData(text, "cube")`,
+// so we convert CCP4 -> Cube text in Swift and reuse that path.
+//
+// Reference: CCP4 map format spec
+//   https://www.ccp4.ac.uk/html/maplib.html#description
+
+/// Read big-/little-endian aware values out of the fixed-width
+/// header. CCP4's `MACHST` field (bytes 212-215) declares the byte
+/// order: 0x44 0x44 0x00 0x00 for little-endian, 0x11 0x11 0x00 0x00
+/// for big-endian. Almost every modern file is little-endian.
+private enum CCP4Endian { case little, big }
+
+private func ccp4Int32(_ data: Data, _ offset: Int, _ endian: CCP4Endian) -> Int32 {
+    let bytes = data.subdata(in: offset..<(offset + 4))
+    let v = bytes.withUnsafeBytes { $0.load(as: UInt32.self) }
+    switch endian {
+    case .little: return Int32(bitPattern: UInt32(littleEndian: v))
+    case .big:    return Int32(bitPattern: UInt32(bigEndian: v))
+    }
+}
+
+private func ccp4Float32(_ data: Data, _ offset: Int, _ endian: CCP4Endian) -> Float {
+    let bytes = data.subdata(in: offset..<(offset + 4))
+    let v = bytes.withUnsafeBytes { $0.load(as: UInt32.self) }
+    let bits: UInt32
+    switch endian {
+    case .little: bits = UInt32(littleEndian: v)
+    case .big:    bits = UInt32(bigEndian: v)
+    }
+    return Float(bitPattern: bits)
+}
+
+/// Convert a CCP4/MRC/MAP file to Gaussian Cube text. Returns nil if
+/// the header is malformed or the data array is shorter than the
+/// declared grid size. The caller hands the text to
+/// `new $3Dmol.VolumeData(text, "cube")`. Sampling: maps larger than
+/// ~5M voxels are downsampled by an integer stride so the cube-text
+/// payload stays under ~30 MB (3Dmol's text-mode parser would
+/// otherwise grind on huge maps).
+internal func convertCCP4ToCube(_ data: Data) -> String? {
+    guard data.count >= 1024 + 4 else { return nil }
+    // Detect endianness from MACHST.
+    let endian: CCP4Endian = {
+        let b212 = data[212]
+        return b212 == 0x44 ? .little : (b212 == 0x11 ? .big : .little)
+    }()
+
+    let nc = Int(ccp4Int32(data, 0,  endian))    // columns
+    let nr = Int(ccp4Int32(data, 4,  endian))    // rows
+    let ns = Int(ccp4Int32(data, 8,  endian))    // sections
+    let mode = Int(ccp4Int32(data, 12, endian))
+    let ncStart = Int(ccp4Int32(data, 16, endian))
+    let nrStart = Int(ccp4Int32(data, 20, endian))
+    let nsStart = Int(ccp4Int32(data, 24, endian))
+    let mx = Int(ccp4Int32(data, 28, endian))
+    let my = Int(ccp4Int32(data, 32, endian))
+    let mz = Int(ccp4Int32(data, 36, endian))
+    let cellA  = ccp4Float32(data, 40, endian)
+    let cellB  = ccp4Float32(data, 44, endian)
+    let cellC  = ccp4Float32(data, 48, endian)
+    let mapc = Int(ccp4Int32(data, 64, endian))  // 1=X, 2=Y, 3=Z
+    let mapr = Int(ccp4Int32(data, 68, endian))
+    let maps = Int(ccp4Int32(data, 72, endian))
+
+    if nc <= 0 || nr <= 0 || ns <= 0 { return nil }
+    if mode != 2 { return nil }                  // only float32 maps for now
+    if mx <= 0 || my <= 0 || mz <= 0 { return nil }
+
+    // Voxel spacing in Angstroms.
+    let dxA = cellA / Float(mx)
+    let dyA = cellB / Float(my)
+    let dzA = cellC / Float(mz)
+
+    // Read the flat float32 grid. Total bytes = 4 * nc * nr * ns.
+    let totalVoxels = nc * nr * ns
+    let payloadOffset = 1024 + Int(ccp4Int32(data, 92, endian)) * 80  // skip extended header (NSYMBT)
+    let needed = payloadOffset + 4 * totalVoxels
+    guard data.count >= needed else { return nil }
+    var values = [Float](repeating: 0, count: totalVoxels)
+    values.withUnsafeMutableBufferPointer { buf in
+        data.copyBytes(to: UnsafeMutableRawBufferPointer(buf),
+                       from: payloadOffset..<needed)
+    }
+    if endian == .big {
+        for i in 0..<totalVoxels {
+            values[i] = Float(bitPattern: UInt32(bigEndian: values[i].bitPattern))
+        }
+    }
+
+    // Decide whether to downsample so the resulting Cube text stays
+    // manageable. We aim for <= 4M voxels in the output.
+    let maxVoxels = 4_000_000
+    var stride = 1
+    while (nc / stride) * (nr / stride) * (ns / stride) > maxVoxels {
+        stride += 1
+    }
+    let outNc = nc / stride
+    let outNr = nr / stride
+    let outNs = ns / stride
+    let outDx = dxA * Float(stride)
+    let outDy = dyA * Float(stride)
+    let outDz = dzA * Float(stride)
+
+    // Cube format axis ordering: outer loop X, middle Y, inner Z.
+    // CCP4 stores in (col, row, section) order with mapc/mapr/maps
+    // telling us which logical axis each corresponds to. For
+    // simplicity we assume the common case mapc=1, mapr=2, maps=3
+    // (column = X, row = Y, section = Z), and warn otherwise.
+    let standardAxisOrder = (mapc == 1 && mapr == 2 && maps == 3)
+
+    // Origin in Angstroms; in Cube's Bohr unit we'll divide by
+    // 0.529177 when emitting.
+    let originXA = Float(ncStart) * dxA
+    let originYA = Float(nrStart) * dyA
+    let originZA = Float(nsStart) * dzA
+    let bohr: Float = 0.529177
+
+    // Sample a value with optional remapping if the axis order is
+    // non-standard. Conservative fallback: bail and use standard
+    // order anyway - the preview will be 90-degree rotated but at
+    // least it'll render.
+    @inline(__always) func sample(_ x: Int, _ y: Int, _ z: Int) -> Float {
+        if standardAxisOrder {
+            return values[z * (nr * nc) + y * nc + x]
+        }
+        // Generic axis remap. mapc/mapr/maps map column/row/section
+        // -> (x, y, z) axes; we want sampling by (x, y, z).
+        var idxC = 0, idxR = 0, idxS = 0
+        let coords = [x, y, z]
+        switch mapc { case 1: idxC = coords[0]; case 2: idxC = coords[1]; case 3: idxC = coords[2]; default: idxC = coords[0] }
+        switch mapr { case 1: idxR = coords[0]; case 2: idxR = coords[1]; case 3: idxR = coords[2]; default: idxR = coords[1] }
+        switch maps { case 1: idxS = coords[0]; case 2: idxS = coords[1]; case 3: idxS = coords[2]; default: idxS = coords[2] }
+        return values[idxS * (nr * nc) + idxR * nc + idxC]
+    }
+
+    var out = ""
+    out += "CCP4 density map (converted by QuickLookProtein 1.7.32+)\n"
+    out += "auto-generated cube\n"
+    // -1 atoms => signals "no atoms, just volumetric data" with
+    // origin in Bohr. 3Dmol's parser handles this case.
+    out += String(format: "%5d %12.6f %12.6f %12.6f\n",
+                  -1, originXA / bohr, originYA / bohr, originZA / bohr)
+    out += String(format: "%5d %12.6f %12.6f %12.6f\n", outNc, outDx / bohr, 0.0, 0.0)
+    out += String(format: "%5d %12.6f %12.6f %12.6f\n", outNr, 0.0, outDy / bohr, 0.0)
+    out += String(format: "%5d %12.6f %12.6f %12.6f\n", outNs, 0.0, 0.0, outDz / bohr)
+    out += String(format: "%5d %5d %12.6f %12.6f %12.6f %12.6f\n", 1, 1, 0.0, 0.0, 0.0, 0.0)
+
+    var col = 0
+    var lineBuf = ""
+    for ix in 0..<outNc {
+        for iy in 0..<outNr {
+            for iz in 0..<outNs {
+                let v = sample(ix * stride, iy * stride, iz * stride)
+                lineBuf += String(format: "%13.5e", v)
+                col += 1
+                if col == 6 { lineBuf += "\n"; out += lineBuf; lineBuf = ""; col = 0 }
+            }
+            if col != 0 { lineBuf += "\n"; out += lineBuf; lineBuf = ""; col = 0 }
+        }
+    }
+    if !lineBuf.isEmpty { out += lineBuf + "\n" }
+    return out
 }
 
 // MARK: - Biological assembly expansion (1.7.31+)
@@ -651,12 +825,27 @@ func prepare3DmolHTML(htmlPath: String,
     // Try common text encodings explicitly — `String(contentsOfFile:)` without an
     // encoding hint will reject any file that isn't valid UTF-8, which routinely fails
     // for CIFs containing Latin-1 author names or older PDB files written on Windows.
+    // Cryo-EM density (.ccp4 / .mrc / .map) is binary and goes
+    // through a Swift-side parser that converts it to a Cube-format
+    // text payload, then through the same {CUBE_ISOSURFACE} viewer
+    // path. Detect by extension here so we never try to read the
+    // binary as text (would crash readMolecularTextFile or produce
+    // garbled output).
+    let lowerExt = pdbPath.lowercased().components(separatedBy: ".").last ?? ""
+    let isCryoEM = (lowerExt == "ccp4" || lowerExt == "mrc" || lowerExt == "map")
+                   && options.cryoEMRender
+
     let rawOriginal: String
-    do {
-        rawOriginal = try readMolecularTextFile(pdbPath)
-    } catch {
-        return errorHTML(title: "Could not read file",
-                         detail: error.localizedDescription)
+    if isCryoEM, let binary = try? Data(contentsOf: URL(fileURLWithPath: pdbPath)),
+       let cube = convertCCP4ToCube(binary) {
+        rawOriginal = cube
+    } else {
+        do {
+            rawOriginal = try readMolecularTextFile(pdbPath)
+        } catch {
+            return errorHTML(title: "Could not read file",
+                             detail: error.localizedDescription)
+        }
     }
 
     // Pre-pass pipeline:
@@ -669,14 +858,24 @@ func prepare3DmolHTML(htmlPath: String,
     //      coordinate block, rewrites as XYZ.
     // If neither pre-pass matches the file is passed through
     // unchanged.
-    let ext = pdbPath.lowercased().components(separatedBy: ".").last ?? ""
+    let ext = lowerExt
     var working = rawOriginal
     var workingFormat = dataFormat
-    if options.bioAssembly, let expanded = expandBiologicalAssembly(working, extension: ext) {
+    if isCryoEM {
+        // The Data we converted above is Cube-formatted text, even
+        // though the original file had a .ccp4 / .mrc / .map suffix.
+        // 3Dmol's cube parser produces a model with -1 atoms (just
+        // volumetric data), and the existing {CUBE_ISOSURFACE} JS
+        // path picks it up from there. We override {CUBE_ISOSURFACE}
+        // at substitution time below so the user's preference is
+        // ignored - rendering a CCP4 without isosurface would just
+        // produce an empty viewport.
+        workingFormat = "cube"
+    } else if options.bioAssembly, let expanded = expandBiologicalAssembly(working, extension: ext) {
         working = expanded
         workingFormat = "pdb"   // multi-MODEL PDB regardless of source
     }
-    if let conv = parseComputationalChem(working, extension: ext) {
+    if !isCryoEM, let conv = parseComputationalChem(working, extension: ext) {
         working = conv.xyz
         workingFormat = "xyz"
     }
@@ -723,7 +922,11 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{CTL_SHOW_RECENTER}", with: options.ctlShowRecenter ? "true" : "false")
     html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",   with: options.outlineShading  ? "true" : "false")
     html = html.replacingOccurrences(of: "{AUTO_ORIENT}",       with: options.autoOrient      ? "true" : "false")
-    html = html.replacingOccurrences(of: "{CUBE_ISOSURFACE}",   with: options.cubeIsosurface  ? "true" : "false")
+    // Force cube isosurface ON when the source was a cryo-EM map
+    // (otherwise we'd render the cube as zero atoms = empty preview).
+    html = html.replacingOccurrences(of: "{CUBE_ISOSURFACE}",   with: (options.cubeIsosurface || isCryoEM)  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CRYO_EM_SIGMA}",     with: String(format: "%.2f", options.cryoEMSigma))
+    html = html.replacingOccurrences(of: "{IS_CRYO_EM}",        with: isCryoEM ? "true" : "false")
     html = html.replacingOccurrences(of: "{BIO_ASSEMBLY}",      with: options.bioAssembly     ? "true" : "false")
     // PDB TITLE record contents, if any. Always passed but only shown
     // when {INFO_PDB_TITLE} is true. Safe-escape so weird titles can't
@@ -903,6 +1106,8 @@ func prepare3DmolHTMLMulti(htmlPath: String,
     html = html.replacingOccurrences(of: "{AUTO_ORIENT}",            with: options.autoOrient      ? "true" : "false")
     html = html.replacingOccurrences(of: "{CUBE_ISOSURFACE}",        with: options.cubeIsosurface  ? "true" : "false")
     html = html.replacingOccurrences(of: "{BIO_ASSEMBLY}",           with: options.bioAssembly     ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CRYO_EM_SIGMA}",          with: String(format: "%.2f", options.cryoEMSigma))
+    html = html.replacingOccurrences(of: "{IS_CRYO_EM}",             with: "false")
     let pdbTitle = extractPDBTitle(from: primary.data) ?? ""
     html = html.replacingOccurrences(of: "{PDB_TITLE}", with: escapeForJSStringLiteral(pdbTitle))
     html = html.replacingOccurrences(of: "{ZOOM_FACTOR}",       with: String(options.defaultZoom.factor))

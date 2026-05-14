@@ -333,6 +333,86 @@
 				</array>
 			</dict>
 		</dict>
+		<!-- Gaussian/ORCA/QChem input + output (1.7.30+) -->
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.gjf</string>
+			<key>UTTypeDescription</key>
+			<string>Gaussian Input</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.plain-text</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key>
+				<array><string>gjf</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.com</string>
+			<key>UTTypeDescription</key>
+			<string>Gaussian/ORCA Input</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.plain-text</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key>
+				<array><string>com</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.compchemlog</string>
+			<key>UTTypeDescription</key>
+			<string>Computational chemistry log</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.plain-text</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key>
+				<array>
+					<!-- We don't claim .log generically (too many other tools
+					     use .log); only .out files from compchem packages. -->
+					<string>orcaout</string>
+					<string>gauout</string>
+					<string>qchemout</string>
+				</array>
+			</dict>
+		</dict>
+		<!-- Cryo-EM density volumes (1.7.32+) -->
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.ccp4</string>
+			<key>UTTypeDescription</key>
+			<string>CCP4 Density Map</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key>
+				<array><string>ccp4</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.mrc</string>
+			<key>UTTypeDescription</key>
+			<string>MRC Density Map</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key>
+				<array><string>mrc</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.map</string>
+			<key>UTTypeDescription</key>
+			<string>CCP4 / MRC Density Map</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key>
+				<array><string>map</string></array>
+			</dict>
+		</dict>
 	</array>
 </dict>
 </plist>

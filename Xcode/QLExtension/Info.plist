@@ -59,6 +59,14 @@
 				<string>com.ariomoniri.QuickLookProtein.vasp</string>
 				<string>com.ariomoniri.QuickLookProtein.cdjson</string>
 				<string>com.ariomoniri.QuickLookProtein.mmtf</string>
+				<!-- Gaussian/ORCA/QChem output text (1.7.30+) -->
+				<string>com.ariomoniri.QuickLookProtein.gjf</string>
+				<string>com.ariomoniri.QuickLookProtein.com</string>
+				<string>com.ariomoniri.QuickLookProtein.compchemlog</string>
+				<!-- Cryo-EM density volumes (1.7.32+) -->
+				<string>com.ariomoniri.QuickLookProtein.ccp4</string>
+				<string>com.ariomoniri.QuickLookProtein.mrc</string>
+				<string>com.ariomoniri.QuickLookProtein.map</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

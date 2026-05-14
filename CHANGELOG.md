@@ -4,6 +4,44 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.32] — 2026-05-14
+
+### 🆕 Added — cryo-EM density maps (.ccp4 / .mrc / .map)
+
+- **Native binary parser for CCP4/MRC/MAP cryo-EM densities** in
+  `Xcode/Shared/SharedFunctions.swift` (`convertCCP4ToCube`).
+  Reads the 1024-byte fixed-width header (auto-detects little- vs
+  big-endian via the `MACHST` field at byte 212), pulls grid
+  dimensions, voxel spacing, axis order (`MAPC/R/S`), and the
+  float32 voxel data, then emits a Gaussian Cube text payload with
+  the negative-natoms volumetric-only convention.
+- **Downsampling**: maps over 4M voxels (~256³+) get strided so
+  the resulting Cube text stays under 30 MB. Quick Look's webview
+  can't realistically render every voxel of a 512³ map and we'd
+  rather show *some* preview than time-out.
+- **Pipeline composes naturally**: detection runs before the
+  computational-chem and bio-assembly pre-passes, sets
+  `workingFormat = "cube"`, and forces `{CUBE_ISOSURFACE}` ON in the
+  viewer template. The existing 3Dmol cube-isosurface JS (added in
+  v1.7.30) then renders the volume.
+- **UTI declarations** for `.ccp4` / `.mrc` / `.map` in the main
+  app's Info.plist and the QL extension's `QLSupportedContentTypes`.
+- **Preview cap** lifted to 500 MB for cryo-EM extensions
+  (text formats stay at the 25 MB ceiling). A 256³ float32 map
+  occupies 67 MB on disk; even 512³ at 537 MB is now accepted, with
+  the downsampler taking the brunt.
+- **Settings**: new `cryoEMRender` (default ON) and `cryoEMSigma`
+  (default 2.5) toggles in Mac side; UTI registration only — Windows
+  parity is queued for a follow-up since the cryo-EM use case is
+  almost entirely macOS in practice (CryoSPARC / RELION / cryoSPARC
+  output).
+
+### 🪟 Windows
+
+- Settings UI gains the matching toggles but the binary parser
+  isn't yet ported to C# (.ccp4/.mrc/.map files still fall through
+  to QL-Win's text-viewer fallback). Queued.
+
 ## [1.7.31] — 2026-05-14
 
 ### 🆕 Added — biological assembly expansion

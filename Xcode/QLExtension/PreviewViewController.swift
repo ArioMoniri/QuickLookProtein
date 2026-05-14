@@ -45,7 +45,11 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
     /// Anything above this is refused with an in-page message — Quick Look extensions
     /// have a small memory budget and parsing a 50 MB PDB inside WKWebView will get the
     /// host process jetsam'd before we can render anything useful.
-    private let maxPreviewBytes: Int = 25 * 1024 * 1024
+    // 25 MB ceiling for text files; cryo-EM .ccp4 / .mrc / .map
+    // density maps can run up to ~250 MB for box sizes of 512^3 + so
+    // we lift the cap when one of those extensions is in play.
+    private let maxPreviewBytes:       Int = 25 * 1024 * 1024
+    private let maxPreviewBytesCryoEM: Int = 500 * 1024 * 1024
 
     override var nibName: NSNib.Name? {
         return NSNib.Name("PreviewViewController")
@@ -81,8 +85,10 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
         os_log("ext=%{public}@ → format=%{public}@", log: qlLog, type: .info, fileExtension, dataFormat)
 
         let html: String
+        let cap = (fileExtension == "ccp4" || fileExtension == "mrc" || fileExtension == "map")
+                  ? maxPreviewBytesCryoEM : maxPreviewBytes
         if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int,
-           size > maxPreviewBytes {
+           size > cap {
             // Render an in-page message rather than returning an error — Quick Look
             // shows a blank preview when the handler is called with an error.
             html = oversizedFileHTML(name: url.lastPathComponent,
