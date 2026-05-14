@@ -185,6 +185,10 @@ public static class SettingsStore
     public static bool GetCubeIsosurface() => ReadBool("CubeIsosurface", false);
     public static void SetCubeIsosurface(bool v) => WriteBool("CubeIsosurface", v);
 
+    // Biological assembly expansion (1.7.31+). Default ON.
+    public static bool GetBioAssembly() => ReadBool("BioAssembly", true);
+    public static void SetBioAssembly(bool v) => WriteBool("BioAssembly", v);
+
     public static void SetInfoShowFileName(bool v)         => WriteBool("InfoShowFileName",         v);
     public static void SetInfoShowAtomCount(bool v)        => WriteBool("InfoShowAtomCount",        v);
     public static void SetInfoShowChainCount(bool v)       => WriteBool("InfoShowChainCount",       v);

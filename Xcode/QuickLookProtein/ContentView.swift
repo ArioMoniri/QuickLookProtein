@@ -139,6 +139,8 @@ struct ContentView: View {
                                 .help("Rotate the molecule so its longest principal axis is horizontal. Useful for screenshots; gives every preview a deterministic canonical pose.")
                             Toggle("Cube isosurface",                 isOn: $userSettings.cubeIsosurface)
                                 .help("Render Gaussian Cube files as ±isovalue isosurfaces (blue/red) instead of bare atoms. Useful for orbital / electron-density plots.")
+                            Toggle("Biological assembly",             isOn: $userSettings.bioAssembly)
+                                .help("Expand PDB / CIF files into their full biological assembly using REMARK 350 (PDB) or _pdbx_struct_oper_list (CIF) transformations. Off: show only the asymmetric unit.")
                         }
 
                         // Per-button toolbar visibility - gated on the master

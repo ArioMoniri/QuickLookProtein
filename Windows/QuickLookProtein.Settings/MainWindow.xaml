@@ -319,6 +319,10 @@
                                       Content="Cube isosurface"
                                       ToolTip="Render Gaussian Cube files as +/- isovalue isosurfaces (blue/red) instead of bare atoms. Useful for orbital / electron-density plots."
                                       Margin="0,4"/>
+                            <CheckBox x:Name="BioAssemblyCheck"
+                                      Content="Biological assembly"
+                                      ToolTip="Expand PDB / CIF files into their full biological assembly using REMARK 350 (PDB) or _pdbx_struct_oper_list (CIF) transformations. Off: show only the asymmetric unit."
+                                      Margin="0,4"/>
                         </StackPanel>
                     </Border>
 

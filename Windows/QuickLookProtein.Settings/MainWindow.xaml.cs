@@ -99,6 +99,7 @@ public partial class MainWindow : Window
         OutlineShadingCheck.IsChecked         = SettingsStore.GetOutlineShading();
         AutoOrientCheck.IsChecked             = SettingsStore.GetAutoOrient();
         CubeIsosurfaceCheck.IsChecked         = SettingsStore.GetCubeIsosurface();
+        BioAssemblyCheck.IsChecked            = SettingsStore.GetBioAssembly();
         CtlShowStickCheck.IsChecked    = SettingsStore.GetCtlShowStick();
         CtlShowLineCheck.IsChecked     = SettingsStore.GetCtlShowLine();
         CtlShowSphereCheck.IsChecked   = SettingsStore.GetCtlShowSphere();
@@ -149,6 +150,7 @@ public partial class MainWindow : Window
         OutlineShadingCheck.Click         += (_, _) => Save(() => SettingsStore.SetOutlineShading(OutlineShadingCheck.IsChecked == true));
         AutoOrientCheck.Click             += (_, _) => Save(() => SettingsStore.SetAutoOrient(AutoOrientCheck.IsChecked == true));
         CubeIsosurfaceCheck.Click         += (_, _) => Save(() => SettingsStore.SetCubeIsosurface(CubeIsosurfaceCheck.IsChecked == true));
+        BioAssemblyCheck.Click            += (_, _) => Save(() => SettingsStore.SetBioAssembly(BioAssemblyCheck.IsChecked == true));
         CtlShowStickCheck.Click    += (_, _) => Save(() => SettingsStore.SetCtlShowStick(CtlShowStickCheck.IsChecked == true));
         CtlShowLineCheck.Click     += (_, _) => Save(() => SettingsStore.SetCtlShowLine(CtlShowLineCheck.IsChecked == true));
         CtlShowSphereCheck.Click   += (_, _) => Save(() => SettingsStore.SetCtlShowSphere(CtlShowSphereCheck.IsChecked == true));
@@ -512,6 +514,7 @@ public partial class MainWindow : Window
             .Replace("{OUTLINE_SHADING}",        QuickLookProtein.Shared.SettingsStore.GetOutlineShading()  ? "true" : "false")
             .Replace("{AUTO_ORIENT}",            QuickLookProtein.Shared.SettingsStore.GetAutoOrient()      ? "true" : "false")
             .Replace("{CUBE_ISOSURFACE}",        QuickLookProtein.Shared.SettingsStore.GetCubeIsosurface()  ? "true" : "false")
+            .Replace("{BIO_ASSEMBLY}",           QuickLookProtein.Shared.SettingsStore.GetBioAssembly()     ? "true" : "false")
             .Replace("{PDB_TITLE}",              "")
             .Replace("{EXTRA_MODELS_JSON}",      "[]")
             .Replace("{EXTRA_MODELS_HTML}",      "")

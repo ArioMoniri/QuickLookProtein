@@ -128,6 +128,14 @@ class SettingsStorage: ObservableObject {
     // dense. Default OFF.
     @Published var cubeIsosurface:  Bool { didSet { Self.preferencesStore.set(cubeIsosurface,  forKey: "cubeIsosurface") } }
 
+    // Biological assembly (1.7.31+): expand PDB / CIF asymmetric
+    // units into their biological assembly using REMARK 350 (PDB)
+    // or _pdbx_struct_assembly_gen / _pdbx_struct_oper_list (CIF)
+    // transformation records. Default ON - matches what RCSB and
+    // most molecular viewers show by default for entries with a
+    // documented biological assembly.
+    @Published var bioAssembly:     Bool { didSet { Self.preferencesStore.set(bioAssembly,     forKey: "bioAssembly") } }
+
     // MARK: - Multi-file Quick Look behaviour
     //
     // Persisted preference for what to do when the user spacebars
@@ -196,6 +204,7 @@ class SettingsStorage: ObservableObject {
         self.outlineShading   = store.object(forKey: "outlineShading")   as? Bool ?? false
         self.autoOrient       = store.object(forKey: "autoOrient")       as? Bool ?? false
         self.cubeIsosurface   = store.object(forKey: "cubeIsosurface")   as? Bool ?? false
+        self.bioAssembly      = store.object(forKey: "bioAssembly")      as? Bool ?? true
 
         self.multiFilePreviewMode = Self.read(forKey: "multiFilePreviewMode", default: .separate)
 

@@ -4,6 +4,54 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.31] — 2026-05-14
+
+### 🆕 Added — biological assembly expansion
+
+PDB and mmCIF entries deposit the *asymmetric unit*, but the
+biological-assembly (the actual functional molecule — tetramer of
+hemoglobin, symmetric dimer of a coiled-coil, etc.) is built by
+applying symmetry-operator transformations declared in
+`REMARK 350 BIOMT*` (PDB) or `_pdbx_struct_oper_list` (mmCIF).
+Most molecular viewers default to showing the assembly. We didn't
+— previews only ever showed the asymmetric unit.
+
+- **New `bioAssembly` setting** (default ON, Mac + Win). When on,
+  `prepare3DmolHTML` runs a Swift pre-pass that:
+  1. Parses every `REMARK 350 BIOMTn N  m11 m12 m13  t` row into a
+     3×4 rotation+translation matrix.
+  2. For CIF: walks the `_pdbx_struct_oper_list` loop, extracts
+     `matrix[i][j]` + `vector[i]` columns by name.
+  3. Reads every `ATOM` / `HETATM` (or `_atom_site` row),
+     transforms `(x, y, z)` by each operator, and emits a
+     multi-MODEL PDB.
+  4. 3Dmol parses that as separate models stacked in one scene.
+- **Skips no-op cases**: files with only the identity operator
+  pass through unchanged. Files without assembly records pass
+  through unchanged.
+- **CIF → PDB-shaped conversion** in
+  [SharedFunctions.swift:cifAtomsAsPdb](Xcode/Shared/SharedFunctions.swift)
+  is lossy (drops alt-conf, anisou, the auth_* vs label_* distinction
+  collapses to auth_*) but coords / chain / residue identity
+  round-trip cleanly, which is all the assembly expansion needs.
+- The pre-pass runs *before* the computational-chem parser so the
+  pipeline composes: bio-assembly first, then comp-chem
+  (mutually exclusive — comp-chem outputs don't have BIOMT
+  records).
+
+### 🪟 Windows
+
+- `SettingsStore.cs` mirrors `BioAssembly` (default ON) under the
+  same registry hive.
+- `MoleculePanel.FillTemplate` forwards the placeholder. Note: the
+  Swift-side assembly expander runs in the Mac QL extension; the
+  Windows plugin currently passes the placeholder through to the
+  template but doesn't yet replicate the expansion in C# — for now
+  Windows users on PDB/CIF still see the asymmetric unit. C# port
+  of the expander is queued for a follow-up release.
+- Settings WPF gains a "Biological assembly" checkbox in
+  *Rendering options*.
+
 ## [1.7.30] — 2026-05-14
 
 ### 🆕 Added — auto-orient + cube isosurface + comp-chem parsers

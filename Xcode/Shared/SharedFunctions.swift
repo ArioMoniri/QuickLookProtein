@@ -50,6 +50,7 @@ struct ViewerOptions {
     var outlineShading:  Bool
     var autoOrient:      Bool
     var cubeIsosurface:  Bool
+    var bioAssembly:     Bool
 
     static func from(_ s: SettingsStorage, fileExtension ext: String, fileName: String) -> ViewerOptions {
         ViewerOptions(
@@ -84,12 +85,319 @@ struct ViewerOptions {
             ctlShowRecenter: s.ctlShowRecenter,
             outlineShading:  s.outlineShading,
             autoOrient:      s.autoOrient,
-            cubeIsosurface:  s.cubeIsosurface
+            cubeIsosurface:  s.cubeIsosurface,
+            bioAssembly:     s.bioAssembly
         )
     }
 }
 
-// MARK: - Computational-chemistry output parsers (1.7.30+)
+// MARK: - Biological assembly expansion (1.7.31+)
+//
+// PDB and mmCIF entries deposit the asymmetric unit; the biological
+// assembly is reconstructed from rotation+translation operators
+// declared via REMARK 350 BIOMT records (PDB) or
+// _pdbx_struct_assembly_gen / _pdbx_struct_oper_list loops (mmCIF).
+// Most molecular viewers default to showing assembly 1 because
+// that's what "the actual functional molecule" usually is - a tetramer
+// of hemoglobin, the symmetric dimer of a coiled-coil, etc.
+//
+// We do the expansion in Swift before handing data to 3Dmol because
+// 3Dmol's PDB parser doesn't apply REMARK 350 automatically.
+// Strategy:
+//   1. Parse all BIOMT/oper rows into [Float; 12] 3×4 matrices.
+//   2. Read the original ATOM/HETATM block.
+//   3. For each operator, transform every atom and emit a new
+//      MODEL section. The viewer then sees the multi-MODEL PDB
+//      and renders all copies stacked in one scene.
+//
+// Files without assembly records pass through unchanged.
+
+/// 3×4 transformation matrix (R | t). Stored row-major so the
+/// rotation rows match the file format exactly.
+private struct AssemblyOperator {
+    let r00, r01, r02, t0: Double
+    let r10, r11, r12, t1: Double
+    let r20, r21, r22, t2: Double
+    /// Identity operator. Identity is the trivial case - the
+    /// asymmetric unit itself.
+    static let identity = AssemblyOperator(
+        r00: 1, r01: 0, r02: 0, t0: 0,
+        r10: 0, r11: 1, r12: 0, t1: 0,
+        r20: 0, r21: 0, r22: 1, t2: 0)
+}
+
+/// Top-level entry point. Returns the expanded PDB text (or nil if
+/// no assembly was found, in which case the caller uses the
+/// original file unchanged).
+internal func expandBiologicalAssembly(_ raw: String, extension ext: String) -> String? {
+    if ext == "pdb" || ext == "ent" {
+        return expandAssemblyPDB(raw)
+    }
+    if ext == "cif" || ext == "mmcif" {
+        return expandAssemblyCIF(raw)
+    }
+    return nil
+}
+
+/// PDB path: parse REMARK 350 BIOMT records into AssemblyOperator
+/// matrices, then apply them to every ATOM/HETATM in the file.
+/// REMARK 350 layout:
+///   REMARK 350 BIOMT1 1  1.000000  0.000000  0.000000        0.00000
+///   REMARK 350 BIOMT2 1  0.000000  1.000000  0.000000        0.00000
+///   REMARK 350 BIOMT3 1  0.000000  0.000000  1.000000        0.00000
+/// The serial number after BIOMTn groups the three rows of one matrix.
+private func expandAssemblyPDB(_ raw: String) -> String? {
+    var operators: [Int: (row1: [Double]?, row2: [Double]?, row3: [Double]?)] = [:]
+    let lines = raw.split(separator: "\n", omittingEmptySubsequences: false)
+    for line in lines {
+        guard line.hasPrefix("REMARK 350 BIOMT") else { continue }
+        guard line.count >= 53 else { continue }
+        let chars = Array(line)
+        // BIOMTn  serial  m11 m12 m13 t
+        let nIdx = chars[16].wholeNumberValue
+        let serialStr = String(chars[17..<24]).trimmingCharacters(in: .whitespaces)
+        let serial = Int(serialStr) ?? -1
+        let m1 = Double(String(chars[24..<34]).trimmingCharacters(in: .whitespaces))
+        let m2 = Double(String(chars[34..<44]).trimmingCharacters(in: .whitespaces))
+        let m3 = Double(String(chars[44..<54]).trimmingCharacters(in: .whitespaces))
+        let endIdx = min(chars.count, 68)
+        let t  = Double(String(chars[54..<endIdx]).trimmingCharacters(in: .whitespaces))
+        guard let nI = nIdx, serial >= 0, let mm1 = m1, let mm2 = m2, let mm3 = m3, let tt = t else { continue }
+        let row = [mm1, mm2, mm3, tt]
+        let cur = operators[serial] ?? (nil, nil, nil)
+        switch nI {
+        case 1: operators[serial] = (row, cur.row2, cur.row3)
+        case 2: operators[serial] = (cur.row1, row, cur.row3)
+        case 3: operators[serial] = (cur.row1, cur.row2, row)
+        default: break
+        }
+    }
+    // Build a list of fully-specified operators in serial order.
+    var ops: [AssemblyOperator] = []
+    for serial in operators.keys.sorted() {
+        guard let group = operators[serial],
+              let r1 = group.row1, let r2 = group.row2, let r3 = group.row3 else { continue }
+        ops.append(AssemblyOperator(
+            r00: r1[0], r01: r1[1], r02: r1[2], t0: r1[3],
+            r10: r2[0], r11: r2[1], r12: r2[2], t1: r2[3],
+            r20: r3[0], r21: r3[1], r22: r3[2], t2: r3[3]))
+    }
+    // Skip if there's only the identity operator - rebuild is a no-op.
+    if ops.count <= 1 {
+        if ops.isEmpty { return nil }
+        if isIdentity(ops[0]) { return nil }
+    }
+    return rewritePDBWithOperators(raw, operators: ops)
+}
+
+private func isIdentity(_ op: AssemblyOperator) -> Bool {
+    return abs(op.r00 - 1) < 1e-6 && abs(op.r01) < 1e-6 && abs(op.r02) < 1e-6 && abs(op.t0) < 1e-6 &&
+           abs(op.r10) < 1e-6 && abs(op.r11 - 1) < 1e-6 && abs(op.r12) < 1e-6 && abs(op.t1) < 1e-6 &&
+           abs(op.r20) < 1e-6 && abs(op.r21) < 1e-6 && abs(op.r22 - 1) < 1e-6 && abs(op.t2) < 1e-6
+}
+
+private func rewritePDBWithOperators(_ raw: String, operators: [AssemblyOperator]) -> String {
+    // Find header lines (everything before the first ATOM/HETATM)
+    // and trailer (CONECT/MASTER/END after the last ATOM). We keep
+    // headers once and stitch each operator's transformed atoms
+    // inside a MODEL/ENDMDL pair so 3Dmol parses them as separate
+    // models stacked in one scene.
+    let lines = raw.split(separator: "\n", omittingEmptySubsequences: false)
+    var headerLines: [Substring] = []
+    var atomLines:   [Substring] = []
+    var trailerLines: [Substring] = []
+    var seenAtom = false
+    var lastAtomIdx = -1
+    for (idx, line) in lines.enumerated() {
+        if line.hasPrefix("ATOM") || line.hasPrefix("HETATM") {
+            seenAtom = true
+            atomLines.append(line)
+            lastAtomIdx = idx
+        } else if !seenAtom {
+            headerLines.append(line)
+        }
+    }
+    if lastAtomIdx >= 0 && lastAtomIdx + 1 < lines.count {
+        trailerLines = Array(lines[(lastAtomIdx + 1)...])
+    }
+    var output = headerLines.joined(separator: "\n")
+    if !output.isEmpty { output += "\n" }
+    for (i, op) in operators.enumerated() {
+        output += String(format: "MODEL     %4d\n", i + 1)
+        for atom in atomLines {
+            output += transformedPDBAtomLine(atom, op: op) + "\n"
+        }
+        output += "ENDMDL\n"
+    }
+    if !trailerLines.isEmpty {
+        output += trailerLines.joined(separator: "\n")
+    }
+    return output
+}
+
+/// Apply the rotation+translation to the x/y/z columns of a single
+/// ATOM/HETATM record while preserving every other column.
+private func transformedPDBAtomLine(_ line: Substring, op: AssemblyOperator) -> String {
+    let chars = Array(line)
+    if chars.count < 54 { return String(line) }
+    func col(_ start: Int, _ end: Int) -> Double {
+        let endClamped = min(end, chars.count)
+        if start >= endClamped { return 0 }
+        return Double(String(chars[start..<endClamped]).trimmingCharacters(in: .whitespaces)) ?? 0
+    }
+    let x = col(30, 38)
+    let y = col(38, 46)
+    let z = col(46, 54)
+    let nx = op.r00 * x + op.r01 * y + op.r02 * z + op.t0
+    let ny = op.r10 * x + op.r11 * y + op.r12 * z + op.t1
+    let nz = op.r20 * x + op.r21 * y + op.r22 * z + op.t2
+    // Splice the new coords back into the original line at fixed
+    // columns 30-54. Preserves columns 55+ (occupancy / B / element).
+    let prefix = String(chars[0..<30])
+    let xs = String(format: "%8.3f", nx)
+    let ys = String(format: "%8.3f", ny)
+    let zs = String(format: "%8.3f", nz)
+    let suffix = chars.count > 54 ? String(chars[54...]) : ""
+    return prefix + xs + ys + zs + suffix
+}
+
+/// CIF path: walk the `_pdbx_struct_oper_list` loop, build the
+/// operator dictionary, then apply each to the atom_site block.
+/// We emit a synthetic multi-MODEL PDB so 3Dmol's PDB parser can
+/// load it - we do NOT try to round-trip back into CIF.
+private func expandAssemblyCIF(_ raw: String) -> String? {
+    // Parse oper list.
+    guard let ops = parseCifOperList(raw), !ops.isEmpty else { return nil }
+    if ops.count == 1 && isIdentity(ops[0]) { return nil }
+    // Parse atom_site rows into a list of PDB-shaped ATOM lines so
+    // we can reuse rewritePDBWithOperators.
+    guard let pdbLike = cifAtomsAsPdb(raw) else { return nil }
+    return rewritePDBWithOperators(pdbLike, operators: ops)
+}
+
+private func parseCifOperList(_ raw: String) -> [AssemblyOperator]? {
+    // Locate the loop_ that contains _pdbx_struct_oper_list.matrix[1][1].
+    guard let loopStart = raw.range(of: "_pdbx_struct_oper_list.") else { return nil }
+    // Walk back to the preceding loop_ marker.
+    let preamble = raw[..<loopStart.lowerBound]
+    guard let loopHeader = preamble.range(of: "loop_", options: .backwards) else { return nil }
+    let lines = raw[loopHeader.upperBound...].split(separator: "\n", maxSplits: 8192, omittingEmptySubsequences: false)
+    var columnNames: [String] = []
+    var dataRows: [[String]] = []
+    var inHeader = true
+    for line in lines {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty || t.hasPrefix("#") { continue }
+        if inHeader && t.hasPrefix("_pdbx_struct_oper_list.") {
+            columnNames.append(t)
+            continue
+        }
+        if t.hasPrefix("_") || t.hasPrefix("loop_") || t.hasPrefix("data_") {
+            if inHeader { continue }
+            break
+        }
+        inHeader = false
+        // CIF data row - whitespace-separated. We won't handle quoted
+        // strings containing whitespace (rare in oper_list entries).
+        let parts = t.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        if !parts.isEmpty { dataRows.append(parts) }
+    }
+    if columnNames.isEmpty || dataRows.isEmpty { return nil }
+    // Find column indices we need.
+    func idx(_ name: String) -> Int? {
+        return columnNames.firstIndex(of: "_pdbx_struct_oper_list." + name)
+    }
+    let m = [
+        ["matrix[1][1]", "matrix[1][2]", "matrix[1][3]", "vector[1]"],
+        ["matrix[2][1]", "matrix[2][2]", "matrix[2][3]", "vector[2]"],
+        ["matrix[3][1]", "matrix[3][2]", "matrix[3][3]", "vector[3]"],
+    ]
+    var rowIdx: [[Int]] = []
+    for triplet in m {
+        var rr: [Int] = []
+        for k in triplet {
+            guard let i = idx(k) else { return nil }
+            rr.append(i)
+        }
+        rowIdx.append(rr)
+    }
+    var ops: [AssemblyOperator] = []
+    for parts in dataRows {
+        if parts.count < columnNames.count { continue }
+        func v(_ ii: Int) -> Double { Double(parts[ii]) ?? 0 }
+        let r1 = rowIdx[0]; let r2 = rowIdx[1]; let r3 = rowIdx[2]
+        ops.append(AssemblyOperator(
+            r00: v(r1[0]), r01: v(r1[1]), r02: v(r1[2]), t0: v(r1[3]),
+            r10: v(r2[0]), r11: v(r2[1]), r12: v(r2[2]), t1: v(r2[3]),
+            r20: v(r3[0]), r21: v(r3[1]), r22: v(r3[2]), t2: v(r3[3])))
+    }
+    return ops
+}
+
+private func cifAtomsAsPdb(_ raw: String) -> String? {
+    // Convert _atom_site loop rows into PDB-shaped ATOM/HETATM lines
+    // so we can reuse rewritePDBWithOperators. The conversion is
+    // lossy (we drop alt-conf, anisou, etc.) but coords + chain +
+    // residue identity round-trip correctly, which is all we need
+    // for the assembly expansion.
+    guard let loopStart = raw.range(of: "_atom_site.") else { return nil }
+    let preamble = raw[..<loopStart.lowerBound]
+    guard let loopHeader = preamble.range(of: "loop_", options: .backwards) else { return nil }
+    let lines = raw[loopHeader.upperBound...].split(separator: "\n", maxSplits: 65536, omittingEmptySubsequences: false)
+    var cols: [String] = []
+    var rows: [[String]] = []
+    var inHeader = true
+    for line in lines {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty || t.hasPrefix("#") { continue }
+        if inHeader && t.hasPrefix("_atom_site.") { cols.append(t); continue }
+        if t.hasPrefix("_") || t.hasPrefix("loop_") || t.hasPrefix("data_") {
+            if inHeader { continue }
+            break
+        }
+        inHeader = false
+        let parts = t.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        if parts.count >= cols.count { rows.append(parts) }
+    }
+    func idx(_ name: String) -> Int? { cols.firstIndex(of: "_atom_site." + name) }
+    guard let cx = idx("Cartn_x"), let cy = idx("Cartn_y"), let cz = idx("Cartn_z") else { return nil }
+    let iSerial   = idx("id") ?? -1
+    let iAtomName = idx("auth_atom_id") ?? idx("label_atom_id") ?? -1
+    let iResName  = idx("auth_comp_id") ?? idx("label_comp_id") ?? -1
+    let iChain    = idx("auth_asym_id") ?? idx("label_asym_id") ?? -1
+    let iResSeq   = idx("auth_seq_id") ?? idx("label_seq_id") ?? -1
+    let iElement  = idx("type_symbol") ?? -1
+    var out = ""
+    for r in rows {
+        let serial = iSerial   >= 0 ? Int(r[iSerial])  ?? 0 : 0
+        let atomNm = iAtomName >= 0 ? r[iAtomName].replacingOccurrences(of: "\"", with: "") : "C"
+        let resNm  = iResName  >= 0 ? r[iResName]  : "UNK"
+        let chain  = iChain    >= 0 ? r[iChain].prefix(1) : "A"
+        let resSeq = iResSeq   >= 0 ? Int(r[iResSeq])  ?? 0 : 0
+        let xv     = Double(r[cx]) ?? 0
+        let yv     = Double(r[cy]) ?? 0
+        let zv     = Double(r[cz]) ?? 0
+        let elem   = iElement  >= 0 ? r[iElement] : "C"
+        // PDB ATOM record format (fixed columns):
+        //   1- 6  Record name
+        //   7-11  serial
+        // 13-16  atom name
+        // 18-20  residue name
+        //    22  chain
+        // 23-26  residue seq
+        // 31-38  x
+        // 39-46  y
+        // 47-54  z
+        // 55-60  occupancy
+        // 61-66  B-factor
+        // 77-78  element
+        let line = String(format: "ATOM  %5d %-4s %3s %1s%4d    %8.3f%8.3f%8.3f  1.00  0.00          %2s",
+                          serial, atomNm as CVarArg, resNm as CVarArg,
+                          String(chain) as CVarArg, resSeq, xv, yv, zv, elem as CVarArg)
+        out += line + "\n"
+    }
+    return out.isEmpty ? nil : out
+}
 //
 // Gaussian (.gjf input / .log + .out output), ORCA (.out), and
 // QChem (.out) produce well-defined Cartesian coordinate blocks
@@ -351,20 +659,29 @@ func prepare3DmolHTML(htmlPath: String,
                          detail: error.localizedDescription)
     }
 
-    // Computational-chem output pre-parse (1.7.30+): if the file
-    // looks like a Gaussian / ORCA / QChem output (or .gjf / .com
-    // input), extract the last coordinate block, rewrite it as XYZ,
-    // and dispatch 3Dmol to its native XYZ parser. Falls through if
-    // not a recognised compchem format.
-    let raw: String
-    let resolvedFormat: String
-    if let conv = parseComputationalChem(rawOriginal, extension: pdbPath.lowercased().components(separatedBy: ".").last ?? "") {
-        raw = conv.xyz
-        resolvedFormat = "xyz"
-    } else {
-        raw = rawOriginal
-        resolvedFormat = dataFormat
+    // Pre-pass pipeline:
+    //   1. Biological assembly expansion (1.7.31+) - PDB / CIF only
+    //      and only when the bioAssembly setting is on. Rewrites the
+    //      file into a multi-MODEL PDB with every BIOMT / oper_list
+    //      operator applied to a copy of the atoms.
+    //   2. Computational-chem output pre-parse (1.7.30+) - sniffs
+    //      Gaussian / ORCA / QChem output text, extracts the final
+    //      coordinate block, rewrites as XYZ.
+    // If neither pre-pass matches the file is passed through
+    // unchanged.
+    let ext = pdbPath.lowercased().components(separatedBy: ".").last ?? ""
+    var working = rawOriginal
+    var workingFormat = dataFormat
+    if options.bioAssembly, let expanded = expandBiologicalAssembly(working, extension: ext) {
+        working = expanded
+        workingFormat = "pdb"   // multi-MODEL PDB regardless of source
     }
+    if let conv = parseComputationalChem(working, extension: ext) {
+        working = conv.xyz
+        workingFormat = "xyz"
+    }
+    let raw = working
+    let resolvedFormat = workingFormat
 
     let safeData = sanitizeForScriptBlock(raw)
     let bg = convertColorToRGB(color: options.bgColor)
@@ -407,6 +724,7 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",   with: options.outlineShading  ? "true" : "false")
     html = html.replacingOccurrences(of: "{AUTO_ORIENT}",       with: options.autoOrient      ? "true" : "false")
     html = html.replacingOccurrences(of: "{CUBE_ISOSURFACE}",   with: options.cubeIsosurface  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{BIO_ASSEMBLY}",      with: options.bioAssembly     ? "true" : "false")
     // PDB TITLE record contents, if any. Always passed but only shown
     // when {INFO_PDB_TITLE} is true. Safe-escape so weird titles can't
     // break out of the JS string literal.
@@ -584,6 +902,7 @@ func prepare3DmolHTMLMulti(htmlPath: String,
     html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",        with: options.outlineShading  ? "true" : "false")
     html = html.replacingOccurrences(of: "{AUTO_ORIENT}",            with: options.autoOrient      ? "true" : "false")
     html = html.replacingOccurrences(of: "{CUBE_ISOSURFACE}",        with: options.cubeIsosurface  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{BIO_ASSEMBLY}",           with: options.bioAssembly     ? "true" : "false")
     let pdbTitle = extractPDBTitle(from: primary.data) ?? ""
     html = html.replacingOccurrences(of: "{PDB_TITLE}", with: escapeForJSStringLiteral(pdbTitle))
     html = html.replacingOccurrences(of: "{ZOOM_FACTOR}",       with: String(options.defaultZoom.factor))

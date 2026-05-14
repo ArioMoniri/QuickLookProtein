@@ -197,6 +197,7 @@ public partial class MoleculePanel : UserControl, IDisposable
         var outlineOn         = QuickLookProtein.Shared.SettingsStore.GetOutlineShading();
         var autoOrient        = QuickLookProtein.Shared.SettingsStore.GetAutoOrient();
         var cubeIsosurface    = QuickLookProtein.Shared.SettingsStore.GetCubeIsosurface();
+        var bioAssembly       = QuickLookProtein.Shared.SettingsStore.GetBioAssembly();
         var pdbTitle          = ExtractPdbTitle(moleculeData);
 
         // Order matters: insert the molecule data block LAST so
@@ -234,6 +235,7 @@ public partial class MoleculePanel : UserControl, IDisposable
             .Replace("{OUTLINE_SHADING}",    outlineOn      ? "true" : "false")
             .Replace("{AUTO_ORIENT}",        autoOrient     ? "true" : "false")
             .Replace("{CUBE_ISOSURFACE}",    cubeIsosurface ? "true" : "false")
+            .Replace("{BIO_ASSEMBLY}",       bioAssembly    ? "true" : "false")
             .Replace("{PDB_TITLE}",         EscapeForJsString(pdbTitle))
             .Replace("{EXTRA_MODELS_JSON}", "[]")
             .Replace("{EXTRA_MODELS_HTML}", "")
