@@ -4,6 +4,26 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.18] — 2026-05-14
+
+### 🐛 Fixed
+
+- **Settings app binaries weren't actually shipping** in v1.7.17. The
+  workflow built the Settings WPF project to `build/settings/` and
+  copied the output into the Setup.exe staging folder, but:
+  - the Inno Setup `[Files]` block had no `Source:` entries for
+    `QuickLookProtein.Settings.exe` / `.exe.config`, so Inno Setup
+    compiled them out of the installer; and
+  - the installer-zip staging block didn't even reference the
+    Settings build output, so users grabbing the zip never saw the
+    new control panel.
+  Verified by `unzip -l` on the v1.7.17 installer zip - it only had
+  the 4 files from before the Settings work. Fixed by adding the
+  explicit `Source:` lines (with `skipifsourcedoesntexist` so the
+  build doesn't break if a future runner image stops emitting one
+  of them) and a parallel `Get-ChildItem` copy in the installer-zip
+  step.
+
 ## [1.7.17] — 2026-05-14
 
 ### 🆕 Added — Windows feature parity

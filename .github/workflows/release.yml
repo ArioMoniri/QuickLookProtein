@@ -893,6 +893,13 @@ jobs:
             "; Bundle every sibling QuickLook-*.exe staged above. install.ps1",
             "; auto-detects them and installs without hitting the network.",
             "Source: ""$stageAbs\QuickLook-*.exe"";            DestDir: ""{app}""; Flags: ignoreversion",
+            "; Settings WPF app + dependencies. install.ps1 copies",
+            "; these from {app} into %LocalAppData%\\QuickLookProtein\\Settings\\",
+            "; and writes a Start Menu shortcut so the user can launch",
+            "; 'QuickLookProtein Settings' the normal Windows way.",
+            "Source: ""$stageAbs\QuickLookProtein.Settings.exe""; DestDir: ""{app}""; Flags: ignoreversion skipifsourcedoesntexist",
+            "Source: ""$stageAbs\QuickLookProtein.Settings.exe.config""; DestDir: ""{app}""; Flags: ignoreversion skipifsourcedoesntexist",
+            "Source: ""$stageAbs\QuickLookProtein.Settings.runtimeconfig.json""; DestDir: ""{app}""; Flags: ignoreversion skipifsourcedoesntexist",
             '',
             '[Run]',
             '; Run install.bat with QLP_SETUP_EXE=1 set so the .bat skips its',
@@ -948,6 +955,17 @@ jobs:
                     -Destination "$stage/install.ps1"               -Force
           Copy-Item -Path "Windows/install.bat" `
                     -Destination "$stage/install.bat"               -Force
+
+          # Include the Settings WPF app + its dependencies so the zip
+          # is also a complete install (matches Setup.exe behaviour).
+          # install.ps1 auto-detects QuickLookProtein.Settings.exe in
+          # its own folder and writes a Start Menu shortcut for it.
+          if (Test-Path "build/settings/QuickLookProtein.Settings.exe") {
+            Get-ChildItem -Path "build/settings" -File `
+                | Where-Object { $_.Extension -in '.exe', '.dll', '.config', '.json' } `
+                | Copy-Item -Destination $stage -Force
+            Write-Host "Bundled Settings app into installer zip."
+          }
 
           @"
           QuickLookProtein $version - Windows installer bundle
