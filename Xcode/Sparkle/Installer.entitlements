@@ -1,25 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!--
-  Sparkle Installer XPC service entitlements (sandboxed host).
-
-  Required by Sparkle 2.x when the host application is sandboxed.
-  Our workflow re-signs Installer.xpc as part of "Embed Sparkle XPC
-  services" and unless we pass these explicitly via `codesign
-  --entitlements`, the re-sign produces a service with no
-  entitlements at all — Sparkle's installer-launcher then fails to
-  open an XPC connection and the user sees
-  "An error occurred while launching the installer."
-
-  Values per https://sparkle-project.org/documentation/sandboxing/:
-   - app-sandbox: must run sandboxed itself (matches the host).
-   - application-groups: same group ID as the host so it can read /
-     write to the shared App Group container used for the update
-     handoff (Sparkle puts the staged .app there before copying
-     into /Applications).
-   - temporary-exception.files.absolute-path.read-write: the
-     installer needs to write the updated .app into /Applications.
--->
 <plist version="1.0">
 <dict>
     <key>com.apple.security.app-sandbox</key>
