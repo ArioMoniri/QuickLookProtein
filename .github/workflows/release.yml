@@ -341,62 +341,100 @@ jobs:
             echo "Using volume icon: $ICNS"
           fi
 
-          # Generate a 640x400 background image with the title +
-          # "Drag to Applications" arrow. Done at workflow time via a
-          # one-shot Python script using PIL/Pillow so we don't have
-          # to commit a binary PNG. Falls back to no-background if
-          # Pillow isn't on the runner.
+          # Generate a 640x400 DMG background with title + drag-arrow
+          # via a one-shot Swift program using CoreGraphics. Swift +
+          # CG ship with every macOS runner image, no `pip install`
+          # gymnastics required (the previous Python+Pillow path
+          # silently fell through because Pillow isn't preinstalled).
           BG_FLAG=""
           BG_PATH="build/dmg-background.png"
-          python3 - <<'PY' || true
-          import sys
-          try:
-              from PIL import Image, ImageDraw, ImageFont
-          except Exception:
-              sys.exit(0)
-          W, H = 640, 400
-          img = Image.new("RGBA", (W, H), (245, 246, 249, 255))
-          d = ImageDraw.Draw(img)
-          # Subtle gradient band so the bg has depth instead of flat
-          # paper. Two thin lines + a soft top stripe.
-          for y in range(0, H):
-              t = y / float(H - 1)
-              r = int(245 - 30 * t); g = int(246 - 28 * t); b = int(249 - 22 * t)
-              d.line([(0, y), (W, y)], fill=(r, g, b, 255))
-          # Drop arrow between app icon and /Applications shortcut.
-          # create-dmg places the .app icon at (170,200) and the
-          # /Applications shortcut at (460,200) - the arrow midpoint
-          # is at (315,200). Render a thick semitransparent arrow
-          # head + tail.
-          arrow_color = (60, 60, 70, 200)
-          # Tail
-          d.rectangle([(225, 190), (385, 210)], fill=arrow_color)
-          # Head (right-pointing triangle)
-          d.polygon([(385, 170), (425, 200), (385, 230)], fill=arrow_color)
-          # Title at the top.
-          title = "QuickLookProtein"
-          subtitle = "Drag the app to your Applications folder"
-          try:
-              font_t = ImageFont.truetype("/System/Library/Fonts/SFNS.ttf", 28)
-              font_s = ImageFont.truetype("/System/Library/Fonts/SFNS.ttf", 13)
-          except Exception:
-              font_t = ImageFont.load_default()
-              font_s = ImageFont.load_default()
-          tw = d.textlength(title, font=font_t)
-          d.text(((W - tw) / 2, 38), title, fill=(40, 42, 50, 255), font=font_t)
-          sw = d.textlength(subtitle, font=font_s)
-          d.text(((W - sw) / 2, 76), subtitle, fill=(110, 112, 125, 255), font=font_s)
-          # Tag line at the bottom.
-          tag = "3D molecule preview for macOS Quick Look - rendered by 3Dmol.js"
-          tw = d.textlength(tag, font=font_s)
-          d.text(((W - tw) / 2, 360), tag, fill=(140, 142, 155, 255), font=font_s)
-          img.save("build/dmg-background.png", "PNG")
-          PY
-          if [ -f "$BG_PATH" ]; then
-            BG_FLAG="--background $BG_PATH"
-            echo "Using generated DMG background: $BG_PATH ($(du -h $BG_PATH | cut -f1))"
+          cat > build/render_dmg_bg.swift <<'SWIFT'
+          import Foundation
+          import CoreGraphics
+          import CoreText
+          import ImageIO
+          import UniformTypeIdentifiers
+
+          let W = 640, H = 400
+          let cs = CGColorSpaceCreateDeviceRGB()
+          guard let ctx = CGContext(data: nil, width: W, height: H,
+                                    bitsPerComponent: 8,
+                                    bytesPerRow: W * 4,
+                                    space: cs,
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+          else { exit(1) }
+          // Flip so 0,0 is top-left when we reason about coordinates.
+          ctx.translateBy(x: 0, y: CGFloat(H))
+          ctx.scaleBy(x: 1, y: -1)
+
+          // Vertical gradient — light grey near top → slightly darker
+          // toward the bottom. Matches the macOS "paper" look used
+          // by many notarised app DMGs.
+          let topColor    = CGColor(srgbRed: 245/255, green: 246/255, blue: 249/255, alpha: 1)
+          let bottomColor = CGColor(srgbRed: 215/255, green: 218/255, blue: 227/255, alpha: 1)
+          if let grad = CGGradient(colorsSpace: cs,
+                                   colors: [topColor, bottomColor] as CFArray,
+                                   locations: [0.0, 1.0]) {
+              ctx.drawLinearGradient(grad,
+                                     start: CGPoint(x: 0, y: 0),
+                                     end:   CGPoint(x: 0, y: CGFloat(H)),
+                                     options: [])
+          }
+
+          // Drop arrow between (170,200) and (460,200). create-dmg
+          // places the .app icon at the former, the Applications
+          // shortcut at the latter; arrow visually says "drag it
+          // that way."
+          ctx.setFillColor(CGColor(srgbRed: 0.32, green: 0.33, blue: 0.37, alpha: 0.85))
+          ctx.fill(CGRect(x: 235, y: 190, width: 150, height: 20))
+          ctx.beginPath()
+          ctx.move(to:    CGPoint(x: 385, y: 170))
+          ctx.addLine(to: CGPoint(x: 425, y: 200))
+          ctx.addLine(to: CGPoint(x: 385, y: 230))
+          ctx.closePath()
+          ctx.fillPath()
+
+          // Helper for centered text using Core Text directly.
+          func drawCentered(_ text: String, y: CGFloat, size: CGFloat, color: CGColor) {
+              let font = CTFontCreateWithName("Helvetica" as CFString, size, nil)
+              let attrs: [CFString: Any] = [
+                  kCTFontAttributeName:        font,
+                  kCTForegroundColorAttributeName: color,
+              ]
+              let line = CTLineCreateWithAttributedString(
+                  CFAttributedStringCreate(nil, text as CFString, attrs as CFDictionary)!)
+              let width = CTLineGetTypographicBounds(line, nil, nil, nil)
+              ctx.textPosition = CGPoint(x: (CGFloat(W) - CGFloat(width)) / 2, y: y)
+              CTLineDraw(line, ctx)
+          }
+
+          // Flip back for text - CoreText draws bottom-up by default.
+          ctx.scaleBy(x: 1, y: -1)
+          ctx.translateBy(x: 0, y: -CGFloat(H))
+
+          drawCentered("QuickLookProtein", y: 68, size: 28,
+                       color: CGColor(srgbRed: 0.16, green: 0.16, blue: 0.20, alpha: 1.0))
+          drawCentered("Drag the app to your Applications folder", y: 90, size: 13,
+                       color: CGColor(srgbRed: 0.42, green: 0.43, blue: 0.49, alpha: 1.0))
+          drawCentered("3D molecule preview for macOS Quick Look - rendered by 3Dmol.js",
+                       y: 372, size: 12,
+                       color: CGColor(srgbRed: 0.52, green: 0.53, blue: 0.59, alpha: 1.0))
+
+          guard let img = ctx.makeImage(),
+                let dest = CGImageDestinationCreateWithURL(
+                    URL(fileURLWithPath: CommandLine.arguments[1]) as CFURL,
+                    "public.png" as CFString, 1, nil)
+          else { exit(2) }
+          CGImageDestinationAddImage(dest, img, nil)
+          if !CGImageDestinationFinalize(dest) { exit(3) }
+          SWIFT
+          if /usr/bin/swift "build/render_dmg_bg.swift" "$(pwd)/$BG_PATH" 2>&1; then
+            if [ -f "$BG_PATH" ]; then
+              BG_FLAG="--background $BG_PATH"
+              echo "Using generated DMG background: $BG_PATH ($(du -h "$BG_PATH" | cut -f1))"
+            fi
           else
-            echo "::warning::DMG background generation failed - shipping without one."
+            echo "::warning::DMG background Swift renderer failed - shipping without background."
           fi
 
           create-dmg \

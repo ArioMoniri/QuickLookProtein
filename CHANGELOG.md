@@ -4,6 +4,27 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.28] — 2026-05-14
+
+### 🐛 Fixed — DMG background actually renders this time
+
+v1.7.27 promised a polished DMG background but shipped without one.
+The release-job log showed
+`::warning::DMG background generation failed - shipping without one.`
+Root cause: the workflow used Python + Pillow to draw the PNG, but
+Pillow isn't preinstalled on github-hosted macOS runners and the
+`try: from PIL import …` fell through silently.
+
+Fix: replaced with a one-shot Swift + CoreGraphics renderer that
+ships with every macOS runner image, no `pip install` required.
+Same 640×400 background — gradient + drop-arrow + "QuickLookProtein"
+title + tagline — but drawn via `CGContext` / Core Text. Locally
+verified producing a valid PNG before tagging.
+
+The volume icon (`--volicon`) already worked in v1.7.27 — that's
+why mounting the DMG showed the app icon on the disk. The empty
+window-background was the only missing piece.
+
 ## [1.7.27] — 2026-05-14
 
 ### 🐛 Fixed — App Group regression introduced in v1.7.24
