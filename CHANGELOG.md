@@ -4,6 +4,32 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.29] — 2026-05-14
+
+### 🆕 Added
+
+- **Per-button toolbar visibility.** Each of the 8 interactive
+  toolbar buttons (Stick / Line / Sphere / Cartoon / Surface /
+  Color SS / Label αC / Recenter) is now an independent toggle
+  in Settings. Useful on smaller previews; hide everything you
+  don't use. Defaults all ON. Mac + Windows in parity.
+- **Outline shading toggle.** Adds 3Dmol's per-style `outline:true`
+  flag to every rendering style — thin dark border around atoms
+  and bonds. Default OFF. Makes structures pop on light
+  backgrounds. Mac + Windows.
+- **B-factor / pLDDT coloring.** New `ColorScheme.bfactor` /
+  `Bfactor` option (Mac + Windows). Auto-detects AlphaFold-style
+  pLDDT confidence (every B-factor in [0, 100] with at least one
+  ≥ 50) and uses 3Dmol's `roygb` gradient pinned at [50, 90]
+  matching standard pLDDT conventions. Falls back to a min/max-fit
+  `rwb` gradient on raw B-factors for X-ray structures.
+- **Keyboard shortcuts in the preview.** Inside any QL preview:
+  - `1`–`4` switch to Stick / Line / Sphere / Cartoon
+  - `S` / `R` / `L` / `C` toggle Surface / Recenter / Label αC / Color SS
+  - `Tab` cycles through visible style buttons
+  Modifier keys (Cmd / Ctrl / Alt) and input fields are skipped
+  so QL's own shortcuts (Cmd-W, spacebar) keep working.
+
 ## [1.7.28] — 2026-05-14
 
 ### 🐛 Fixed — DMG background actually renders this time

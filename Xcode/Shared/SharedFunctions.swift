@@ -38,6 +38,17 @@ struct ViewerOptions {
     // Interactive 3Dmol toolbar (1.7.27+).
     var showControlsInPreview:    Bool
 
+    // 8 per-button visibility flags + outline shading (1.7.29+).
+    var ctlShowStick:    Bool
+    var ctlShowLine:     Bool
+    var ctlShowSphere:   Bool
+    var ctlShowCartoon:  Bool
+    var ctlShowSurface:  Bool
+    var ctlShowColorSS:  Bool
+    var ctlShowLabelCA:  Bool
+    var ctlShowRecenter: Bool
+    var outlineShading:  Bool
+
     static func from(_ s: SettingsStorage, fileExtension ext: String, fileName: String) -> ViewerOptions {
         ViewerOptions(
             atomStyle:       s.atomStyle(forExtension: ext),
@@ -60,7 +71,16 @@ struct ViewerOptions {
             infoShowMolWeight:        s.infoShowMolWeight,
             infoShowBondCount:        s.infoShowBondCount,
             infoShowPDBTitle:         s.infoShowPDBTitle,
-            showControlsInPreview:    s.showControlsInPreview
+            showControlsInPreview:    s.showControlsInPreview,
+            ctlShowStick:    s.ctlShowStick,
+            ctlShowLine:     s.ctlShowLine,
+            ctlShowSphere:   s.ctlShowSphere,
+            ctlShowCartoon:  s.ctlShowCartoon,
+            ctlShowSurface:  s.ctlShowSurface,
+            ctlShowColorSS:  s.ctlShowColorSS,
+            ctlShowLabelCA:  s.ctlShowLabelCA,
+            ctlShowRecenter: s.ctlShowRecenter,
+            outlineShading:  s.outlineShading
         )
     }
 }
@@ -151,6 +171,16 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{INFO_BOND_COUNT}",    with: options.infoShowBondCount        ? "true" : "false")
     html = html.replacingOccurrences(of: "{INFO_PDB_TITLE}",     with: options.infoShowPDBTitle         ? "true" : "false")
     html = html.replacingOccurrences(of: "{SHOW_CONTROLS}",      with: options.showControlsInPreview    ? "true" : "false")
+    // Per-button toolbar visibility (1.7.29+).
+    html = html.replacingOccurrences(of: "{CTL_SHOW_STICK}",    with: options.ctlShowStick    ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_LINE}",     with: options.ctlShowLine     ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_SPHERE}",   with: options.ctlShowSphere   ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_CARTOON}",  with: options.ctlShowCartoon  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_SURFACE}",  with: options.ctlShowSurface  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_COLORSS}",  with: options.ctlShowColorSS  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_LABELCA}",  with: options.ctlShowLabelCA  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_RECENTER}", with: options.ctlShowRecenter ? "true" : "false")
+    html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",   with: options.outlineShading  ? "true" : "false")
     // PDB TITLE record contents, if any. Always passed but only shown
     // when {INFO_PDB_TITLE} is true. Safe-escape so weird titles can't
     // break out of the JS string literal.
@@ -317,6 +347,15 @@ func prepare3DmolHTMLMulti(htmlPath: String,
     html = html.replacingOccurrences(of: "{INFO_BOND_COUNT}",        with: options.infoShowBondCount        ? "true" : "false")
     html = html.replacingOccurrences(of: "{INFO_PDB_TITLE}",         with: options.infoShowPDBTitle         ? "true" : "false")
     html = html.replacingOccurrences(of: "{SHOW_CONTROLS}",          with: options.showControlsInPreview    ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_STICK}",         with: options.ctlShowStick    ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_LINE}",          with: options.ctlShowLine     ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_SPHERE}",        with: options.ctlShowSphere   ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_CARTOON}",       with: options.ctlShowCartoon  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_SURFACE}",       with: options.ctlShowSurface  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_COLORSS}",       with: options.ctlShowColorSS  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_LABELCA}",       with: options.ctlShowLabelCA  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_RECENTER}",      with: options.ctlShowRecenter ? "true" : "false")
+    html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",        with: options.outlineShading  ? "true" : "false")
     let pdbTitle = extractPDBTitle(from: primary.data) ?? ""
     html = html.replacingOccurrences(of: "{PDB_TITLE}", with: escapeForJSStringLiteral(pdbTitle))
     html = html.replacingOccurrences(of: "{ZOOM_FACTOR}",       with: String(options.defaultZoom.factor))

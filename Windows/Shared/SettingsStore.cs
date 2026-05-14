@@ -41,6 +41,11 @@ public enum ColorScheme
     Element,
     SecondaryStructure,
     AminoAcid,
+    // B-factor / pLDDT (1.7.29+). For X-ray structures this is
+    // thermal motion (rwb gradient); for AlphaFold predictions
+    // the B-factor field holds pLDDT confidence (roygb 50-90).
+    // Viewer template auto-detects which by examining the range.
+    Bfactor,
 }
 
 public enum RotationSpeed
@@ -148,6 +153,29 @@ public static class SettingsStore
     /// bottom-right of every Quick Look preview. Default ON.
     public static bool GetShowControlsInPreview()    => ReadBool("ShowControlsInPreview",    true);
     public static void SetShowControlsInPreview(bool v) => WriteBool("ShowControlsInPreview", v);
+
+    // Per-button toolbar visibility (1.7.29+ on Windows; matches the
+    // 8 Mac ctlShow* toggles). Defaults all ON.
+    public static bool GetCtlShowStick()    => ReadBool("CtlShowStick",    true);
+    public static bool GetCtlShowLine()     => ReadBool("CtlShowLine",     true);
+    public static bool GetCtlShowSphere()   => ReadBool("CtlShowSphere",   true);
+    public static bool GetCtlShowCartoon()  => ReadBool("CtlShowCartoon",  true);
+    public static bool GetCtlShowSurface()  => ReadBool("CtlShowSurface",  true);
+    public static bool GetCtlShowColorSS()  => ReadBool("CtlShowColorSS",  true);
+    public static bool GetCtlShowLabelCA()  => ReadBool("CtlShowLabelCA",  true);
+    public static bool GetCtlShowRecenter() => ReadBool("CtlShowRecenter", true);
+    public static void SetCtlShowStick(bool v)    => WriteBool("CtlShowStick",    v);
+    public static void SetCtlShowLine(bool v)     => WriteBool("CtlShowLine",     v);
+    public static void SetCtlShowSphere(bool v)   => WriteBool("CtlShowSphere",   v);
+    public static void SetCtlShowCartoon(bool v)  => WriteBool("CtlShowCartoon",  v);
+    public static void SetCtlShowSurface(bool v)  => WriteBool("CtlShowSurface",  v);
+    public static void SetCtlShowColorSS(bool v)  => WriteBool("CtlShowColorSS",  v);
+    public static void SetCtlShowLabelCA(bool v)  => WriteBool("CtlShowLabelCA",  v);
+    public static void SetCtlShowRecenter(bool v) => WriteBool("CtlShowRecenter", v);
+
+    // Outline shading (1.7.29+). Default OFF.
+    public static bool GetOutlineShading() => ReadBool("OutlineShading", false);
+    public static void SetOutlineShading(bool v) => WriteBool("OutlineShading", v);
 
     public static void SetInfoShowFileName(bool v)         => WriteBool("InfoShowFileName",         v);
     public static void SetInfoShowAtomCount(bool v)        => WriteBool("InfoShowAtomCount",        v);

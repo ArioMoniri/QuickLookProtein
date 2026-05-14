@@ -75,14 +75,14 @@
              share the .active highlight; toggles (surface, labels)
              flip themselves on each click. -->
         <div id="controls" style="display: none;">
-            <button data-cmd="style:stick">Stick</button>
-            <button data-cmd="style:line">Line</button>
-            <button data-cmd="style:sphere">Sphere</button>
-            <button data-cmd="style:cartoon">Cartoon</button>
-            <button data-cmd="surface">Surface</button>
-            <button data-cmd="colorss">Color SS</button>
-            <button data-cmd="labelca">Label αC</button>
-            <button data-cmd="recenter">Recenter</button>
+            <button data-cmd="style:stick"   data-show="{CTL_SHOW_STICK}">Stick</button>
+            <button data-cmd="style:line"    data-show="{CTL_SHOW_LINE}">Line</button>
+            <button data-cmd="style:sphere"  data-show="{CTL_SHOW_SPHERE}">Sphere</button>
+            <button data-cmd="style:cartoon" data-show="{CTL_SHOW_CARTOON}">Cartoon</button>
+            <button data-cmd="surface"       data-show="{CTL_SHOW_SURFACE}">Surface</button>
+            <button data-cmd="colorss"       data-show="{CTL_SHOW_COLORSS}">Color SS</button>
+            <button data-cmd="labelca"       data-show="{CTL_SHOW_LABELCA}">Label αC</button>
+            <button data-cmd="recenter"      data-show="{CTL_SHOW_RECENTER}">Recenter</button>
         </div>
         <script type="text/plain" id="mol-data">{MOL_DATA}</script>
         <!-- Merge mode (multi-file Quick Look) extras. Each sibling
@@ -259,6 +259,39 @@
                             case 'ssJmol':  return hasProtein ? { colorscheme: 'ssJmol' }
                                                               : { colorscheme: 'Jmol' };
                             case 'residue': return { colorscheme: 'amino' };
+                            // B-factor / pLDDT coloring (1.7.29+).
+                            // For AlphaFold-style predicted models the
+                            // B-factor field actually carries pLDDT
+                            // confidence (0-100). For X-ray crystallo-
+                            // graphic structures it's thermal motion
+                            // (typically 0-80 Angstroms^2). Either way
+                            // 3Dmol's "RWB" gradient (red-white-blue)
+                            // gives a useful visualization with a
+                            // domain-sensitive range.
+                            case 'bfactor': {
+                                // Detect AlphaFold-style pLDDT: if EVERY
+                                // observed B-factor is between 0 and
+                                // 100 with at least one value above 50,
+                                // treat it as confidence (inverted - low
+                                // B = red = LOW confidence in AlphaFold's
+                                // convention; we flip so high = blue =
+                                // confident, matching pLDDT's intuition).
+                                var bs = [], plddtLike = true, sawAny = false;
+                                for (var bi = 0; bi < atoms.length; bi++) {
+                                    var bv = atoms[bi].b;
+                                    if (bv === undefined || bv === null) continue;
+                                    sawAny = true;
+                                    bs.push(bv);
+                                    if (bv < 0 || bv > 100.5) plddtLike = false;
+                                }
+                                if (!sawAny) return { color: 'spectrum' };
+                                var lo = Math.min.apply(null, bs);
+                                var hi = Math.max.apply(null, bs);
+                                if (plddtLike) {
+                                    return { colorscheme: { prop: 'b', gradient: 'roygb', min: 50, max: 90 } };
+                                }
+                                return { colorscheme: { prop: 'b', gradient: 'rwb', min: lo, max: hi } };
+                            }
                             default:        return { color: 'spectrum' };
                         }
                     }
@@ -271,8 +304,30 @@
                     // Base style FIRST — guarantees every atom has *some* style
                     // even if the smart-style serial-array selectors below match
                     // nothing on a particular 3Dmol build.
+                    //
+                    // Outline shading (1.7.29+): adds a thin dark border around
+                    // every atom/bond. 3Dmol exposes this via the per-style
+                    // `outline: true` flag - we splat it into every style
+                    // object below so cartoon / stick / sphere / line all
+                    // honour it consistently.
+                    var outlineOn = {OUTLINE_SHADING};
+                    function withOutline(s) {
+                        if (!outlineOn) return s;
+                        var k, dup = {};
+                        for (k in s) {
+                            if (typeof s[k] === 'object' && s[k] !== null) {
+                                var inner = {};
+                                for (var ik in s[k]) inner[ik] = s[k][ik];
+                                inner.outline = true;
+                                dup[k] = inner;
+                            } else {
+                                dup[k] = s[k];
+                            }
+                        }
+                        return dup;
+                    }
                     var baseStyle = {}; baseStyle[styleType] = colorFor();
-                    viewer.setStyle({}, baseStyle);
+                    viewer.setStyle({}, withOutline(baseStyle));
 
                     // Smart styling — gated on the user toggle. We previously
                     // required the structure to have BOTH a polymer AND a
@@ -492,6 +547,17 @@
                         (function () {
                             var bar = document.getElementById('controls');
                             if (!bar) return;
+                            // Per-button visibility (1.7.29+). Swift / C#
+                            // fill paths replace data-show with "true" or
+                            // "false"; remove the button entirely if false.
+                            var allBtns = bar.querySelectorAll('button[data-show]');
+                            allBtns.forEach(function (b) {
+                                if (b.getAttribute('data-show') !== 'true') {
+                                    b.parentNode.removeChild(b);
+                                }
+                            });
+                            // If every button got removed, hide the bar too.
+                            if (bar.querySelectorAll('button').length === 0) return;
                             bar.style.display = 'flex';
                             var styleButtons = bar.querySelectorAll('button[data-cmd^="style:"]');
                             var surfaceState = false;
@@ -602,6 +668,51 @@
                                         viewer.zoomTo();
                                         viewer.render();
                                     } catch (e) {}
+                                }
+                            });
+
+                            // Keyboard shortcuts (1.7.29+):
+                            //   1 / 2 / 3 / 4 : switch to Stick / Line / Sphere / Cartoon
+                            //   S            : toggle Surface
+                            //   R            : Recenter
+                            //   L            : toggle Label αC
+                            //   C            : toggle Color by SS
+                            //   Tab          : cycle to next style
+                            // We only fire on plain keys (no modifier) so we
+                            // don't fight Quick Look's own shortcuts like
+                            // Cmd-W and the spacebar that dismisses the
+                            // preview.
+                            function fireCmd(c) {
+                                var btn = bar.querySelector('button[data-cmd="' + c + '"]');
+                                if (btn) btn.click();
+                            }
+                            var styleOrder = ['style:stick','style:line','style:sphere','style:cartoon'];
+                            window.addEventListener('keydown', function (e) {
+                                if (e.metaKey || e.ctrlKey || e.altKey) return;
+                                if (e.target && e.target.tagName === 'INPUT') return;
+                                switch (e.key) {
+                                    case '1': fireCmd('style:stick');   break;
+                                    case '2': fireCmd('style:line');    break;
+                                    case '3': fireCmd('style:sphere');  break;
+                                    case '4': fireCmd('style:cartoon'); break;
+                                    case 's': case 'S': fireCmd('surface');  break;
+                                    case 'r': case 'R': fireCmd('recenter'); break;
+                                    case 'l': case 'L': fireCmd('labelca');  break;
+                                    case 'c': case 'C': fireCmd('colorss');  break;
+                                    case 'Tab': {
+                                        // Cycle through visible style buttons.
+                                        var visible = styleOrder.filter(function (s) {
+                                            return bar.querySelector('button[data-cmd="' + s + '"]');
+                                        });
+                                        if (visible.length === 0) return;
+                                        var cur = bar.querySelector('button[data-cmd^="style:"].active');
+                                        var idx = cur ? visible.indexOf(cur.getAttribute('data-cmd')) : -1;
+                                        idx = (idx + 1) % visible.length;
+                                        fireCmd(visible[idx]);
+                                        e.preventDefault();
+                                        break;
+                                    }
+                                    default: return;
                                 }
                             });
                         })();

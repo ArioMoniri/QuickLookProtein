@@ -186,6 +186,15 @@ public partial class MoleculePanel : UserControl, IDisposable
         var infoBondCount     = QuickLookProtein.Shared.SettingsStore.GetInfoShowBondCount();
         var infoPdbTitle      = QuickLookProtein.Shared.SettingsStore.GetInfoShowPDBTitle();
         var showControls      = QuickLookProtein.Shared.SettingsStore.GetShowControlsInPreview();
+        var ctlStick          = QuickLookProtein.Shared.SettingsStore.GetCtlShowStick();
+        var ctlLine           = QuickLookProtein.Shared.SettingsStore.GetCtlShowLine();
+        var ctlSphere         = QuickLookProtein.Shared.SettingsStore.GetCtlShowSphere();
+        var ctlCartoon        = QuickLookProtein.Shared.SettingsStore.GetCtlShowCartoon();
+        var ctlSurface        = QuickLookProtein.Shared.SettingsStore.GetCtlShowSurface();
+        var ctlColorSS        = QuickLookProtein.Shared.SettingsStore.GetCtlShowColorSS();
+        var ctlLabelCA        = QuickLookProtein.Shared.SettingsStore.GetCtlShowLabelCA();
+        var ctlRecenter       = QuickLookProtein.Shared.SettingsStore.GetCtlShowRecenter();
+        var outlineOn         = QuickLookProtein.Shared.SettingsStore.GetOutlineShading();
         var pdbTitle          = ExtractPdbTitle(moleculeData);
 
         // Order matters: insert the molecule data block LAST so
@@ -212,6 +221,15 @@ public partial class MoleculePanel : UserControl, IDisposable
             .Replace("{INFO_BOND_COUNT}",        infoBondCount     ? "true" : "false")
             .Replace("{INFO_PDB_TITLE}",         infoPdbTitle      ? "true" : "false")
             .Replace("{SHOW_CONTROLS}",          showControls      ? "true" : "false")
+            .Replace("{CTL_SHOW_STICK}",     ctlStick   ? "true" : "false")
+            .Replace("{CTL_SHOW_LINE}",      ctlLine    ? "true" : "false")
+            .Replace("{CTL_SHOW_SPHERE}",    ctlSphere  ? "true" : "false")
+            .Replace("{CTL_SHOW_CARTOON}",   ctlCartoon ? "true" : "false")
+            .Replace("{CTL_SHOW_SURFACE}",   ctlSurface ? "true" : "false")
+            .Replace("{CTL_SHOW_COLORSS}",   ctlColorSS ? "true" : "false")
+            .Replace("{CTL_SHOW_LABELCA}",   ctlLabelCA ? "true" : "false")
+            .Replace("{CTL_SHOW_RECENTER}",  ctlRecenter? "true" : "false")
+            .Replace("{OUTLINE_SHADING}",    outlineOn  ? "true" : "false")
             .Replace("{PDB_TITLE}",         EscapeForJsString(pdbTitle))
             .Replace("{EXTRA_MODELS_JSON}", "[]")
             .Replace("{EXTRA_MODELS_HTML}", "")

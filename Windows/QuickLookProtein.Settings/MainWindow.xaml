@@ -307,6 +307,28 @@
                                       Content="Show interactive controls"
                                       ToolTip="Adds a small bottom-right toolbar in every Quick Look preview with one-click buttons for Stick / Line / Sphere / Cartoon style, Surface, Color SS, Label alpha-C, and Recenter."
                                       Margin="0,4"/>
+                            <CheckBox x:Name="OutlineShadingCheck"
+                                      Content="Outline shading"
+                                      ToolTip="Adds a thin dark border around every atom/bond. Makes the preview pop on light backgrounds."
+                                      Margin="0,4"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Toolbar buttons - per-button visibility. -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Toolbar buttons"
+                                       Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Style="{StaticResource Caption}"
+                                       Text="Hide any individual button from the bottom-right toolbar. Useful for smaller previews."/>
+                            <CheckBox x:Name="CtlShowStickCheck"    Content="Stick"    Margin="0,4"/>
+                            <CheckBox x:Name="CtlShowLineCheck"     Content="Line"     Margin="0,4"/>
+                            <CheckBox x:Name="CtlShowSphereCheck"   Content="Sphere"   Margin="0,4"/>
+                            <CheckBox x:Name="CtlShowCartoonCheck"  Content="Cartoon"  Margin="0,4"/>
+                            <CheckBox x:Name="CtlShowSurfaceCheck"  Content="Surface"  Margin="0,4"/>
+                            <CheckBox x:Name="CtlShowColorSSCheck"  Content="Color SS" Margin="0,4"/>
+                            <CheckBox x:Name="CtlShowLabelCACheck"  Content="Label alpha-C" Margin="0,4"/>
+                            <CheckBox x:Name="CtlShowRecenterCheck" Content="Recenter" Margin="0,4"/>
                         </StackPanel>
                     </Border>
 

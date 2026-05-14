@@ -97,6 +97,23 @@ class SettingsStorage: ObservableObject {
     // recenter without leaving Quick Look. Default ON.
     @Published var showControlsInPreview: Bool { didSet { Self.preferencesStore.set(showControlsInPreview, forKey: "showControlsInPreview") } }
 
+    // Per-button toolbar visibility (1.7.29+). User can hide any
+    // individual button so the toolbar stays compact on small
+    // previews. All default ON.
+    @Published var ctlShowStick:    Bool { didSet { Self.preferencesStore.set(ctlShowStick,    forKey: "ctlShowStick") } }
+    @Published var ctlShowLine:     Bool { didSet { Self.preferencesStore.set(ctlShowLine,     forKey: "ctlShowLine") } }
+    @Published var ctlShowSphere:   Bool { didSet { Self.preferencesStore.set(ctlShowSphere,   forKey: "ctlShowSphere") } }
+    @Published var ctlShowCartoon:  Bool { didSet { Self.preferencesStore.set(ctlShowCartoon,  forKey: "ctlShowCartoon") } }
+    @Published var ctlShowSurface:  Bool { didSet { Self.preferencesStore.set(ctlShowSurface,  forKey: "ctlShowSurface") } }
+    @Published var ctlShowColorSS:  Bool { didSet { Self.preferencesStore.set(ctlShowColorSS,  forKey: "ctlShowColorSS") } }
+    @Published var ctlShowLabelCA:  Bool { didSet { Self.preferencesStore.set(ctlShowLabelCA,  forKey: "ctlShowLabelCA") } }
+    @Published var ctlShowRecenter: Bool { didSet { Self.preferencesStore.set(ctlShowRecenter, forKey: "ctlShowRecenter") } }
+
+    // Outline shading: 3Dmol's `style: { outline: true }` flag. Adds a
+    // thin black border around each atom/bond, makes the preview
+    // pop on light backgrounds. Default OFF.
+    @Published var outlineShading:  Bool { didSet { Self.preferencesStore.set(outlineShading,  forKey: "outlineShading") } }
+
     // MARK: - Multi-file Quick Look behaviour
     //
     // Persisted preference for what to do when the user spacebars
@@ -154,6 +171,15 @@ class SettingsStorage: ObservableObject {
         self.infoShowBondCount        = store.object(forKey: "infoShowBondCount")        as? Bool ?? false
         self.infoShowPDBTitle         = store.object(forKey: "infoShowPDBTitle")         as? Bool ?? false
         self.showControlsInPreview    = store.object(forKey: "showControlsInPreview")    as? Bool ?? true
+        self.ctlShowStick     = store.object(forKey: "ctlShowStick")     as? Bool ?? true
+        self.ctlShowLine      = store.object(forKey: "ctlShowLine")      as? Bool ?? true
+        self.ctlShowSphere    = store.object(forKey: "ctlShowSphere")    as? Bool ?? true
+        self.ctlShowCartoon   = store.object(forKey: "ctlShowCartoon")   as? Bool ?? true
+        self.ctlShowSurface   = store.object(forKey: "ctlShowSurface")   as? Bool ?? true
+        self.ctlShowColorSS   = store.object(forKey: "ctlShowColorSS")   as? Bool ?? true
+        self.ctlShowLabelCA   = store.object(forKey: "ctlShowLabelCA")   as? Bool ?? true
+        self.ctlShowRecenter  = store.object(forKey: "ctlShowRecenter")  as? Bool ?? true
+        self.outlineShading   = store.object(forKey: "outlineShading")   as? Bool ?? false
 
         self.multiFilePreviewMode = Self.read(forKey: "multiFilePreviewMode", default: .separate)
 
@@ -258,6 +284,12 @@ struct Settings {
         case element  = "By element (CPK)"
         case ssJmol   = "Secondary structure"
         case residue  = "By amino acid"
+        // B-factor coloring. For X-ray structures this is thermal
+        // motion (blue = stiff, red = flexible). For AlphaFold-style
+        // predicted models, B-factor holds the pLDDT confidence
+        // score (0..100, higher = more confident), so this
+        // doubles as a confidence-coloring mode.
+        case bfactor  = "By B-factor / pLDDT"
 
         var id: ColorScheme { return self }
 
@@ -269,6 +301,7 @@ struct Settings {
             case .element:  return "element"
             case .ssJmol:   return "ssJmol"
             case .residue:  return "residue"
+            case .bfactor:  return "bfactor"
             }
         }
     }

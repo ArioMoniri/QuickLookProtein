@@ -96,6 +96,15 @@ public partial class MainWindow : Window
         ShowUnitCellCheck.IsChecked    = SettingsStore.GetShowUnitCell();
         ShowInfoOverlayCheck.IsChecked        = SettingsStore.GetShowInfoOverlay();
         ShowControlsInPreviewCheck.IsChecked  = SettingsStore.GetShowControlsInPreview();
+        OutlineShadingCheck.IsChecked         = SettingsStore.GetOutlineShading();
+        CtlShowStickCheck.IsChecked    = SettingsStore.GetCtlShowStick();
+        CtlShowLineCheck.IsChecked     = SettingsStore.GetCtlShowLine();
+        CtlShowSphereCheck.IsChecked   = SettingsStore.GetCtlShowSphere();
+        CtlShowCartoonCheck.IsChecked  = SettingsStore.GetCtlShowCartoon();
+        CtlShowSurfaceCheck.IsChecked  = SettingsStore.GetCtlShowSurface();
+        CtlShowColorSSCheck.IsChecked  = SettingsStore.GetCtlShowColorSS();
+        CtlShowLabelCACheck.IsChecked  = SettingsStore.GetCtlShowLabelCA();
+        CtlShowRecenterCheck.IsChecked = SettingsStore.GetCtlShowRecenter();
 
         InfoFileNameCheck.IsChecked         = SettingsStore.GetInfoShowFileName();
         InfoAtomCountCheck.IsChecked        = SettingsStore.GetInfoShowAtomCount();
@@ -135,6 +144,15 @@ public partial class MainWindow : Window
         ShowUnitCellCheck.Click    += (_, _) => Save(() => SettingsStore.SetShowUnitCell(ShowUnitCellCheck.IsChecked == true));
         ShowInfoOverlayCheck.Click        += (_, _) => Save(() => SettingsStore.SetShowInfoOverlay(ShowInfoOverlayCheck.IsChecked == true));
         ShowControlsInPreviewCheck.Click  += (_, _) => Save(() => SettingsStore.SetShowControlsInPreview(ShowControlsInPreviewCheck.IsChecked == true));
+        OutlineShadingCheck.Click         += (_, _) => Save(() => SettingsStore.SetOutlineShading(OutlineShadingCheck.IsChecked == true));
+        CtlShowStickCheck.Click    += (_, _) => Save(() => SettingsStore.SetCtlShowStick(CtlShowStickCheck.IsChecked == true));
+        CtlShowLineCheck.Click     += (_, _) => Save(() => SettingsStore.SetCtlShowLine(CtlShowLineCheck.IsChecked == true));
+        CtlShowSphereCheck.Click   += (_, _) => Save(() => SettingsStore.SetCtlShowSphere(CtlShowSphereCheck.IsChecked == true));
+        CtlShowCartoonCheck.Click  += (_, _) => Save(() => SettingsStore.SetCtlShowCartoon(CtlShowCartoonCheck.IsChecked == true));
+        CtlShowSurfaceCheck.Click  += (_, _) => Save(() => SettingsStore.SetCtlShowSurface(CtlShowSurfaceCheck.IsChecked == true));
+        CtlShowColorSSCheck.Click  += (_, _) => Save(() => SettingsStore.SetCtlShowColorSS(CtlShowColorSSCheck.IsChecked == true));
+        CtlShowLabelCACheck.Click  += (_, _) => Save(() => SettingsStore.SetCtlShowLabelCA(CtlShowLabelCACheck.IsChecked == true));
+        CtlShowRecenterCheck.Click += (_, _) => Save(() => SettingsStore.SetCtlShowRecenter(CtlShowRecenterCheck.IsChecked == true));
 
         InfoFileNameCheck.Click         += (_, _) => Save(() => SettingsStore.SetInfoShowFileName(InfoFileNameCheck.IsChecked == true));
         InfoAtomCountCheck.Click        += (_, _) => Save(() => SettingsStore.SetInfoShowAtomCount(InfoAtomCountCheck.IsChecked == true));
@@ -479,6 +497,15 @@ public partial class MainWindow : Window
             .Replace("{INFO_BOND_COUNT}",        QuickLookProtein.Shared.SettingsStore.GetInfoShowBondCount()        ? "true" : "false")
             .Replace("{INFO_PDB_TITLE}",         QuickLookProtein.Shared.SettingsStore.GetInfoShowPDBTitle()         ? "true" : "false")
             .Replace("{SHOW_CONTROLS}",          QuickLookProtein.Shared.SettingsStore.GetShowControlsInPreview()    ? "true" : "false")
+            .Replace("{CTL_SHOW_STICK}",         QuickLookProtein.Shared.SettingsStore.GetCtlShowStick()    ? "true" : "false")
+            .Replace("{CTL_SHOW_LINE}",          QuickLookProtein.Shared.SettingsStore.GetCtlShowLine()     ? "true" : "false")
+            .Replace("{CTL_SHOW_SPHERE}",        QuickLookProtein.Shared.SettingsStore.GetCtlShowSphere()   ? "true" : "false")
+            .Replace("{CTL_SHOW_CARTOON}",       QuickLookProtein.Shared.SettingsStore.GetCtlShowCartoon()  ? "true" : "false")
+            .Replace("{CTL_SHOW_SURFACE}",       QuickLookProtein.Shared.SettingsStore.GetCtlShowSurface()  ? "true" : "false")
+            .Replace("{CTL_SHOW_COLORSS}",       QuickLookProtein.Shared.SettingsStore.GetCtlShowColorSS()  ? "true" : "false")
+            .Replace("{CTL_SHOW_LABELCA}",       QuickLookProtein.Shared.SettingsStore.GetCtlShowLabelCA()  ? "true" : "false")
+            .Replace("{CTL_SHOW_RECENTER}",      QuickLookProtein.Shared.SettingsStore.GetCtlShowRecenter() ? "true" : "false")
+            .Replace("{OUTLINE_SHADING}",        QuickLookProtein.Shared.SettingsStore.GetOutlineShading()  ? "true" : "false")
             .Replace("{PDB_TITLE}",              "")
             .Replace("{EXTRA_MODELS_JSON}",      "[]")
             .Replace("{EXTRA_MODELS_HTML}",      "")

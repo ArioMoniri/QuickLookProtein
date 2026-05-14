@@ -133,7 +133,28 @@ struct ContentView: View {
                             Toggle("Show info overlay",               isOn: $userSettings.showInfoOverlay)
                             Toggle("Show interactive controls",       isOn: $userSettings.showControlsInPreview)
                                 .help("Adds a small bottom-right toolbar in every Quick Look preview with one-click buttons for Stick / Line / Sphere / Cartoon style, Surface, Color SS, Label αC, and Recenter.")
+                            Toggle("Outline shading",                 isOn: $userSettings.outlineShading)
+                                .help("Adds a thin dark border around every atom/bond. Makes the preview pop on light backgrounds.")
                         }
+
+                        // Per-button toolbar visibility - gated on the master
+                        // "Show interactive controls" toggle above. When that
+                        // toggle is off, the whole bar is hidden so flipping
+                        // these has no immediate effect; we still keep the UI
+                        // alive so users can pre-configure their selection.
+                        Text("Toolbar buttons").font(.headline).padding(.top, 8)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("Stick",     isOn: $userSettings.ctlShowStick)
+                            Toggle("Line",      isOn: $userSettings.ctlShowLine)
+                            Toggle("Sphere",    isOn: $userSettings.ctlShowSphere)
+                            Toggle("Cartoon",   isOn: $userSettings.ctlShowCartoon)
+                            Toggle("Surface",   isOn: $userSettings.ctlShowSurface)
+                            Toggle("Color SS",  isOn: $userSettings.ctlShowColorSS)
+                            Toggle("Label αC",  isOn: $userSettings.ctlShowLabelCA)
+                            Toggle("Recenter",  isOn: $userSettings.ctlShowRecenter)
+                        }
+                        .disabled(!userSettings.showControlsInPreview)
+                        .opacity(userSettings.showControlsInPreview ? 1 : 0.4)
 
                         // MARK: Info-overlay fields - which bits of info appear
                         //       in the info pill at the top-left of every
