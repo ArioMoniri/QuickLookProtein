@@ -429,6 +429,16 @@ function Install-SettingsApp {
         return
     }
 
+    # SampleAssets/ subfolder feeds the Settings app's live-preview
+    # tiles. Without it, every format button shows "Sample files
+    # not bundled with this build." in the Settings UI.
+    $sampleSrc = Join-Path $scriptDir "SampleAssets"
+    if (Test-Path $sampleSrc) {
+        Copy-Item -Path $sampleSrc -Destination $appDir -Recurse -Force
+    } else {
+        Write-Host "  Note: SampleAssets folder not in source dir; preview tiles will be unavailable."
+    }
+
     # Start Menu shortcut. Per-user (no admin needed).
     $startMenu = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs"
     $shortcut  = Join-Path $startMenu "QuickLookProtein Settings.lnk"

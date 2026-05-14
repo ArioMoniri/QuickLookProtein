@@ -4,6 +4,30 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.22] — 2026-05-14
+
+### 🐛 Fixed
+
+- **Live preview tiles in v1.7.21 couldn't find any samples** to load.
+  The csproj's `<Content Include>` items did copy the sample files
+  into `build/settings/SampleAssets/`, and the Settings.exe looked
+  there at runtime, but the workflow's Setup.exe staging block and
+  installer-zip block both used `Get-ChildItem -File` (top-level
+  files only), so the `SampleAssets/` subfolder never made it into
+  either bundle. Setup.exe shipped the `.exe` + `.config` + WebView2
+  DLLs but no samples; every format button silently showed *"Sample
+  files not bundled with this build."*
+  Three fixes:
+  - workflow Setup.exe staging now copies `build/settings/SampleAssets/`
+    recursively into the staging dir.
+  - Inno Setup `[Files]` block gets a new `Source: SampleAssets\*` entry
+    with `recursesubdirs createallsubdirs skipifsourcedoesntexist`
+    flags so the whole tree lands under `{app}\SampleAssets`.
+  - `install.ps1`'s `Install-SettingsApp` copies the bundled
+    `SampleAssets/` next to `QuickLookProtein.Settings.exe` in
+    `%LocalAppData%\QuickLookProtein\Settings\` so the preview
+    tiles work even when Setup.exe's staging dir gets cleaned up.
+
 ## [1.7.21] — 2026-05-14
 
 ### 🆕 Added — Live preview tiles in Windows Settings

@@ -810,6 +810,15 @@ jobs:
             Get-ChildItem -Path build/settings -File `
                 | Where-Object { $_.Extension -in '.exe', '.dll', '.config' } `
                 | Copy-Item -Destination $stage
+            # The Settings app also needs its SampleAssets subfolder
+            # for the live-preview tiles (1.7.21+). Without this the
+            # preview panel shows "Sample files not bundled" because
+            # the format tiles can't find the bundled .pdb / .cif /
+            # etc. samples next to the .exe.
+            if (Test-Path "build/settings/SampleAssets") {
+              Copy-Item -Path "build/settings/SampleAssets" `
+                        -Destination "$stage/SampleAssets" -Recurse -Force
+            }
             Write-Host "Bundled Settings WPF app into Setup.exe payload."
           } else {
             Write-Host "::warning::Settings app build output not found; Setup.exe will skip Start Menu shortcut."
@@ -900,6 +909,9 @@ jobs:
             "Source: ""$stageAbs\QuickLookProtein.Settings.exe""; DestDir: ""{app}""; Flags: ignoreversion skipifsourcedoesntexist",
             "Source: ""$stageAbs\QuickLookProtein.Settings.exe.config""; DestDir: ""{app}""; Flags: ignoreversion skipifsourcedoesntexist",
             "Source: ""$stageAbs\QuickLookProtein.Settings.runtimeconfig.json""; DestDir: ""{app}""; Flags: ignoreversion skipifsourcedoesntexist",
+            "; Bundled sample structures + viewer.html + 3Dmol.js used by",
+            "; the Settings app's live preview tiles (1.7.21+).",
+            "Source: ""$stageAbs\SampleAssets\*""; DestDir: ""{app}\SampleAssets""; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist",
             '',
             '[Run]',
             '; Run install.bat with QLP_SETUP_EXE=1 set so the .bat skips its',
@@ -956,15 +968,20 @@ jobs:
           Copy-Item -Path "Windows/install.bat" `
                     -Destination "$stage/install.bat"               -Force
 
-          # Include the Settings WPF app + its dependencies so the zip
-          # is also a complete install (matches Setup.exe behaviour).
-          # install.ps1 auto-detects QuickLookProtein.Settings.exe in
-          # its own folder and writes a Start Menu shortcut for it.
+          # Include the Settings WPF app + its dependencies + the
+          # SampleAssets subfolder so the zip is also a complete
+          # install (matches Setup.exe behaviour). install.ps1's
+          # Install-SettingsApp step relocates the lot into
+          # %LocalAppData%\QuickLookProtein\Settings\.
           if (Test-Path "build/settings/QuickLookProtein.Settings.exe") {
             Get-ChildItem -Path "build/settings" -File `
                 | Where-Object { $_.Extension -in '.exe', '.dll', '.config', '.json' } `
                 | Copy-Item -Destination $stage -Force
-            Write-Host "Bundled Settings app into installer zip."
+            if (Test-Path "build/settings/SampleAssets") {
+              Copy-Item -Path "build/settings/SampleAssets" `
+                        -Destination "$stage/SampleAssets" -Recurse -Force
+            }
+            Write-Host "Bundled Settings app + SampleAssets into installer zip."
           }
 
           @"
