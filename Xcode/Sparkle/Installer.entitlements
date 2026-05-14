@@ -6,7 +6,7 @@
     <true/>
     <key>com.apple.security.application-groups</key>
     <array>
-        <string>$(TeamIdentifierPrefix)group.com.ariomoniri.QuickLookProtein</string>
+        <string>FF68N39FU5.group.com.ariomoniri.QuickLookProtein</string>
     </array>
     <key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
     <array>
