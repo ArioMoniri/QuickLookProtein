@@ -10,6 +10,7 @@
 		05D0F5A02FB46E020059B3CB /* QuickLookThumbnailing.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05D0F59F2FB46E020059B3CB /* QuickLookThumbnailing.framework */; };
 		05D0F5A12FB46E020059B3CB /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4B0FDF9426C9A38000C94DDE /* Quartz.framework */; };
 		05D0F5A82FB46E020059B3CB /* QLThumbnail.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 05D0F59E2FB46E020059B3CB /* QLThumbnail.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		0A1B2C3D2FB46E020059B40B /* QLActions.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0A1B2C3D2FB46E020059B404 /* QLActions.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		05DD438D2FB452B000444B3A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 05DD438C2FB452B000444B3A /* Sparkle */; };
 		4B0FDF7F26C9A31F00C94DDE /* QuickLookProteinApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B0FDF7E26C9A31F00C94DDE /* QuickLookProteinApp.swift */; };
 		4B0FDF8126C9A31F00C94DDE /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B0FDF8026C9A31F00C94DDE /* ContentView.swift */; };
@@ -50,6 +51,13 @@
 			remoteGlobalIDString = 05D0F59D2FB46E020059B3CB;
 			remoteInfo = QLThumbnail;
 		};
+		0A1B2C3D2FB46E020059B40D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4B0FDF7326C9A31F00C94DDE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0A1B2C3D2FB46E020059B401;
+			remoteInfo = QLActions;
+		};
 		4B0FDF9E26C9A38000C94DDE /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4B0FDF7326C9A31F00C94DDE /* Project object */;
@@ -67,6 +75,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				05D0F5A82FB46E020059B3CB /* QLThumbnail.appex in Embed Foundation Extensions */,
+				0A1B2C3D2FB46E020059B40B /* QLActions.appex in Embed Foundation Extensions */,
 				4B0FDFA026C9A38000C94DDE /* QuickLookProtein Extension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
@@ -76,6 +85,7 @@
 
 /* Begin PBXFileReference section */
 		05D0F59E2FB46E020059B3CB /* QLThumbnail.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QLThumbnail.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A1B2C3D2FB46E020059B404 /* QLActions.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QLActions.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		05D0F59F2FB46E020059B3CB /* QuickLookThumbnailing.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLookThumbnailing.framework; path = System/Library/Frameworks/QuickLookThumbnailing.framework; sourceTree = SDKROOT; };
 		4B0FDF7B26C9A31F00C94DDE /* QuickLookProtein.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuickLookProtein.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4B0FDF7E26C9A31F00C94DDE /* QuickLookProteinApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLookProteinApp.swift; sourceTree = "<group>"; };
@@ -117,6 +127,13 @@
 			);
 			target = 05D0F59D2FB46E020059B3CB /* QLThumbnail */;
 		};
+		0A1B2C3D2FB46E020059B403 /* Exceptions for "QLActions" folder in "QLActions" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0A1B2C3D2FB46E020059B401 /* QLActions */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -130,6 +147,16 @@
 			path = QLThumbnail;
 			sourceTree = "<group>";
 		};
+		0A1B2C3D2FB46E020059B402 /* QLActions */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0A1B2C3D2FB46E020059B403 /* Exceptions for "QLActions" folder in "QLActions" target */,
+			);
+			explicitFileTypes = {};
+			explicitFolders = ();
+			path = QLActions;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,6 +166,13 @@
 			files = (
 				05D0F5A02FB46E020059B3CB /* QuickLookThumbnailing.framework in Frameworks */,
 				05D0F5A12FB46E020059B3CB /* Quartz.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A1B2C3D2FB46E020059B406 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -186,6 +220,7 @@
 				4B0FDF7D26C9A31F00C94DDE /* QuickLookProtein */,
 				4B0FDF9626C9A38000C94DDE /* QLExtension */,
 				05D0F5A22FB46E020059B3CB /* QLThumbnail */,
+				0A1B2C3D2FB46E020059B402 /* QLActions */,
 				4B0FDF9326C9A38000C94DDE /* Frameworks */,
 				4B0FDF7C26C9A31F00C94DDE /* Products */,
 			);
@@ -197,6 +232,7 @@
 				4B0FDF7B26C9A31F00C94DDE /* QuickLookProtein.app */,
 				4B0FDF9226C9A38000C94DDE /* QuickLookProtein Extension.appex */,
 				05D0F59E2FB46E020059B3CB /* QLThumbnail.appex */,
+				0A1B2C3D2FB46E020059B404 /* QLActions.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -289,6 +325,28 @@
 			productReference = 05D0F59E2FB46E020059B3CB /* QLThumbnail.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		0A1B2C3D2FB46E020059B401 /* QLActions */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A1B2C3D2FB46E020059B408 /* Build configuration list for PBXNativeTarget "QLActions" */;
+			buildPhases = (
+				0A1B2C3D2FB46E020059B405 /* Sources */,
+				0A1B2C3D2FB46E020059B406 /* Frameworks */,
+				0A1B2C3D2FB46E020059B407 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0A1B2C3D2FB46E020059B402 /* QLActions */,
+			);
+			name = QLActions;
+			packageProductDependencies = (
+			);
+			productName = QLActions;
+			productReference = 0A1B2C3D2FB46E020059B404 /* QLActions.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		4B0FDF7A26C9A31F00C94DDE /* QuickLookProtein */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4B0FDF8B26C9A32100C94DDE /* Build configuration list for PBXNativeTarget "QuickLookProtein" */;
@@ -303,6 +361,7 @@
 			dependencies = (
 				4B0FDF9F26C9A38000C94DDE /* PBXTargetDependency */,
 				05D0F5A72FB46E020059B3CB /* PBXTargetDependency */,
+				0A1B2C3D2FB46E020059B40C /* PBXTargetDependency */,
 			);
 			name = QuickLookProtein;
 			productName = QuickLookProtein;
@@ -339,6 +398,9 @@
 					05D0F59D2FB46E020059B3CB = {
 						CreatedOnToolsVersion = 26.1.1;
 					};
+					0A1B2C3D2FB46E020059B401 = {
+						CreatedOnToolsVersion = 26.1.1;
+					};
 					4B0FDF7A26C9A31F00C94DDE = {
 						CreatedOnToolsVersion = 12.5.1;
 					};
@@ -366,12 +428,20 @@
 				4B0FDF7A26C9A31F00C94DDE /* QuickLookProtein */,
 				4B0FDF9126C9A38000C94DDE /* QuickLookProtein Extension */,
 				05D0F59D2FB46E020059B3CB /* QLThumbnail */,
+				0A1B2C3D2FB46E020059B401 /* QLActions */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		05D0F59C2FB46E020059B3CB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A1B2C3D2FB46E020059B407 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -420,6 +490,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0A1B2C3D2FB46E020059B405 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4B0FDF7726C9A31F00C94DDE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -450,6 +527,11 @@
 			isa = PBXTargetDependency;
 			target = 05D0F59D2FB46E020059B3CB /* QLThumbnail */;
 			targetProxy = 05D0F5A62FB46E020059B3CB /* PBXContainerItemProxy */;
+		};
+		0A1B2C3D2FB46E020059B40C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0A1B2C3D2FB46E020059B401 /* QLActions */;
+			targetProxy = 0A1B2C3D2FB46E020059B40D /* PBXContainerItemProxy */;
 		};
 		4B0FDF9F26C9A38000C94DDE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -496,7 +578,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.39;
+				MARKETING_VERSION = 1.7.40;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLThumbnail;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -535,8 +617,85 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.39;
+				MARKETING_VERSION = 1.7.40;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLThumbnail;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		0A1B2C3D2FB46E020059B409 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = QLActions/QLActions.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FF68N39FU5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QLActions/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Render Molecule to PNG";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.7.40;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLActions;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		0A1B2C3D2FB46E020059B40A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = QLActions/QLActions.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FF68N39FU5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QLActions/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Render Molecule to PNG";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.7.40;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLActions;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -687,7 +846,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.39;
+				MARKETING_VERSION = 1.7.40;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -715,7 +874,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.39;
+				MARKETING_VERSION = 1.7.40;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -738,7 +897,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.39;
+				MARKETING_VERSION = 1.7.40;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -762,7 +921,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.39;
+				MARKETING_VERSION = 1.7.40;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -778,6 +937,15 @@
 			buildConfigurations = (
 				05D0F5A92FB46E020059B3CB /* Debug */,
 				05D0F5AA2FB46E020059B3CB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0A1B2C3D2FB46E020059B408 /* Build configuration list for PBXNativeTarget "QLActions" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A1B2C3D2FB46E020059B409 /* Debug */,
+				0A1B2C3D2FB46E020059B40A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
