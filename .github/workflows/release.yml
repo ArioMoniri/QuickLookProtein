@@ -698,7 +698,16 @@ jobs:
       # Pages (configured to serve from this branch /docs) will pick it up
       # within a minute, and any installed Sparkle client will see the new
       # release at the next check.
-      - name: Update appcast.xml
+      #
+      # IMPORTANT: do this on a fresh branch checkout, not on the tag's
+      # worktree. We hit a regression in 1.7.36-1.7.38 where rebases of
+      # the developer's local branch left git-stash conflict markers
+      # ("<<<<<<< Updated upstream") inside docs/appcast.xml on the tag
+      # commit. The old recipe (modify on the tag worktree, stash, switch
+      # branch, pop) then re-committed the markers verbatim, breaking
+      # Sparkle for everyone. Reading the appcast off origin's HEAD here
+      # makes this step idempotent regardless of what's in the tag.
+      - name: Update appcast.xml on branch & push
         if: steps.sparkle_inject.outputs.configured == 'true'
         env:
           APPCAST: docs/appcast.xml
@@ -706,6 +715,35 @@ jobs:
           SIGLINE: ${{ steps.sparkle.outputs.signature_line }}
           LENGTH:  ${{ steps.sparkle.outputs.length }}
         run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="${GITHUB_REF_NAME}"
+          if [[ "$BRANCH" == v* ]]; then BRANCH="feature/ario-signed"; fi
+
+          # Discard any modifications the tag's checkout may have made to
+          # docs/appcast.xml so the upcoming branch checkout is clean. The
+          # tag's appcast.xml is irrelevant — the branch HEAD is the source
+          # of truth.
+          git checkout -- "$APPCAST" 2>/dev/null || true
+
+          git fetch origin "$BRANCH"
+          git checkout "$BRANCH"
+          git pull --rebase origin "$BRANCH" || true
+
+          # Sanity-check the on-disk appcast parses as XML before we touch
+          # it. If a conflict marker slipped in via a developer rebase, fail
+          # loudly here so the regression is visible rather than masked by
+          # update-appcast.py crashing with a low-level traceback.
+          python3 -c "
+          import sys, xml.etree.ElementTree as ET
+          try: ET.parse('$APPCAST')
+          except Exception as e:
+              sys.stderr.write(f'appcast.xml is not well-formed: {e}\n')
+              sys.stderr.write('Likely a git-stash / merge conflict marker left over from a rebase.\n')
+              sys.exit(2)
+          "
+
           python3 scripts/update-appcast.py \
               --appcast "$APPCAST" \
               --version "$VERSION" \
@@ -714,38 +752,12 @@ jobs:
               --length "$LENGTH" \
               --release-url "https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
 
-      - name: Commit appcast back to the branch
-        if: steps.sparkle_inject.outputs.configured == 'true'
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # The tag points at the historical commit; we want the commit on
-          # the branch (feature/ario-signed) that the tag was cut from, so
-          # we check out that branch by name and push there.
-          BRANCH="${GITHUB_REF_NAME}"
-          # When triggered by a tag push, GITHUB_REF_NAME is the tag, so
-          # we use a fallback. Adjust the branch name if you ever rename it.
-          if [[ "$BRANCH" == v* ]]; then BRANCH="feature/ario-signed"; fi
-
-          # The "Update appcast.xml" step just modified docs/appcast.xml
-          # in the tag's worktree. Switching to the branch will refuse
-          # because of those local changes. Stash, switch, pop, retry.
-          # If the upstream branch already advanced (e.g. a previous
-          # release commit), rebase the stashed pop on top.
-          git stash push --include-untracked -m "appcast-update-${{ steps.version.outputs.version }}" -- docs/appcast.xml || true
-          git fetch origin "$BRANCH"
-          git checkout "$BRANCH"
-          git pull --rebase origin "$BRANCH" || true
-          # Re-apply the stashed appcast.xml on top of the branch.
-          git stash pop || true
-
-          git add docs/appcast.xml
+          git add "$APPCAST"
           if git diff --cached --quiet; then
               echo "appcast.xml unchanged; nothing to commit."
               exit 0
           fi
-          git commit -m "Release ${{ steps.version.outputs.version }}: appcast update [skip ci]"
+          git commit -m "Release ${VERSION}: appcast update [skip ci]"
           git push origin "$BRANCH"
 
       # ----------------------------------------------------------------
