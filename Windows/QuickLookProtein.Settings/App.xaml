@@ -1,0 +1,9 @@
+<Application x:Class="QuickLookProtein.Settings.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <!--
+      No global resources yet. If we add a shared dark theme later
+      it lands here; for now MainWindow defines everything in-place.
+    -->
+</Application>

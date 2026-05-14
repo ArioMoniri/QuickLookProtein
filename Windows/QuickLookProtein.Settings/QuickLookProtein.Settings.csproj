@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Windows-side settings UI for QuickLookProtein. WPF + net472 to
+    match the plugin's runtime (so the same shared SettingsStore.cs
+    works in both processes without recompilation).
+
+    This produces QuickLookProtein.Settings.exe - a regular Windows
+    app (not a shell extension), launched from the Start Menu entry
+    Setup.exe writes during install. It reads / writes the same
+    HKCU\Software\QuickLookProtein\Settings hive that the plugin
+    reads on every preview, so a change made here takes effect on
+    the user's next Space-bar tap with no IPC or restart.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>10.0</LangVersion>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <!-- ColorDialog is in WinForms; we only use it from MainWindow's
+         "Choose color..." button. Cheaper than pulling a 3rd-party
+         WPF color-picker NuGet for one dialog. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>QuickLookProtein.Settings</AssemblyName>
+    <RootNamespace>QuickLookProtein.Settings</RootNamespace>
+    <ApplicationIcon></ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- File-linked shared source: single source of truth with the
+         plugin so no settings drift can happen across the two
+         processes. -->
+    <Compile Include="..\Shared\SettingsStore.cs">
+      <Link>Shared\SettingsStore.cs</Link>
+    </Compile>
+  </ItemGroup>
+</Project>

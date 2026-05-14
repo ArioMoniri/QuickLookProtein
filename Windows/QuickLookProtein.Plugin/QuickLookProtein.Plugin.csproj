@@ -71,6 +71,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Single source of truth for the registry-backed settings store
+         is Windows/Shared/SettingsStore.cs. Both the plugin and the
+         standalone Settings WPF app compile that same file via this
+         link rather than depending on a separate shared assembly,
+         which would mean shipping a third DLL inside the .qlplugin. -->
+    <Compile Include="..\Shared\SettingsStore.cs">
+      <Link>Shared\SettingsStore.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
     <!--
       QuickLook.Common.dll is loaded by the QL-Win host process at runtime.
       We only need the API surface to compile against — Private=False keeps

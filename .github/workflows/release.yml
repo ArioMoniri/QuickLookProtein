@@ -693,6 +693,19 @@ jobs:
               -c Release `
               -o build/thumbnail
 
+      - name: Build Settings WPF app
+        shell: pwsh
+        # Settings.exe is the Windows-side control panel for user-
+        # tunable preferences (atom style per format, rotation,
+        # background, etc.). It writes to HKCU registry; the plugin
+        # reads from the same hive on every preview. Setup.exe drops
+        # the .exe + dll alongside the plugin and writes a Start
+        # Menu shortcut.
+        run: |
+          dotnet build Windows/QuickLookProtein.Settings/QuickLookProtein.Settings.csproj `
+              -c Release `
+              -o build/settings
+
       - name: Package .qlplugin
         id: pkg
         shell: pwsh
@@ -786,6 +799,21 @@ jobs:
           Copy-Item "${{ steps.pkg.outputs.path }}" "$stage/QuickLookProtein.qlplugin" -Force
           Copy-Item "Windows/install.ps1"           "$stage/install.ps1"               -Force
           Copy-Item "Windows/install.bat"           "$stage/install.bat"               -Force
+
+          # Bundle the Settings WPF app + its dependencies into the
+          # Setup.exe payload. install.ps1's Install-SettingsApp step
+          # copies them out of the plugin folder into a separate
+          # %LocalAppData% location and registers a Start Menu
+          # shortcut, so the user can launch "QuickLookProtein
+          # Settings" without hunting for an EXE.
+          if (Test-Path "build/settings/QuickLookProtein.Settings.exe") {
+            Get-ChildItem -Path build/settings -File `
+                | Where-Object { $_.Extension -in '.exe', '.dll', '.config' } `
+                | Copy-Item -Destination $stage
+            Write-Host "Bundled Settings WPF app into Setup.exe payload."
+          } else {
+            Write-Host "::warning::Settings app build output not found; Setup.exe will skip Start Menu shortcut."
+          }
 
           # Pull the QuickLook installer from QL-Win's latest release.
           # QL-Win is GPL-3; bundling the installer unmodified is fine

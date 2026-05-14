@@ -4,6 +4,50 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.17] — 2026-05-14
+
+### 🆕 Added — Windows feature parity
+
+- **QuickLookProtein Settings.exe** — full WPF settings app for the
+  Windows side, with the same controls as the macOS settings panel:
+  - **Atom display style per format** for all 12 supported file types
+    (PDB / CIF / SDF / MOL / MOL2 / XYZ / GRO / CUBE / PQR / VASP /
+    CDJSON / MMTF). Choose between Cartoon / Stick / Sphere / Line.
+  - **Color scheme** — Spectrum / Chain / Element / Secondary
+    structure / Amino acid.
+  - **Rotation speed** — Off / Slow / Medium / Fast.
+  - **Default zoom** — Auto / Tight / Normal / Wide.
+  - **Background color** — Windows ColorDialog picker, with a
+    swatch preview and a "Transparent" reset.
+  - **Rendering toggles** — Smart protein + ligand styling, Show
+    molecular surface, Hide hydrogens, Show unit cell (CIF), Show
+    info overlay.
+  - Dark themed UI, card-based layout, About / Tips / Trouble
+    sidebar with "Open GitHub" + "Open plugin folder" actions.
+  - No "Save" button — every change persists immediately to the
+    same registry hive the plugin reads on the next preview, so a
+    toggle flipped here shows up the next time you tap Space in
+    Explorer.
+- **`Windows/Shared/SettingsStore.cs`** — single source of truth for
+  the Windows settings. File-linked into both `QuickLookProtein.Plugin`
+  and `QuickLookProtein.Settings` so neither project can drift from
+  the other. Persists everything under
+  `HKCU\Software\QuickLookProtein\Settings`, matching the cross-
+  process semantics of macOS's App Group UserDefaults.
+- **Start Menu shortcut** "QuickLookProtein Settings" written by
+  `install.ps1`'s new `Install-SettingsApp` step. Per-user, no admin
+  needed. Setup.exe bundles `QuickLookProtein.Settings.exe` and its
+  dependencies into the installer payload.
+
+### 🪟 Plugin integration
+
+- **`MoleculePanel.FillTemplate`** now reads every template
+  placeholder (`{ATOM_STYLE}`, `{COLOR_SCHEME}`, `{BG_COLOR}`,
+  `{ROTATION_SPEED}`, `{ZOOM_FACTOR}`, the boolean toggles, …)
+  from `SettingsStore` instead of hardcoded values, so a Settings-
+  app change immediately affects the next Space-bar preview without
+  restarting QuickLook.
+
 ## [1.7.16] — 2026-05-14
 
 ### 🆕 Added — thumbnail completeness pass

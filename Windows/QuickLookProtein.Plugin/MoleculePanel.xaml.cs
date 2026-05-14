@@ -145,30 +145,79 @@ public partial class MoleculePanel : UserControl, IDisposable
     private static string FillTemplate(string template, string ext,
                                        string fileName, string moleculeData)
     {
-        var (format, atomStyle) = ResolveFormatAndStyle(ext);
+        var (format, defaultAtomStyle) = ResolveFormatAndStyle(ext);
         var safeData = SanitizeForScriptBlock(moleculeData);
         var safeName = EscapeForHtmlAttribute(fileName);
+
+        // Read every user-configurable knob from the Windows
+        // SettingsStore (registry-backed) so a change made in the
+        // Settings WPF app is picked up on the next preview without
+        // restarting QuickLook. Mirror of the macOS path in
+        // SharedFunctions.swift's prepare3DmolHTML.
+        var atomStyle      = QuickLookProtein.Shared.SettingsStore.GetAtomStyle(ext).ToString().ToLowerInvariant();
+        if (string.IsNullOrEmpty(atomStyle)) atomStyle = defaultAtomStyle;
+        var colorScheme    = QuickLookProtein.Shared.SettingsStore.GetColorScheme().ToString().ToLowerInvariant();
+        var rotation       = ResolveRotationToken(QuickLookProtein.Shared.SettingsStore.GetRotationSpeed());
+        var zoomFactor     = ResolveZoomFactor(QuickLookProtein.Shared.SettingsStore.GetDefaultZoom());
+        var zoomIsAuto     = QuickLookProtein.Shared.SettingsStore.GetDefaultZoom() == QuickLookProtein.Shared.DefaultZoom.Auto;
+        var autoStyleHet   = QuickLookProtein.Shared.SettingsStore.GetAutoStyleHetero();
+        var showSurface    = QuickLookProtein.Shared.SettingsStore.GetShowSurface();
+        var hideHydrogens  = QuickLookProtein.Shared.SettingsStore.GetHideHydrogens();
+        var showUnitCell   = QuickLookProtein.Shared.SettingsStore.GetShowUnitCell();
+        var showInfo       = QuickLookProtein.Shared.SettingsStore.GetShowInfoOverlay();
+        var (br, bg, bb, ba) = QuickLookProtein.Shared.SettingsStore.GetBgColor();
+        var bgHex = ResolveBgHex(br, bg, bb);
 
         // Order matters: insert the molecule data block LAST so
         // {…} sequences inside it can't be mistaken for placeholders.
         var html = template
             .Replace("{ATOM_STYLE}",        atomStyle)
-            .Replace("{COLOR_SCHEME}",      "spectrum")
-            .Replace("{BG_COLOR}",          "000000")
-            .Replace("{BG_ALPHA}",          "1.0")
-            .Replace("{ROTATION_SPEED}",    "1")
+            .Replace("{COLOR_SCHEME}",      colorScheme)
+            .Replace("{BG_COLOR}",          bgHex)
+            .Replace("{BG_ALPHA}",          ba.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))
+            .Replace("{ROTATION_SPEED}",    rotation)
             .Replace("{DATA_FORMAT}",       format)
-            .Replace("{AUTO_STYLE_HETERO}", "true")
-            .Replace("{SHOW_SURFACE}",      "false")
-            .Replace("{HIDE_H}",            "false")
-            .Replace("{SHOW_UNIT_CELL}",    "false")
-            .Replace("{SHOW_INFO}",         "true")
+            .Replace("{AUTO_STYLE_HETERO}", autoStyleHet  ? "true" : "false")
+            .Replace("{SHOW_SURFACE}",      showSurface   ? "true" : "false")
+            .Replace("{HIDE_H}",            hideHydrogens ? "true" : "false")
+            .Replace("{SHOW_UNIT_CELL}",    showUnitCell  ? "true" : "false")
+            .Replace("{SHOW_INFO}",         showInfo      ? "true" : "false")
             .Replace("{FILE_NAME}",         safeName)
-            .Replace("{ZOOM_FACTOR}",       "1.0")
-            .Replace("{ZOOM_IS_AUTO}",      "true")
+            .Replace("{ZOOM_FACTOR}",       zoomFactor)
+            .Replace("{ZOOM_IS_AUTO}",      zoomIsAuto ? "true" : "false")
             .Replace("{THUMBNAIL_MODE}",    "false")
             .Replace("{MOL_DATA}",          safeData);
         return html;
+    }
+
+    /// Map RotationSpeed enum to the integer token 3Dmol's viewer
+    /// template uses (0 = off, 1..3 = increasing).
+    private static string ResolveRotationToken(QuickLookProtein.Shared.RotationSpeed s) => s switch
+    {
+        QuickLookProtein.Shared.RotationSpeed.Off    => "0",
+        QuickLookProtein.Shared.RotationSpeed.Slow   => "1",
+        QuickLookProtein.Shared.RotationSpeed.Medium => "2",
+        QuickLookProtein.Shared.RotationSpeed.Fast   => "3",
+        _                                            => "2",
+    };
+
+    private static string ResolveZoomFactor(QuickLookProtein.Shared.DefaultZoom z) => z switch
+    {
+        QuickLookProtein.Shared.DefaultZoom.Auto   => "1.0",
+        QuickLookProtein.Shared.DefaultZoom.Tight  => "1.4",
+        QuickLookProtein.Shared.DefaultZoom.Normal => "1.0",
+        QuickLookProtein.Shared.DefaultZoom.Wide   => "0.7",
+        _                                          => "1.0",
+    };
+
+    /// Pack the 0..1 RGB triple into a "RRGGBB" hex string the
+    /// 3Dmol viewer template's background-color line expects.
+    private static string ResolveBgHex(double r, double g, double b)
+    {
+        int ri = (int)System.Math.Round(System.Math.Max(0, System.Math.Min(1, r)) * 255);
+        int gi = (int)System.Math.Round(System.Math.Max(0, System.Math.Min(1, g)) * 255);
+        int bi = (int)System.Math.Round(System.Math.Max(0, System.Math.Min(1, b)) * 255);
+        return $"{ri:X2}{gi:X2}{bi:X2}";
     }
 
     /// Map a file extension to the (3Dmol-format, default-atom-style)

@@ -283,6 +283,68 @@ function Try-StopQuickLook {
     return $false
 }
 
+function Install-SettingsApp {
+    # Look for the Settings WPF app + dependencies in the script's
+    # own folder (the Setup.exe payload puts everything alongside
+    # install.ps1 + install.bat + the .qlplugin). If present, copy
+    # to a stable per-user location and write a Start Menu shortcut
+    # so the user can launch "QuickLookProtein Settings" the normal
+    # Windows way.
+    $scriptDir = Split-Path -Parent $PSCommandPath
+    $settingsExe = Join-Path $scriptDir "QuickLookProtein.Settings.exe"
+    if (-not (Test-Path $settingsExe)) {
+        Write-Host "  Settings app not bundled - skipping shortcut install."
+        return
+    }
+
+    Write-Step "Installing Settings app..."
+
+    $appDir = Join-Path $env:LocalAppData "QuickLookProtein\Settings"
+    if (Test-Path $appDir) {
+        Remove-Item -Recurse -Force $appDir
+    }
+    New-Item -ItemType Directory -Force -Path $appDir | Out-Null
+
+    # Copy the WPF app plus every sibling DLL / .config in the
+    # script folder that doesn't belong to the plugin (the plugin
+    # files are referenced from the .qlplugin's own folder by
+    # QL-Win - we don't want duplicates).
+    $exclude = @(
+        "QuickLookProtein.qlplugin",
+        "install.bat", "install.ps1", "README.txt"
+    )
+    Get-ChildItem -Path $scriptDir -File | Where-Object {
+        ($_.Extension -in ".exe", ".dll", ".config") -and
+        ($exclude -notcontains $_.Name) -and
+        ($_.Name -notlike "QuickLook-*.exe") -and
+        ($_.Name -notlike "QuickLook.Plugin.*") -and
+        ($_.Name -notlike "QuickLookProtein.Thumbnail.dll") -and
+        ($_.Name -notlike "Microsoft.Web.WebView2.*") -and
+        ($_.Name -notlike "WebView2Loader.dll")
+    } | ForEach-Object {
+        Copy-Item -Path $_.FullName -Destination $appDir -Force
+    }
+    if (-not (Test-Path (Join-Path $appDir "QuickLookProtein.Settings.exe"))) {
+        Write-Host "  Settings app didn't land where expected - skipping shortcut."
+        return
+    }
+
+    # Start Menu shortcut. Per-user (no admin needed).
+    $startMenu = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs"
+    $shortcut  = Join-Path $startMenu "QuickLookProtein Settings.lnk"
+    try {
+        $wsh = New-Object -ComObject WScript.Shell
+        $lnk = $wsh.CreateShortcut($shortcut)
+        $lnk.TargetPath = Join-Path $appDir "QuickLookProtein.Settings.exe"
+        $lnk.WorkingDirectory = $appDir
+        $lnk.Description = "Configure QuickLookProtein preview settings"
+        $lnk.Save()
+        Write-Host "  Start Menu shortcut created: $shortcut"
+    } catch {
+        Write-Host "  Could not create Start Menu shortcut: $($_.Exception.Message)"
+    }
+}
+
 function Register-ThumbnailHandler {
     # Install the Windows Explorer thumbnail handler if the DLL is
     # present in the plugin folder (Setup.exe / installer zip /
@@ -441,6 +503,13 @@ if (-not (Test-QuickLookInstalled)) {
 }
 
 Install-Plugin
+
+# Best-effort: install the Settings WPF app + Start Menu shortcut.
+try { Install-SettingsApp } catch {
+    Write-Host ""
+    Write-Host "  Could not install Settings app: $($_.Exception.Message)"
+    Write-Host "  Plugin and thumbnails will still work."
+}
 
 # Best-effort: register the Windows Explorer thumbnail handler. Same
 # rule as the QuickLook restart - never fail the install over this.
