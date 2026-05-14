@@ -22,6 +22,19 @@ struct ViewerOptions {
     var defaultZoom: Settings.DefaultZoom
     var fileName: String
 
+    // Info-overlay field toggles (1.7.19+). All read from
+    // SettingsStorage so a change in the Settings UI propagates to
+    // the next preview without a relaunch.
+    var infoShowFileName:         Bool
+    var infoShowAtomCount:        Bool
+    var infoShowChainCount:       Bool
+    var infoShowFormat:           Bool
+    var infoShowResidueCount:     Bool
+    var infoShowElementBreakdown: Bool
+    var infoShowMolWeight:        Bool
+    var infoShowBondCount:        Bool
+    var infoShowPDBTitle:         Bool
+
     static func from(_ s: SettingsStorage, fileExtension ext: String, fileName: String) -> ViewerOptions {
         ViewerOptions(
             atomStyle:       s.atomStyle(forExtension: ext),
@@ -34,9 +47,44 @@ struct ViewerOptions {
             showUnitCell:    s.showUnitCell,
             showInfoOverlay: s.showInfoOverlay,
             defaultZoom:     s.defaultZoom,
-            fileName:        fileName
+            fileName:        fileName,
+            infoShowFileName:         s.infoShowFileName,
+            infoShowAtomCount:        s.infoShowAtomCount,
+            infoShowChainCount:       s.infoShowChainCount,
+            infoShowFormat:           s.infoShowFormat,
+            infoShowResidueCount:     s.infoShowResidueCount,
+            infoShowElementBreakdown: s.infoShowElementBreakdown,
+            infoShowMolWeight:        s.infoShowMolWeight,
+            infoShowBondCount:        s.infoShowBondCount,
+            infoShowPDBTitle:         s.infoShowPDBTitle
         )
     }
+}
+
+/// Quick-and-dirty PDB title scrape. Only walks the first ~16 KB of
+/// the file (titles are always near the top); concatenates every
+/// `TITLE   ` continuation record per the PDB spec. Returns nil for
+/// non-PDB formats and for PDBs with no TITLE record.
+func extractPDBTitle(from raw: String) -> String? {
+    var lines = raw.split(separator: "\n", maxSplits: 200, omittingEmptySubsequences: false)
+    if lines.count > 200 { lines = Array(lines.prefix(200)) }
+    var title = ""
+    for line in lines {
+        if line.hasPrefix("TITLE ") {
+            // PDB TITLE record: cols 11-80 are the title text.
+            let s = String(line)
+            if s.count >= 11 {
+                let start = s.index(s.startIndex, offsetBy: 10)
+                title += s[start...].trimmingCharacters(in: .whitespaces) + " "
+            }
+        } else if line.hasPrefix("ATOM") || line.hasPrefix("HETATM") {
+            // Titles are always before atom records; bail when we hit
+            // one so we don't scan the whole file.
+            break
+        }
+    }
+    let trimmed = title.trimmingCharacters(in: .whitespaces)
+    return trimmed.isEmpty ? nil : trimmed
 }
 
 /// Loads the bundled 3Dmol viewer HTML, injects the structure file's contents and the
@@ -88,6 +136,21 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{SHOW_UNIT_CELL}",    with: options.showUnitCell     ? "true" : "false")
     html = html.replacingOccurrences(of: "{SHOW_INFO}",         with: options.showInfoOverlay  ? "true" : "false")
     html = html.replacingOccurrences(of: "{FILE_NAME}",         with: escapeForHTMLAttribute(options.fileName))
+    // Info-overlay field toggles (1.7.19+).
+    html = html.replacingOccurrences(of: "{INFO_FILE_NAME}",     with: options.infoShowFileName         ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_ATOM_COUNT}",    with: options.infoShowAtomCount        ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_CHAIN_COUNT}",   with: options.infoShowChainCount       ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_FORMAT}",        with: options.infoShowFormat           ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_RES_COUNT}",     with: options.infoShowResidueCount     ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_ELEMENT_BREAKDOWN}", with: options.infoShowElementBreakdown ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_MOL_WEIGHT}",    with: options.infoShowMolWeight        ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_BOND_COUNT}",    with: options.infoShowBondCount        ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_PDB_TITLE}",     with: options.infoShowPDBTitle         ? "true" : "false")
+    // PDB TITLE record contents, if any. Always passed but only shown
+    // when {INFO_PDB_TITLE} is true. Safe-escape so weird titles can't
+    // break out of the JS string literal.
+    let pdbTitle = extractPDBTitle(from: raw) ?? ""
+    html = html.replacingOccurrences(of: "{PDB_TITLE}", with: escapeForJSStringLiteral(pdbTitle))
     html = html.replacingOccurrences(of: "{ZOOM_FACTOR}",       with: String(options.defaultZoom.factor))
     html = html.replacingOccurrences(of: "{ZOOM_IS_AUTO}",      with: options.defaultZoom == .auto ? "true" : "false")
     html = html.replacingOccurrences(of: "{THUMBNAIL_MODE}",    with: thumbnailMode ? "true" : "false")
@@ -130,6 +193,20 @@ private func escapeForHTMLAttribute(_ s: String) -> String {
     out = out.replacingOccurrences(of: "}",  with: "&#125;")
     out = out.replacingOccurrences(of: "\n", with: " ")
     out = out.replacingOccurrences(of: "\r", with: " ")
+    return out
+}
+
+/// Escape a string for use inside a JS double-quoted literal. Used
+/// for the PDB title we inject as `var pdbTitle = "...";`. Same rules
+/// as escapeForHTMLAttribute minus the HTML-entity bits.
+internal func escapeForJSStringLiteral(_ s: String) -> String {
+    var out = s
+    out = out.replacingOccurrences(of: "\\", with: "\\\\")
+    out = out.replacingOccurrences(of: "\"", with: "\\\"")
+    out = out.replacingOccurrences(of: "\n", with: " ")
+    out = out.replacingOccurrences(of: "\r", with: " ")
+    out = out.replacingOccurrences(of: "{",  with: "\\u007b")
+    out = out.replacingOccurrences(of: "}",  with: "\\u007d")
     return out
 }
 

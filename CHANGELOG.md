@@ -4,6 +4,37 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.19] — 2026-05-14
+
+### 🆕 Added — Mac info overlay extras
+
+- **Info overlay fields are now per-field configurable**. The pill at
+  the top-left of every preview used to be a fixed
+  `filename · atoms · chains · format`. Now each piece is its own
+  toggle in *Settings → Info overlay fields*: file name, atom count,
+  chain count, file format (the originals, all default ON), plus four
+  new fields default OFF:
+  - **Residue count** — unique `(chain, resi, resn)` tuples.
+  - **Element breakdown** — top 4 most abundant elements with counts,
+    e.g. *"C:120 N:36 O:30 H:24"*.
+  - **Molecular weight** — sum of IUPAC 2021 standard atomic masses
+    over all atoms; auto-formats Da vs kDa above 1000.
+  - **Bond count** — derived from 3Dmol's per-atom `bonds` arrays,
+    halved (each bond is listed twice).
+  - **PDB title** — first `TITLE` record from the PDB header, parsed
+    in Swift before passing the file to 3Dmol, truncated to 60 chars
+    in the overlay.
+  All fields gated on the master "Show info overlay" master toggle.
+- **Multi-file Quick Look behaviour setting** in Settings. Two modes:
+  - *Separate windows (default)* — what you already get; QuickLook's
+    own `<` `>` arrows navigate between selected files.
+  - *Merge all in same folder* — placeholder for the planned QL-
+    extension feature where the preview also pulls in every other
+    supported structure in the file's folder and overlays them in
+    one 3Dmol scene. Stored in user defaults; the QL extension
+    will honour it in a later release once the sibling-read
+    sandbox-permission story is clarified.
+
 ## [1.7.18] — 2026-05-14
 
 ### 🐛 Fixed

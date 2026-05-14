@@ -73,6 +73,36 @@ class SettingsStorage: ObservableObject {
     @Published var showUnitCell:    Bool                   { didSet { Self.preferencesStore.set(showUnitCell,    forKey: "showUnitCell")    } }
     @Published var showInfoOverlay: Bool                   { didSet { Self.preferencesStore.set(showInfoOverlay, forKey: "showInfoOverlay") } }
 
+    // MARK: - Info overlay fields
+    //
+    // The overlay was always "filename · atoms · chains · format" -
+    // users asked for finer control over what shows. Each field
+    // below is a separate toggle so they can build whatever info
+    // strip they want. All default to the previous behaviour for
+    // back-compat: filename / atoms / chains / format ON, everything
+    // else OFF.
+    @Published var infoShowFileName:        Bool { didSet { Self.preferencesStore.set(infoShowFileName,        forKey: "infoShowFileName") } }
+    @Published var infoShowAtomCount:       Bool { didSet { Self.preferencesStore.set(infoShowAtomCount,       forKey: "infoShowAtomCount") } }
+    @Published var infoShowChainCount:      Bool { didSet { Self.preferencesStore.set(infoShowChainCount,      forKey: "infoShowChainCount") } }
+    @Published var infoShowFormat:          Bool { didSet { Self.preferencesStore.set(infoShowFormat,          forKey: "infoShowFormat") } }
+    @Published var infoShowResidueCount:    Bool { didSet { Self.preferencesStore.set(infoShowResidueCount,    forKey: "infoShowResidueCount") } }
+    @Published var infoShowElementBreakdown:Bool { didSet { Self.preferencesStore.set(infoShowElementBreakdown,forKey: "infoShowElementBreakdown") } }
+    @Published var infoShowMolWeight:       Bool { didSet { Self.preferencesStore.set(infoShowMolWeight,       forKey: "infoShowMolWeight") } }
+    @Published var infoShowBondCount:       Bool { didSet { Self.preferencesStore.set(infoShowBondCount,       forKey: "infoShowBondCount") } }
+    @Published var infoShowPDBTitle:        Bool { didSet { Self.preferencesStore.set(infoShowPDBTitle,        forKey: "infoShowPDBTitle") } }
+
+    // MARK: - Multi-file Quick Look behaviour
+    //
+    // Persisted preference for what to do when the user spacebars
+    // multiple files in Finder. Quick Look's `<` `>` navigation is
+    // built in - we can't disable it - but we *can* offer a "merge
+    // siblings in same folder" mode where the QL extension reads
+    // sibling structures and loads them all into one 3Dmol scene.
+    // Default is .separate (current behaviour, native QL nav).
+    @Published var multiFilePreviewMode: Settings.MultiFilePreviewMode {
+        didSet { Self.write(multiFilePreviewMode, forKey: "multiFilePreviewMode") }
+    }
+
     /// Initial zoom factor applied after 3Dmol's `viewer.zoomTo()` auto-fit.
     @Published var defaultZoom: Settings.DefaultZoom { didSet { Self.write(defaultZoom, forKey: "defaultZoom") } }
 
@@ -104,6 +134,22 @@ class SettingsStorage: ObservableObject {
         self.hideHydrogens   = store.bool(forKey: "hideHydrogens")
         self.showUnitCell    = store.bool(forKey: "showUnitCell")
         self.showInfoOverlay = store.object(forKey: "showInfoOverlay") as? Bool ?? true
+
+        // Info-overlay field toggles. Existing fields default ON
+        // (preserves pre-1.7.19 overlay content); new fields default
+        // OFF (avoids surprising existing users with extra clutter).
+        self.infoShowFileName         = store.object(forKey: "infoShowFileName")         as? Bool ?? true
+        self.infoShowAtomCount        = store.object(forKey: "infoShowAtomCount")        as? Bool ?? true
+        self.infoShowChainCount       = store.object(forKey: "infoShowChainCount")       as? Bool ?? true
+        self.infoShowFormat           = store.object(forKey: "infoShowFormat")           as? Bool ?? true
+        self.infoShowResidueCount     = store.object(forKey: "infoShowResidueCount")     as? Bool ?? false
+        self.infoShowElementBreakdown = store.object(forKey: "infoShowElementBreakdown") as? Bool ?? false
+        self.infoShowMolWeight        = store.object(forKey: "infoShowMolWeight")        as? Bool ?? false
+        self.infoShowBondCount        = store.object(forKey: "infoShowBondCount")        as? Bool ?? false
+        self.infoShowPDBTitle         = store.object(forKey: "infoShowPDBTitle")         as? Bool ?? false
+
+        self.multiFilePreviewMode = Self.read(forKey: "multiFilePreviewMode", default: .separate)
+
         self.bgColorRed      = store.double(forKey: "bgColorRed")
         self.bgColorGreen    = store.double(forKey: "bgColorGreen")
         self.bgColorBlue     = store.double(forKey: "bgColorBlue")
@@ -223,6 +269,21 @@ struct Settings {
     /// Initial zoom factor applied *after* 3Dmol's auto-fit `zoomTo()`. A value
     /// > 1 zooms in (closer to the molecule); < 1 zooms out. `auto` skips the
     /// extra zoom call so 3Dmol's fitting heuristic decides framing alone.
+    /// What to do when the user spacebars several files in Finder.
+    /// `separate` is the native Quick Look behaviour: each file gets
+    /// its own preview, with `<` `>` arrows in the QL chrome to
+    /// navigate between them. `mergeFolder` tells the QL extension
+    /// to ALSO load every other supported structure in the same
+    /// folder into the current preview, overlaying them in one
+    /// 3Dmol scene. Useful when comparing related structures (e.g.
+    /// a set of docking poses).
+    enum MultiFilePreviewMode: String, CaseIterable, Identifiable {
+        case separate     = "Separate windows (default)"
+        case mergeFolder  = "Merge all in same folder"
+
+        var id: MultiFilePreviewMode { return self }
+    }
+
     enum DefaultZoom: String, CaseIterable, Identifiable {
         case auto      = "Auto-fit"
         case zoom50    = "50%"

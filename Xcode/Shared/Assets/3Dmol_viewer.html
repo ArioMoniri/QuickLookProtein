@@ -255,10 +255,102 @@
                         var infoEl = document.getElementById('info');
                         var parts = [];
                         var fileName = "{FILE_NAME}";
-                        if (fileName) parts.push(fileName);
-                        parts.push(atoms.length.toLocaleString() + ' atoms');
-                        if (chainCount > 0) parts.push(chainCount + ' chain' + (chainCount === 1 ? '' : 's'));
-                        parts.push(format.toUpperCase());
+                        var pdbTitle = "{PDB_TITLE}";
+
+                        // PDB header title (only meaningful for .pdb / .ent).
+                        if ({INFO_PDB_TITLE} && pdbTitle && pdbTitle.length > 0) {
+                            // Truncate long titles so the overlay doesn't wrap into
+                            // a wall of text - keep first ~60 chars + ellipsis.
+                            var t = pdbTitle.length > 60
+                                  ? pdbTitle.substring(0, 60).replace(/\s+$/, '') + '...'
+                                  : pdbTitle;
+                            parts.push(t);
+                        }
+
+                        if ({INFO_FILE_NAME} && fileName) parts.push(fileName);
+
+                        if ({INFO_ATOM_COUNT}) {
+                            parts.push(atoms.length.toLocaleString() + ' atoms');
+                        }
+
+                        if ({INFO_CHAIN_COUNT} && chainCount > 0) {
+                            parts.push(chainCount + ' chain' + (chainCount === 1 ? '' : 's'));
+                        }
+
+                        // Residue count: unique tuples of (chain, resi, resn).
+                        if ({INFO_RES_COUNT}) {
+                            var residueSet = {};
+                            for (var ri = 0; ri < atoms.length; ri++) {
+                                var ai = atoms[ri];
+                                if (ai.resi === undefined || ai.resi === '') continue;
+                                var key = (ai.chain || '') + '|' + ai.resi + '|' + (ai.resn || '');
+                                residueSet[key] = 1;
+                            }
+                            var rc = Object.keys(residueSet).length;
+                            if (rc > 0) parts.push(rc.toLocaleString() + ' residue' + (rc === 1 ? '' : 's'));
+                        }
+
+                        // Element breakdown: top 4 most abundant elements.
+                        if ({INFO_ELEMENT_BREAKDOWN}) {
+                            var elemCount = {};
+                            for (var ei = 0; ei < atoms.length; ei++) {
+                                var e = (atoms[ei].elem || '?').toUpperCase();
+                                elemCount[e] = (elemCount[e] || 0) + 1;
+                            }
+                            var pairs = [];
+                            for (var k in elemCount) pairs.push([k, elemCount[k]]);
+                            pairs.sort(function (a, b) { return b[1] - a[1]; });
+                            var top = pairs.slice(0, 4).map(function (p) {
+                                return p[0] + ':' + p[1];
+                            }).join(' ');
+                            if (top.length > 0) parts.push(top);
+                        }
+
+                        // Molecular weight in Daltons. IUPAC 2021 standard
+                        // atomic weights for the common elements; unknowns
+                        // contribute 0.
+                        if ({INFO_MOL_WEIGHT}) {
+                            var ATOMIC_MASS = {
+                                'H': 1.008, 'HE': 4.0026,
+                                'LI': 6.94,   'BE': 9.0122, 'B':  10.81,
+                                'C':  12.011, 'N':  14.007, 'O':  15.999,
+                                'F':  18.998, 'NE': 20.180,
+                                'NA': 22.990, 'MG': 24.305, 'AL': 26.982, 'SI': 28.085,
+                                'P':  30.974, 'S':  32.06,  'CL': 35.45,  'AR': 39.948,
+                                'K':  39.098, 'CA': 40.078,
+                                'MN': 54.938, 'FE': 55.845, 'CO': 58.933, 'NI': 58.693,
+                                'CU': 63.546, 'ZN': 65.38,
+                                'BR': 79.904, 'I': 126.904,
+                                'SE': 78.971, 'MO': 95.95,
+                            };
+                            var mw = 0;
+                            for (var mi = 0; mi < atoms.length; mi++) {
+                                var em = (atoms[mi].elem || '').toUpperCase();
+                                if (ATOMIC_MASS[em] !== undefined) mw += ATOMIC_MASS[em];
+                            }
+                            if (mw > 0) {
+                                var disp = mw >= 1000
+                                         ? (mw / 1000).toFixed(2) + ' kDa'
+                                         : mw.toFixed(1) + ' Da';
+                                parts.push(disp);
+                            }
+                        }
+
+                        // Bond count: 3Dmol atoms have a `bonds` array of
+                        // partner serials. Each bond appears twice (once per
+                        // partner) so divide by 2.
+                        if ({INFO_BOND_COUNT}) {
+                            var bondTotal = 0;
+                            for (var bi = 0; bi < atoms.length; bi++) {
+                                var b = atoms[bi].bonds;
+                                if (b && b.length) bondTotal += b.length;
+                            }
+                            var bondCount = Math.floor(bondTotal / 2);
+                            if (bondCount > 0) parts.push(bondCount.toLocaleString() + ' bonds');
+                        }
+
+                        if ({INFO_FORMAT}) parts.push(format.toUpperCase());
+
                         infoEl.textContent = parts.join(' · ');
                     }
 

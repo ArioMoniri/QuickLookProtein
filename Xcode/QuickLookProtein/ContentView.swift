@@ -132,6 +132,48 @@ struct ContentView: View {
                             Toggle("Show unit cell (CIF)",            isOn: $userSettings.showUnitCell)
                             Toggle("Show info overlay",               isOn: $userSettings.showInfoOverlay)
                         }
+
+                        // MARK: Info-overlay fields - which bits of info appear
+                        //       in the info pill at the top-left of every
+                        //       preview. Gated on the master "Show info
+                        //       overlay" toggle above so users can hide the
+                        //       whole strip without re-checking each field.
+                        Text("Info overlay fields").font(.headline).padding(.top, 8)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("File name",          isOn: $userSettings.infoShowFileName)
+                            Toggle("Atom count",         isOn: $userSettings.infoShowAtomCount)
+                            Toggle("Chain count",        isOn: $userSettings.infoShowChainCount)
+                            Toggle("Residue count",      isOn: $userSettings.infoShowResidueCount)
+                            Toggle("Element breakdown",  isOn: $userSettings.infoShowElementBreakdown)
+                                .help("Top four most abundant elements with counts, e.g. \"C:120 N:36 O:30 H:24\".")
+                            Toggle("Molecular weight",   isOn: $userSettings.infoShowMolWeight)
+                                .help("Sum of standard atomic masses (Daltons / kDa above 1000).")
+                            Toggle("Bond count",         isOn: $userSettings.infoShowBondCount)
+                            Toggle("PDB title",          isOn: $userSettings.infoShowPDBTitle)
+                                .help("First TITLE record from the PDB header. Only meaningful for .pdb / .ent files.")
+                            Toggle("File format",        isOn: $userSettings.infoShowFormat)
+                        }
+                        .disabled(!userSettings.showInfoOverlay)
+                        .opacity(userSettings.showInfoOverlay ? 1 : 0.4)
+
+                        // MARK: Multi-file Quick Look behaviour.
+                        //       Quick Look's `<` `>` navigation between
+                        //       selected files is built into macOS and
+                        //       can't be disabled from a Quick Look
+                        //       extension. The "Merge in same folder"
+                        //       option is honoured by the preview
+                        //       extension - it reads sibling structures
+                        //       and stacks them in one 3Dmol scene.
+                        Text("Multiple-file preview").font(.headline).padding(.top, 8)
+                        Form {
+                            Picker("When previewing many files:",
+                                   selection: $userSettings.multiFilePreviewMode) {
+                                ForEach(Settings.MultiFilePreviewMode.allCases) {
+                                    Text($0.rawValue).tag($0)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: 340)
                     }
                     .padding()
 
