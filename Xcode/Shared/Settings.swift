@@ -151,6 +151,14 @@ class SettingsStorage: ObservableObject {
     // PNG without leaving QuickLook). Default ON.
     @Published var showShareButton: Bool { didSet { Self.preferencesStore.set(showShareButton, forKey: "showShareButton") } }
 
+    // Animated APNG thumbnails (1.7.35+). Default OFF. macOS Finder does NOT
+    // animate APNG thumbnails in stock builds, so this is shipped as an
+    // experimental toggle: the file is a valid APNG (animates anywhere that
+    // honours the format), the still preview Finder shows is the first
+    // rotated frame. Rendering 12 frames takes ~12x as long as a single
+    // thumbnail, so the user should opt in deliberately.
+    @Published var animatedThumbnails: Bool { didSet { Self.preferencesStore.set(animatedThumbnails, forKey: "animatedThumbnails") } }
+
     // MARK: - Multi-file Quick Look behaviour
     //
     // Persisted preference for what to do when the user spacebars
@@ -223,6 +231,7 @@ class SettingsStorage: ObservableObject {
         self.cryoEMRender     = store.object(forKey: "cryoEMRender")     as? Bool ?? true
         self.cryoEMSigma      = (store.object(forKey: "cryoEMSigma")     as? Double) ?? 2.5
         self.showShareButton  = store.object(forKey: "showShareButton")  as? Bool ?? true
+        self.animatedThumbnails = store.object(forKey: "animatedThumbnails") as? Bool ?? false
 
         self.multiFilePreviewMode = Self.read(forKey: "multiFilePreviewMode", default: .separate)
 

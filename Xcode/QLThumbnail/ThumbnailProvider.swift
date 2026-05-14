@@ -68,6 +68,33 @@ final class ThumbnailProvider: QLThumbnailProvider {
         // result is identical; for list-view the URL form is full-bleed.
         let tempURL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("qlp-thumb-\(UUID().uuidString).png")
+
+        // Animated APNG path: opt-in via Settings, only at sizes ≥ 128 px
+        // (smaller icons aren't worth the 12x render cost). On failure we
+        // fall through to the single-frame still.
+        // Read settings directly from the App Group container — QLThumbnail
+        // doesn't link Settings.swift to keep the extension's footprint tiny.
+        let defaults = UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein")
+            ?? .standard
+        let animatedOn = defaults.object(forKey: "animatedThumbnails") as? Bool ?? false
+        if animatedOn,
+           min(size.width, size.height) >= 128,
+           let atoms = atoms, !atoms.isEmpty,
+           let apng = Self.renderAPNG(atoms: atoms, ext: ext, size: size) {
+            let apngURL = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("qlp-thumb-\(UUID().uuidString).png")
+            do {
+                try apng.write(to: apngURL, options: .atomic)
+                os_log("returning APNG thumbnail (%{public}@)",
+                       log: thumbLog, type: .info, apngURL.path)
+                handler(QLThumbnailReply(imageFileURL: apngURL), nil)
+                return
+            } catch {
+                os_log("APNG write failed: %{public}@ — falling back",
+                       log: thumbLog, type: .error, error.localizedDescription)
+            }
+        }
+
         let renderedOK = Self.renderToPNG(at: tempURL, size: size) { rect in
             if let atoms = atoms, !atoms.isEmpty {
                 Self.drawMolecule(atoms: atoms, ext: ext, in: rect)
@@ -708,5 +735,70 @@ final class ThumbnailProvider: QLThumbnailProvider {
                          radius: centerR, color: accent)
 
         drawFormatLabel(ext: ext, in: rect)
+    }
+
+    // MARK: - APNG multi-frame render
+
+    /// Render 12 rotation frames in 30° steps around the Y axis and stitch
+    /// them into a single APNG. Returns nil if any frame fails to encode.
+    private static func renderAPNG(atoms: [Atom], ext: String, size: CGSize) -> Data? {
+        let frameCount = 12
+        var pngFrames: [Data] = []
+        pngFrames.reserveCapacity(frameCount)
+        for i in 0..<frameCount {
+            let angle = (Double(i) / Double(frameCount)) * 2 * .pi
+            let rotated = rotateAtomsY(atoms, angle: angle)
+            guard let pngData = renderPNGData(size: size, body: { rect in
+                drawMolecule(atoms: rotated, ext: ext, in: rect)
+            }) else { return nil }
+            pngFrames.append(pngData)
+        }
+        return APNGEncoder.encode(frames: pngFrames, frameDelayMs: 60, loop: 0)
+    }
+
+    /// Render a single drawing block to an in-memory PNG (instead of writing
+    /// to disk). Used to feed APNG frames without N temp files.
+    private static func renderPNGData(size: CGSize, body: (NSRect) -> Void) -> Data? {
+        guard let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: Int(size.width),
+                pixelsHigh: Int(size.height),
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0),
+              let nsCtx = NSGraphicsContext(bitmapImageRep: rep)
+        else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = nsCtx
+        body(NSRect(origin: .zero, size: size))
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.representation(using: .png, properties: [:])
+    }
+
+    /// Rotate every atom around the Y axis (vertical), preserving residue /
+    /// chain metadata so drawCartoonTrace still gets to depth-sort correctly.
+    private static func rotateAtomsY(_ atoms: [Atom], angle: Double) -> [Atom] {
+        // Centre on the centroid so the rotation is around the molecule, not
+        // around the world origin (which might be far from the structure).
+        var cx = 0.0, cy = 0.0, cz = 0.0
+        for a in atoms { cx += a.x; cy += a.y; cz += a.z }
+        let n = Double(atoms.count)
+        cx /= n; cy /= n; cz /= n
+        let c = cos(angle), s = sin(angle)
+        var out = [Atom]()
+        out.reserveCapacity(atoms.count)
+        for a in atoms {
+            let dx = a.x - cx, dz = a.z - cz
+            let nx = dx * c + dz * s + cx
+            let nz = -dx * s + dz * c + cz
+            out.append(Atom(x: nx, y: a.y, z: nz,
+                            element: a.element, name: a.name,
+                            chain: a.chain, residueSeq: a.residueSeq))
+        }
+        return out
     }
 }

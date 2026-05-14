@@ -145,6 +145,8 @@ struct ContentView: View {
                                 .help("Render .ccp4 / .mrc / .map files as a volumetric isosurface. Off: those files fall back to the host's text viewer.")
                             Toggle("Share button in preview",         isOn: $userSettings.showShareButton)
                                 .help("Adds a Share button to the in-preview toolbar that captures the current rendering as PNG and presents the system Sharing picker.")
+                            Toggle("Animated thumbnails (experimental)", isOn: $userSettings.animatedThumbnails)
+                                .help("Encode Finder thumbnails as 12-frame spinning APNGs (≥128 px only). Renders ~12x slower per thumbnail. macOS Finder displays the first frame statically — visible animation requires third-party viewers that honour APNG.")
                         }
 
                         // Per-button toolbar visibility - gated on the master
