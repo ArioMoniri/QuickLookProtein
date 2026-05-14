@@ -47,6 +47,23 @@
             #controls button:hover  { background: rgba(255,255,255,1.0); }
             #controls button.active { background: rgba(0,120,215,0.85);
                                        color: #fff; border-color: rgba(0,120,215,0.95); }
+            /* Corner-pill hide toggles (1.7.38+). Three tiny buttons in the
+               top-right that hide / show the #info overlay, #label badge, and
+               the #controls toolbar without leaving the preview. They live in
+               their own pill so the user can dismiss every other overlay if
+               they want a clean rendering. */
+            #hide-pill { position: absolute; top: 8px; right: 8px; z-index: 13;
+                         display: flex; gap: 2px;
+                         background: rgba(255,255,255,0.65);
+                         border: 1px solid rgba(0,0,0,0.18);
+                         border-radius: 999px; padding: 2px 4px; }
+            #hide-pill button {
+                font: 500 10px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+                background: transparent; color: #333;
+                border: 0; padding: 2px 5px; cursor: pointer; border-radius: 999px;
+                transition: background 0.1s ease; min-width: 18px; }
+            #hide-pill button:hover  { background: rgba(0,0,0,0.08); }
+            #hide-pill button.muted  { color: #b00; text-decoration: line-through; }
             @media (prefers-color-scheme: dark) {
                 #info  { color: #ddd; background: rgba(30,30,30,0.70); }
                 #label { color: #fff; background: rgba(30,30,30,0.92); }
@@ -57,6 +74,11 @@
                 #controls button:hover  { background: rgba(60,60,62,0.95); }
                 #controls button.active { background: rgba(58,145,235,0.85);
                                           color: #fff; border-color: rgba(58,145,235,0.95); }
+                #hide-pill { background: rgba(40,40,42,0.75);
+                              border-color: rgba(255,255,255,0.18); }
+                #hide-pill button { color: #ddd; }
+                #hide-pill button:hover { background: rgba(255,255,255,0.12); }
+                #hide-pill button.muted { color: #ff8a8a; }
             }
         </style>
     </head>
@@ -68,6 +90,15 @@
         <div style="height: 100vh; width: 100%; position: relative;" id="3dviewer"></div>
         <div id="info"></div>
         <div id="label"></div>
+        <!-- Corner-pill hide toggles (1.7.38+). Tap to mute the info strip,
+             label badge, or controls toolbar without leaving the preview.
+             State is local to this preview; reopening the file restores
+             the defaults from Settings. -->
+        <div id="hide-pill">
+            <button data-target="info"     title="Toggle info strip">i</button>
+            <button data-target="label"    title="Toggle label badge">L</button>
+            <button data-target="controls" title="Toggle controls">⋯</button>
+        </div>
         <!-- Interactive 3Dmol controls (1.7.27+). Bottom-right pill
              toolbar visible only when {SHOW_CONTROLS} is true. The JS
              below wires each button to the corresponding 3Dmol API
@@ -832,6 +863,38 @@
                             });
                         })();
                     }
+
+                    // === corner-pill hide toggles (1.7.38+) ==================
+                    // Three tiny buttons in the top-right that mute / unmute
+                    // the info strip, label badge, and controls toolbar in
+                    // place. State is local to this preview — closing and
+                    // re-opening restores defaults from Settings.
+                    (function () {
+                        var pill = document.getElementById('hide-pill');
+                        if (!pill) return;
+                        pill.querySelectorAll('button[data-target]').forEach(function (btn) {
+                            var target = btn.getAttribute('data-target');
+                            var el = document.getElementById(target);
+                            if (!el) {
+                                btn.style.display = 'none';
+                                return;
+                            }
+                            // Reflect initial visibility — if the element was
+                            // already hidden via Settings, start in the muted
+                            // state so the user can choose to reveal it.
+                            var cs = window.getComputedStyle(el).display;
+                            if (cs === 'none') btn.classList.add('muted');
+                            btn.addEventListener('click', function () {
+                                var hidden = btn.classList.toggle('muted');
+                                if (hidden) {
+                                    el.dataset.qlpPrevDisplay = el.style.display || '';
+                                    el.style.display = 'none';
+                                } else {
+                                    el.style.display = el.dataset.qlpPrevDisplay || '';
+                                }
+                            });
+                        });
+                    })();
 
                     // === window-resize → canvas-resize =======================
                     var resizeTimer = null;
