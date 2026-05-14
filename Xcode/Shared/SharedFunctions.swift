@@ -853,9 +853,10 @@ func prepare3DmolHTML(htmlPath: String,
             return errorHTML(
                 title: "Trajectory format not previewable",
                 detail: "\(lowerExt.uppercased()) trajectory could not be parsed. " +
-                        "DCD is supported (CHARMM/NAMD); XTC/TRR are not yet readable " +
-                        "without GROMACS-side decompression. Add a sibling .pdb or .psf " +
-                        "topology file to get element-aware atom labels.")
+                        "DCD (CHARMM/NAMD) and TRR (GROMACS uncompressed) are supported. " +
+                        "XTC requires libxdrfile-style decompression and is not yet readable " +
+                        "in this build. Add a sibling .pdb / .psf / .gro topology file to get " +
+                        "element-aware atom labels.")
         }
     } else {
         do {
@@ -1289,11 +1290,14 @@ func convertColorToRGB(color: Color) -> (rgbHex: String, alpha: String) {
 //           via the leading record marker (84) and walk header → title → natoms
 //           → first-frame X/Y/Z.
 //
+// Supported now (1.7.41+):
+//   .trr  — GROMACS XDR-encoded full-precision floats; reads frame 0 only.
+//
 // Not yet supported (returns nil so the caller emits a friendly error HTML):
-//   .xtc  — GROMACS XDR-encoded with custom 3D-vector compression (libxdrfile).
-//           Implementable in Swift but a few hundred lines for the bit-unpacker.
-//   .trr  — GROMACS XDR-encoded full-precision floats. Simpler than XTC but
-//           still requires an XDR walker and integration tests.
+//   .xtc  — GROMACS XDR-encoded with custom 3D-vector compression
+//           (libxdrfile-style bit-packed deltas). Implementable in Swift but
+//           a few hundred lines for the bit-unpacker — out of scope for the
+//           "final" release; track here so a future contributor can pick it up.
 
 /// Top-level dispatcher. Returns first-frame XYZ text, or nil if the format
 /// isn't decodable yet.
@@ -1302,7 +1306,9 @@ internal func readTrajectoryFirstFrame(path: String, ext: String) -> String? {
     switch ext {
     case "dcd":
         return parseDCDFirstFrame(data: data, dcdURL: URL(fileURLWithPath: path))
-    case "xtc", "trr":
+    case "trr":
+        return parseTRRFirstFrame(data: data, trrURL: URL(fileURLWithPath: path))
+    case "xtc":
         return nil  // explicit unsupported — caller shows an info panel
     default:
         return nil
@@ -1516,4 +1522,121 @@ private func readFloatArray(_ data: Data, offset: inout Int, count: Int,
     // Trailing length marker.
     offset += 4
     return true
+}
+
+// MARK: - TRR (GROMACS uncompressed trajectory)
+//
+// TRR header per frame:
+//   int32 magic   = 1993 (big-endian — XDR is always BE)
+//   int32 slen    = length of version string (12 or 13)
+//   <slen bytes>  = ASCII "GMX_trn_file" (XDR pads up to 4-byte boundary)
+//   int32 ir_size, e_size, box_size, vir_size, pres_size,
+//         top_size, sym_size, x_size, v_size, f_size  (each in bytes)
+//   int32 natoms
+//   int32 step
+//   int32 nre
+//   T t           (sim time — float32 if x_size/(natoms*3)==4, float64 if 8)
+//   T lambda      (same precision as t)
+// Then for each non-zero section in order box / vir / pres / x / v / f:
+//   raw float array of that size in bytes (big-endian)
+//
+// We read only the first frame's x block and emit XYZ text.
+
+private func parseTRRFirstFrame(data: Data, trrURL: URL) -> String? {
+    guard data.count >= 4 else { return nil }
+    var offset = 0
+    // Magic — TRR is always big-endian (XDR).
+    let magic = readInt32BE(data, offset: offset); offset += 4
+    guard magic == 1993 else { return nil }
+
+    // Version string with XDR padding.
+    let slen = Int(readInt32BE(data, offset: offset)); offset += 4
+    guard slen > 0 && slen < 64 && offset + slen <= data.count else { return nil }
+    offset += slen
+    // XDR rule: every variable-length item is padded up to a 4-byte boundary.
+    let pad = (4 - slen % 4) % 4
+    offset += pad
+
+    // 10 size fields.
+    guard offset + 10 * 4 <= data.count else { return nil }
+    let irSize    = Int(readInt32BE(data, offset: offset)); offset += 4
+    let eSize     = Int(readInt32BE(data, offset: offset)); offset += 4
+    let boxSize   = Int(readInt32BE(data, offset: offset)); offset += 4
+    let virSize   = Int(readInt32BE(data, offset: offset)); offset += 4
+    let presSize  = Int(readInt32BE(data, offset: offset)); offset += 4
+    let topSize   = Int(readInt32BE(data, offset: offset)); offset += 4
+    let symSize   = Int(readInt32BE(data, offset: offset)); offset += 4
+    let xSize     = Int(readInt32BE(data, offset: offset)); offset += 4
+    let vSize     = Int(readInt32BE(data, offset: offset)); offset += 4
+    let fSize     = Int(readInt32BE(data, offset: offset)); offset += 4
+
+    // natoms / step / nre.
+    guard offset + 12 <= data.count else { return nil }
+    let natoms = Int(readInt32BE(data, offset: offset)); offset += 4
+    _ = readInt32BE(data, offset: offset);               offset += 4  // step
+    _ = readInt32BE(data, offset: offset);               offset += 4  // nre
+    guard natoms > 0 && natoms < 10_000_000 else { return nil }
+    guard xSize > 0 else {
+        // No positions in this frame — TRR can encode velocity-only frames.
+        // First-frame preview is meaningless without positions; bail.
+        return nil
+    }
+
+    // Precision: total xSize / (3*natoms) is bytes per float component.
+    let bytesPerFloat = xSize / (natoms * 3)
+    guard bytesPerFloat == 4 || bytesPerFloat == 8 else { return nil }
+
+    // Skip t and lambda (each is bytesPerFloat bytes).
+    offset += 2 * bytesPerFloat
+
+    // Skip the optional energy/box/virial/pressure/topology/sym sections that
+    // precede the x section. ir_size and e_size aren't section sizes per se in
+    // every GROMACS version, but they're always followed by box/vir/pres in
+    // bytes. Trust the size fields and skip exactly those byte counts.
+    offset += irSize + eSize + boxSize + virSize + presSize + topSize + symSize
+    guard offset + xSize <= data.count else { return nil }
+
+    // Read x_size bytes as natoms * 3 floats.
+    var xs = [Float](repeating: 0, count: natoms)
+    var ys = [Float](repeating: 0, count: natoms)
+    var zs = [Float](repeating: 0, count: natoms)
+    for i in 0..<natoms {
+        xs[i] = readTRRFloat(data, offset: &offset, bytesPerFloat: bytesPerFloat)
+        ys[i] = readTRRFloat(data, offset: &offset, bytesPerFloat: bytesPerFloat)
+        zs[i] = readTRRFloat(data, offset: &offset, bytesPerFloat: bytesPerFloat)
+    }
+
+    // GROMACS coordinates are in nanometers; multiply by 10 for Ångström so
+    // bond perception (which uses Å-scale thresholds) sees sensible distances.
+    let elements = readSiblingElements(dcdURL: trrURL, count: natoms)
+        ?? Array(repeating: "C", count: natoms)
+    var xyz = "\(natoms)\nFirst frame from \(trrURL.lastPathComponent) (TRR, nm→Å)\n"
+    for i in 0..<natoms {
+        xyz += "\(elements[i]) \(xs[i] * 10) \(ys[i] * 10) \(zs[i] * 10)\n"
+    }
+    // Quiet the unused-variable warnings for vSize / fSize.
+    _ = vSize; _ = fSize
+    return xyz
+}
+
+/// Read a TRR float (BE), supporting both single (4 byte) and double (8 byte)
+/// precision. Advances offset by `bytesPerFloat`.
+private func readTRRFloat(_ data: Data, offset: inout Int, bytesPerFloat: Int) -> Float {
+    if bytesPerFloat == 4 {
+        let u32: UInt32 =
+            UInt32(data[data.startIndex + offset]) << 24 |
+            UInt32(data[data.startIndex + offset + 1]) << 16 |
+            UInt32(data[data.startIndex + offset + 2]) << 8 |
+            UInt32(data[data.startIndex + offset + 3])
+        offset += 4
+        return Float(bitPattern: u32)
+    } else {
+        // Double precision — read 8 BE bytes, convert to Double, cast to Float.
+        var u64: UInt64 = 0
+        for i in 0..<8 {
+            u64 = (u64 << 8) | UInt64(data[data.startIndex + offset + i])
+        }
+        offset += 8
+        return Float(Double(bitPattern: u64))
+    }
 }
