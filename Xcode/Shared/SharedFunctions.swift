@@ -48,6 +48,7 @@ struct ViewerOptions {
     var ctlShowLabelCA:  Bool
     var ctlShowRecenter: Bool
     var outlineShading:  Bool
+    var ambientOcclusion: Bool
     var autoOrient:      Bool
     var cubeIsosurface:  Bool
     var bioAssembly:     Bool
@@ -87,6 +88,7 @@ struct ViewerOptions {
             ctlShowLabelCA:  s.ctlShowLabelCA,
             ctlShowRecenter: s.ctlShowRecenter,
             outlineShading:  s.outlineShading,
+            ambientOcclusion: s.ambientOcclusion,
             autoOrient:      s.autoOrient,
             cubeIsosurface:  s.cubeIsosurface,
             bioAssembly:     s.bioAssembly,
@@ -940,6 +942,7 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{CTL_SHOW_LABELCA}",  with: options.ctlShowLabelCA  ? "true" : "false")
     html = html.replacingOccurrences(of: "{CTL_SHOW_RECENTER}", with: options.ctlShowRecenter ? "true" : "false")
     html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",   with: options.outlineShading  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{AMBIENT_OCCLUSION}", with: options.ambientOcclusion ? "true" : "false")
     html = html.replacingOccurrences(of: "{AUTO_ORIENT}",       with: options.autoOrient      ? "true" : "false")
     // Force cube isosurface ON when the source was a cryo-EM map
     // (otherwise we'd render the cube as zero atoms = empty preview).
@@ -1123,6 +1126,7 @@ func prepare3DmolHTMLMulti(htmlPath: String,
     html = html.replacingOccurrences(of: "{CTL_SHOW_LABELCA}",       with: options.ctlShowLabelCA  ? "true" : "false")
     html = html.replacingOccurrences(of: "{CTL_SHOW_RECENTER}",      with: options.ctlShowRecenter ? "true" : "false")
     html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",        with: options.outlineShading  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{AMBIENT_OCCLUSION}",      with: options.ambientOcclusion ? "true" : "false")
     html = html.replacingOccurrences(of: "{AUTO_ORIENT}",            with: options.autoOrient      ? "true" : "false")
     html = html.replacingOccurrences(of: "{CUBE_ISOSURFACE}",        with: options.cubeIsosurface  ? "true" : "false")
     html = html.replacingOccurrences(of: "{BIO_ASSEMBLY}",           with: options.bioAssembly     ? "true" : "false")

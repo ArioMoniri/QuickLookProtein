@@ -177,6 +177,10 @@ public static class SettingsStore
     public static bool GetOutlineShading() => ReadBool("OutlineShading", false);
     public static void SetOutlineShading(bool v) => WriteBool("OutlineShading", v);
 
+    // Ambient occlusion vignette (1.7.39+). Default ON.
+    public static bool GetAmbientOcclusion() => ReadBool("AmbientOcclusion", true);
+    public static void SetAmbientOcclusion(bool v) => WriteBool("AmbientOcclusion", v);
+
     // Auto-orient by principal axes (1.7.30+).
     public static bool GetAutoOrient() => ReadBool("AutoOrient", false);
     public static void SetAutoOrient(bool v) => WriteBool("AutoOrient", v);

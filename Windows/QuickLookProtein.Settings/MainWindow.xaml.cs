@@ -97,6 +97,7 @@ public partial class MainWindow : Window
         ShowInfoOverlayCheck.IsChecked        = SettingsStore.GetShowInfoOverlay();
         ShowControlsInPreviewCheck.IsChecked  = SettingsStore.GetShowControlsInPreview();
         OutlineShadingCheck.IsChecked         = SettingsStore.GetOutlineShading();
+        AmbientOcclusionCheck.IsChecked       = SettingsStore.GetAmbientOcclusion();
         AutoOrientCheck.IsChecked             = SettingsStore.GetAutoOrient();
         CubeIsosurfaceCheck.IsChecked         = SettingsStore.GetCubeIsosurface();
         BioAssemblyCheck.IsChecked            = SettingsStore.GetBioAssembly();
@@ -150,6 +151,7 @@ public partial class MainWindow : Window
         ShowInfoOverlayCheck.Click        += (_, _) => Save(() => SettingsStore.SetShowInfoOverlay(ShowInfoOverlayCheck.IsChecked == true));
         ShowControlsInPreviewCheck.Click  += (_, _) => Save(() => SettingsStore.SetShowControlsInPreview(ShowControlsInPreviewCheck.IsChecked == true));
         OutlineShadingCheck.Click         += (_, _) => Save(() => SettingsStore.SetOutlineShading(OutlineShadingCheck.IsChecked == true));
+        AmbientOcclusionCheck.Click       += (_, _) => Save(() => SettingsStore.SetAmbientOcclusion(AmbientOcclusionCheck.IsChecked == true));
         AutoOrientCheck.Click             += (_, _) => Save(() => SettingsStore.SetAutoOrient(AutoOrientCheck.IsChecked == true));
         CubeIsosurfaceCheck.Click         += (_, _) => Save(() => SettingsStore.SetCubeIsosurface(CubeIsosurfaceCheck.IsChecked == true));
         BioAssemblyCheck.Click            += (_, _) => Save(() => SettingsStore.SetBioAssembly(BioAssemblyCheck.IsChecked == true));
@@ -515,8 +517,9 @@ public partial class MainWindow : Window
             .Replace("{CTL_SHOW_COLORSS}",       QuickLookProtein.Shared.SettingsStore.GetCtlShowColorSS()  ? "true" : "false")
             .Replace("{CTL_SHOW_LABELCA}",       QuickLookProtein.Shared.SettingsStore.GetCtlShowLabelCA()  ? "true" : "false")
             .Replace("{CTL_SHOW_RECENTER}",      QuickLookProtein.Shared.SettingsStore.GetCtlShowRecenter() ? "true" : "false")
-            .Replace("{OUTLINE_SHADING}",        QuickLookProtein.Shared.SettingsStore.GetOutlineShading()  ? "true" : "false")
-            .Replace("{AUTO_ORIENT}",            QuickLookProtein.Shared.SettingsStore.GetAutoOrient()      ? "true" : "false")
+            .Replace("{OUTLINE_SHADING}",        QuickLookProtein.Shared.SettingsStore.GetOutlineShading()    ? "true" : "false")
+            .Replace("{AMBIENT_OCCLUSION}",      QuickLookProtein.Shared.SettingsStore.GetAmbientOcclusion() ? "true" : "false")
+            .Replace("{AUTO_ORIENT}",            QuickLookProtein.Shared.SettingsStore.GetAutoOrient()        ? "true" : "false")
             .Replace("{CUBE_ISOSURFACE}",        QuickLookProtein.Shared.SettingsStore.GetCubeIsosurface()  ? "true" : "false")
             .Replace("{BIO_ASSEMBLY}",           QuickLookProtein.Shared.SettingsStore.GetBioAssembly()     ? "true" : "false")
             .Replace("{IS_CRYO_EM}",             "false")

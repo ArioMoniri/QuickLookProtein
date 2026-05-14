@@ -114,6 +114,13 @@ class SettingsStorage: ObservableObject {
     // pop on light backgrounds. Default OFF.
     @Published var outlineShading:  Bool { didSet { Self.preferencesStore.set(outlineShading,  forKey: "outlineShading") } }
 
+    // Ambient occlusion (1.7.39+). A radial-gradient CSS inset shadow
+    // over the WebGL canvas that darkens edges, giving a pseudo-AO
+    // effect that visually deepens crevices in protein surfaces without
+    // a real postprocess pass. Cheap; degrades to a no-op overlay on
+    // small molecules. Default ON.
+    @Published var ambientOcclusion: Bool { didSet { Self.preferencesStore.set(ambientOcclusion, forKey: "ambientOcclusion") } }
+
     // Auto-orient (1.7.30+): rotate the molecule so its longest
     // principal axis is horizontal. Computed from the atom-coord
     // covariance matrix via a small 3x3 power-iteration eigendecomp
@@ -231,6 +238,7 @@ class SettingsStorage: ObservableObject {
         self.ctlShowLabelCA   = store.object(forKey: "ctlShowLabelCA")   as? Bool ?? true
         self.ctlShowRecenter  = store.object(forKey: "ctlShowRecenter")  as? Bool ?? true
         self.outlineShading   = store.object(forKey: "outlineShading")   as? Bool ?? false
+        self.ambientOcclusion = store.object(forKey: "ambientOcclusion") as? Bool ?? true
         self.autoOrient       = store.object(forKey: "autoOrient")       as? Bool ?? false
         self.cubeIsosurface   = store.object(forKey: "cubeIsosurface")   as? Bool ?? false
         self.bioAssembly      = store.object(forKey: "bioAssembly")      as? Bool ?? true

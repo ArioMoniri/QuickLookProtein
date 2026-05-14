@@ -311,6 +311,10 @@
                                       Content="Outline shading"
                                       ToolTip="Adds a thin dark border around every atom/bond. Makes the preview pop on light backgrounds."
                                       Margin="0,4"/>
+                            <CheckBox x:Name="AmbientOcclusionCheck"
+                                      Content="Ambient occlusion"
+                                      ToolTip="CSS vignette over the WebGL canvas that deepens edges, giving a low-cost pseudo-AO effect. Auto-disabled for stick/line previews of small molecules so atoms don't get washed out."
+                                      Margin="0,4"/>
                             <CheckBox x:Name="AutoOrientCheck"
                                       Content="Auto-orient (longest axis horizontal)"
                                       ToolTip="Rotate the molecule so its longest principal axis is horizontal. Useful for screenshots; gives every preview a deterministic canonical pose."

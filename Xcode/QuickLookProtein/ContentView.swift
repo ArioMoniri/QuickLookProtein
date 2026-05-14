@@ -135,6 +135,8 @@ struct ContentView: View {
                                 .help("Adds a small bottom-right toolbar in every Quick Look preview with one-click buttons for Stick / Line / Sphere / Cartoon style, Surface, Color SS, Label αC, and Recenter.")
                             Toggle("Outline shading",                 isOn: $userSettings.outlineShading)
                                 .help("Adds a thin dark border around every atom/bond. Makes the preview pop on light backgrounds.")
+                            Toggle("Ambient occlusion",               isOn: $userSettings.ambientOcclusion)
+                                .help("CSS vignette over the WebGL canvas that deepens edges, giving a low-cost pseudo-AO effect. Auto-disabled for stick/line previews of small molecules so atoms don't get washed out.")
                             Toggle("Auto-orient (longest axis horizontal)", isOn: $userSettings.autoOrient)
                                 .help("Rotate the molecule so its longest principal axis is horizontal. Useful for screenshots; gives every preview a deterministic canonical pose.")
                             Toggle("Cube isosurface",                 isOn: $userSettings.cubeIsosurface)

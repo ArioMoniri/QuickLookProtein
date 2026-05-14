@@ -195,6 +195,7 @@ public partial class MoleculePanel : UserControl, IDisposable
         var ctlLabelCA        = QuickLookProtein.Shared.SettingsStore.GetCtlShowLabelCA();
         var ctlRecenter       = QuickLookProtein.Shared.SettingsStore.GetCtlShowRecenter();
         var outlineOn         = QuickLookProtein.Shared.SettingsStore.GetOutlineShading();
+        var ambientOcclusion  = QuickLookProtein.Shared.SettingsStore.GetAmbientOcclusion();
         var autoOrient        = QuickLookProtein.Shared.SettingsStore.GetAutoOrient();
         var cubeIsosurface    = QuickLookProtein.Shared.SettingsStore.GetCubeIsosurface();
         var bioAssembly       = QuickLookProtein.Shared.SettingsStore.GetBioAssembly();
@@ -233,8 +234,9 @@ public partial class MoleculePanel : UserControl, IDisposable
             .Replace("{CTL_SHOW_COLORSS}",   ctlColorSS ? "true" : "false")
             .Replace("{CTL_SHOW_LABELCA}",   ctlLabelCA ? "true" : "false")
             .Replace("{CTL_SHOW_RECENTER}",  ctlRecenter? "true" : "false")
-            .Replace("{OUTLINE_SHADING}",    outlineOn      ? "true" : "false")
-            .Replace("{AUTO_ORIENT}",        autoOrient     ? "true" : "false")
+            .Replace("{OUTLINE_SHADING}",    outlineOn        ? "true" : "false")
+            .Replace("{AMBIENT_OCCLUSION}",  ambientOcclusion ? "true" : "false")
+            .Replace("{AUTO_ORIENT}",        autoOrient       ? "true" : "false")
             .Replace("{CUBE_ISOSURFACE}",    cubeIsosurface ? "true" : "false")
             .Replace("{BIO_ASSEMBLY}",       bioAssembly    ? "true" : "false")
             .Replace("{IS_CRYO_EM}",         "false")

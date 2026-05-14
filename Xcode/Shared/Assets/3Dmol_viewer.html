@@ -64,6 +64,20 @@
                 transition: background 0.1s ease; min-width: 18px; }
             #hide-pill button:hover  { background: rgba(0,0,0,0.08); }
             #hide-pill button.muted  { color: #b00; text-decoration: line-through; }
+            /* Ambient-occlusion vignette (1.7.39+). A CSS inset radial
+               shadow that darkens the edges of the canvas, giving a
+               cheap pseudo-AO that deepens crevices in protein surfaces
+               and complements the WebGL render without a real
+               postprocess pass. Pointer-events disabled so it never
+               intercepts mouse interaction with the underlying 3Dmol
+               canvas. The viewer JS toggles its display based on
+               {AMBIENT_OCCLUSION} + current style. */
+            #ao-vignette { position: absolute; inset: 0; z-index: 11;
+                           pointer-events: none; display: none;
+                           box-shadow: inset 0 0 80px rgba(0,0,0,0.40); }
+            @media (prefers-color-scheme: dark) {
+                #ao-vignette { box-shadow: inset 0 0 80px rgba(0,0,0,0.55); }
+            }
             @media (prefers-color-scheme: dark) {
                 #info  { color: #ddd; background: rgba(30,30,30,0.70); }
                 #label { color: #fff; background: rgba(30,30,30,0.92); }
@@ -88,6 +102,12 @@
              inline styles before script-eval; styles applied via stylesheet
              can race the createViewer call. -->
         <div style="height: 100vh; width: 100%; position: relative;" id="3dviewer"></div>
+        <!-- Ambient-occlusion vignette overlay (1.7.39+). Hidden by
+             default; the viewer JS enables it when {AMBIENT_OCCLUSION}
+             is true and the current style benefits visually (cartoon
+             or surface). Skipped for stick-only previews so small
+             molecules don't get washed out. -->
+        <div id="ao-vignette"></div>
         <div id="info"></div>
         <div id="label"></div>
         <!-- Corner-pill hide toggles (1.7.38+). Tap to mute the info strip,
@@ -372,6 +392,23 @@
                     }
                     var baseStyle = {}; baseStyle[styleType] = colorFor();
                     viewer.setStyle({}, withOutline(baseStyle));
+
+                    // Ambient occlusion vignette (1.7.39+). Show the
+                    // CSS inset-shadow overlay when AO is enabled and
+                    // the current style benefits visually. Skip for
+                    // line/stick on small molecules - the vignette
+                    // washes out tiny atom rendering. Cartoon, sphere,
+                    // and surface styles all keep it on.
+                    var aoOn = {AMBIENT_OCCLUSION};
+                    if (aoOn) {
+                        var aoBenefits = (styleType === 'cartoon' ||
+                                          styleType === 'sphere'  ||
+                                          {SHOW_SURFACE});
+                        if (aoBenefits) {
+                            var aoEl = document.getElementById('ao-vignette');
+                            if (aoEl) aoEl.style.display = 'block';
+                        }
+                    }
 
                     // Smart styling — gated on the user toggle. We previously
                     // required the structure to have BOTH a polymer AND a
