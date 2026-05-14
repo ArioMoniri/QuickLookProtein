@@ -38,9 +38,11 @@ import Foundation
 @available(macOS 12.0, *)
 final class ImportExtension: CSImportExtension {
 
-    /// PDB / mmCIF headers live in the first few KB; beyond that is the coordinate
-    /// table. 64 KB is plenty for the metadata fields we care about.
-    private let headerByteLimit = 64 * 1024
+    /// PDB / mmCIF headers + SEQRES live in the first dozens of KB. We also sample
+    /// a few hundred ATOM CA records so we can compute mean B-factor (pLDDT detector
+    /// for AlphaFold), so 256 KB is the sweet spot between coverage and Spotlight
+    /// install-time throughput.
+    private let headerByteLimit = 256 * 1024
 
     override func update(_ attributes: CSSearchableItemAttributeSet,
                          forFileAt contentURL: URL) throws {
@@ -89,6 +91,18 @@ final class ImportExtension: CSImportExtension {
         var method      = ""
         var resolution  = ""
 
+        // Sequence (SEQRES → 1-letter, per chain), ligand inventory (HETNAM), and
+        // quality metadata (REMARK 3 R-free / R-work, mean CA B-factor → pLDDT).
+        var seqresByChain: [String: String] = [:]
+        var ligands: [String: String] = [:]   // 3-letter code → name
+        var rFree   = ""
+        var rWork   = ""
+        var bFactorSum: Double = 0
+        var bFactorCount: Int  = 0
+        var bFactorMax: Double = 0
+        // Cap CA samples so we don't pay for a 1M-atom file at Spotlight install time.
+        let maxBFactorSamples = 500
+
         // Reusable formatter for the HEADER date column (DD-MMM-YY).
         let pdbDateFormatter: DateFormatter = {
             let f = DateFormatter()
@@ -97,7 +111,8 @@ final class ImportExtension: CSImportExtension {
             return f
         }()
 
-        for raw in text.split(separator: "\n").prefix(800) {
+        // Walk more lines than before so SEQRES & a B-factor sample window fit.
+        for raw in text.split(separator: "\n").prefix(8_000) {
             let line = String(raw)
             guard line.count >= 6 else { continue }
             let tag = line.prefix(6).trimmingCharacters(in: .whitespaces)
@@ -168,12 +183,78 @@ final class ImportExtension: CSImportExtension {
                         if let _ = Double(token) { resolution = String(token); break }
                     }
                 }
-            // Stop scanning once we hit coordinate records — header is over.
-            case "ATOM", "HETATM", "MODEL":
+                // REMARK 3 captures refinement statistics. Two common spellings:
+                //   "FREE R VALUE                     :  0.234"
+                //   "R VALUE            (WORKING SET) :  0.198"
+                if rest.hasPrefix("3 ") {
+                    let upper = rest.uppercased()
+                    if upper.contains("FREE R VALUE") && !upper.contains("ERROR") && !upper.contains("BIN") {
+                        if let v = lastNumericToken(upper), v > 0 && v < 1 {
+                            rFree = formatRValue(v)
+                        }
+                    } else if upper.contains("R VALUE") && upper.contains("WORKING SET") {
+                        if let v = lastNumericToken(upper), v > 0 && v < 1 {
+                            rWork = formatRValue(v)
+                        }
+                    }
+                }
+            case "SEQRES":
+                // Cols 12-13 chain ID; remainder is up to 13 three-letter codes
+                // separated by whitespace. We translate to one-letter and append.
+                if line.count >= 19 {
+                    let chainIdx = line.index(line.startIndex, offsetBy: 11)
+                    let chain = String(line[chainIdx]).trimmingCharacters(in: .whitespaces)
+                    let body  = line.count > 19
+                        ? String(line.dropFirst(19))
+                        : ""
+                    let codes = body.split(whereSeparator: { $0.isWhitespace })
+                    var one = ""
+                    for code in codes {
+                        one.append(threeLetterToOne(String(code)))
+                    }
+                    if !one.isEmpty {
+                        seqresByChain[chain.isEmpty ? "A" : chain, default: ""] += one
+                    }
+                }
+            case "HETNAM":
+                // "HETNAM     ATP  ADENOSINE-5'-TRIPHOSPHATE" — cols 12-14 are
+                // the 3-letter code, the rest is the human name. Multi-line
+                // continuations get concatenated by 3-letter code.
+                if line.count >= 14 {
+                    let cStart = line.index(line.startIndex, offsetBy: 11)
+                    let cEnd   = line.index(line.startIndex, offsetBy: 14)
+                    let code = String(line[cStart..<cEnd])
+                        .trimmingCharacters(in: .whitespaces)
+                        .uppercased()
+                    let nameStart = line.index(line.startIndex, offsetBy: 14)
+                    let name = String(line[nameStart...])
+                        .trimmingCharacters(in: .whitespaces)
+                    if !code.isEmpty && code != "HOH" && code != "WAT" && code != "DOD" {
+                        ligands[code, default: ""] += (ligands[code]?.isEmpty == false ? " " : "") + name
+                    }
+                }
+            case "ATOM":
+                // Sample CA temperature factors. Per the PDB spec:
+                //   cols 13-16 atom name, cols 61-66 temperature factor.
+                if bFactorCount < maxBFactorSamples && line.count >= 66 {
+                    let nStart = line.index(line.startIndex, offsetBy: 12)
+                    let nEnd   = line.index(line.startIndex, offsetBy: 16)
+                    let atomName = String(line[nStart..<nEnd]).trimmingCharacters(in: .whitespaces)
+                    if atomName == "CA" {
+                        let bStart = line.index(line.startIndex, offsetBy: 60)
+                        let bEnd   = line.index(line.startIndex, offsetBy: 66)
+                        let bStr = String(line[bStart..<bEnd]).trimmingCharacters(in: .whitespaces)
+                        if let b = Double(bStr) {
+                            bFactorSum += b
+                            bFactorCount += 1
+                            if b > bFactorMax { bFactorMax = b }
+                        }
+                    }
+                }
+            case "HETATM", "MODEL":
                 break
             default: break
             }
-            if tag == "ATOM" || tag == "HETATM" || tag == "MODEL" { break }
         }
 
         if !title.isEmpty       { a.title = collapseWhitespace(title) }
@@ -189,11 +270,93 @@ final class ImportExtension: CSImportExtension {
         if !resolution.isEmpty {
             keywords.append("\(resolution) Å resolution")
         }
+        if !rFree.isEmpty { keywords.append("R-free \(rFree)") }
+        if !rWork.isEmpty { keywords.append("R-work \(rWork)") }
+
+        // pLDDT detection: AlphaFold puts confidence in the B-factor column on
+        // a 0-100 scale. If mean is in [40,100] and max ≤ 100, treat as pLDDT.
+        if bFactorCount > 0 {
+            let mean = bFactorSum / Double(bFactorCount)
+            if mean >= 40 && mean <= 100 && bFactorMax <= 100 {
+                keywords.append(String(format: "pLDDT %.0f", mean))
+                keywords.append("AlphaFold")
+            } else {
+                keywords.append(String(format: "mean B-factor %.1f", mean))
+            }
+        }
+
+        // Ligand inventory: include 3-letter codes plus full names (separately
+        // indexed in keywords).
+        for (code, name) in ligands {
+            keywords.append(code)
+            let trimmedName = collapseWhitespace(name)
+            if !trimmedName.isEmpty { keywords.append(trimmedName) }
+        }
+
+        // SEQRES sequence: dump as kMDItemTextContent (Spotlight full-text indexes
+        // this field). Multi-chain joined by space so token-search across chains works.
+        if !seqresByChain.isEmpty {
+            let joined = seqresByChain.keys.sorted()
+                .map { (seqresByChain[$0] ?? "") }
+                .joined(separator: " ")
+            if !joined.isEmpty {
+                a.textContent = joined
+            }
+        }
+
         keywords.append(contentsOf: organisms)
         if !keywords.isEmpty    { a.keywords = uniquePreservingOrder(keywords) }
         if !authors.isEmpty     { a.authors  = uniquePreservingOrder(authors)  }
         if let d = depositDate  { a.contentCreationDate = d }
         a.kind = "Protein Data Bank file"
+    }
+
+    // MARK: - PDB helpers
+
+    private func lastNumericToken(_ s: String) -> Double? {
+        let tokens = s.split(whereSeparator: { $0.isWhitespace || $0 == ":" })
+        for token in tokens.reversed() {
+            if let v = Double(token) { return v }
+        }
+        return nil
+    }
+
+    private func formatRValue(_ v: Double) -> String {
+        return String(format: "%.3f", v)
+    }
+
+    /// 3-letter → 1-letter amino acid code. Falls back to "X" for unknown residues
+    /// (DNA/RNA/modified residues) so Spotlight still has a sequence token.
+    private func threeLetterToOne(_ code: String) -> String {
+        switch code.uppercased() {
+        case "ALA": return "A"
+        case "ARG": return "R"
+        case "ASN": return "N"
+        case "ASP": return "D"
+        case "CYS": return "C"
+        case "GLU": return "E"
+        case "GLN": return "Q"
+        case "GLY": return "G"
+        case "HIS": return "H"
+        case "ILE": return "I"
+        case "LEU": return "L"
+        case "LYS": return "K"
+        case "MET": return "M"
+        case "PHE": return "F"
+        case "PRO": return "P"
+        case "SER": return "S"
+        case "THR": return "T"
+        case "TRP": return "W"
+        case "TYR": return "Y"
+        case "VAL": return "V"
+        // Nucleic acids: emit lowercase to remain searchable but visually distinct.
+        case "A", "DA": return "a"
+        case "C", "DC": return "c"
+        case "G", "DG": return "g"
+        case "T", "DT": return "t"
+        case "U":       return "u"
+        default:        return "X"
+        }
     }
 
     // MARK: - CIF / mmCIF
@@ -228,6 +391,38 @@ final class ImportExtension: CSImportExtension {
         if let res = scanCIFValue(lines, key: "_reflns.d_resolution_high")
                   ?? scanCIFValue(lines, key: "_refine.ls_d_res_high") {
             keywords.append("\(res) Å resolution")
+        }
+        // R-free / R-work (mmCIF)
+        if let rf = scanCIFValue(lines, key: "_refine.ls_R_factor_R_free"),
+           let v = Double(rf), v > 0 && v < 1 {
+            keywords.append("R-free \(formatRValue(v))")
+        }
+        if let rw = scanCIFValue(lines, key: "_refine.ls_R_factor_R_work"),
+           let v = Double(rw), v > 0 && v < 1 {
+            keywords.append("R-work \(formatRValue(v))")
+        }
+        // Sequence: _entity_poly.pdbx_seq_one_letter_code (or _can equivalent).
+        // mmCIF wraps long sequences across multi-line ;-blocks; scanCIFValue
+        // already concatenates those.
+        if let seq = scanCIFValue(lines, key: "_entity_poly.pdbx_seq_one_letter_code_can")
+                  ?? scanCIFValue(lines, key: "_entity_poly.pdbx_seq_one_letter_code") {
+            // CIF inserts "\n" and parentheses (modified residues); strip both.
+            let clean = seq
+                .replacingOccurrences(of: "\n", with: "")
+                .replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: "(", with: "")
+                .replacingOccurrences(of: ")", with: "")
+            if !clean.isEmpty { a.textContent = clean }
+        }
+        // Ligands from chem_comp loop (3-letter id + name columns).
+        if let codes = scanCIFLoopColumn(lines, key: "_chem_comp.id"),
+           let names = scanCIFLoopColumn(lines, key: "_chem_comp.name") {
+            for (i, code) in codes.enumerated() {
+                let upper = code.uppercased()
+                if upper == "HOH" || upper == "WAT" || upper == "DOD" { continue }
+                keywords.append(upper)
+                if i < names.count { keywords.append(names[i]) }
+            }
         }
         // Deposition date (mmCIF)
         if let dateStr = scanCIFValue(lines, key: "_pdbx_database_status.recvd_initial_deposition_date") {
