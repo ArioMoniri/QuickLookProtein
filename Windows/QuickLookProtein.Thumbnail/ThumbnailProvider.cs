@@ -152,7 +152,12 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
             using var ms = new MemoryStream(_data, writable: false);
             var atoms = MoleculeParser.Parse(ms, _extension);
             if (atoms is null || atoms.Count == 0) return;
-            using var bmp = CpkRenderer.Render(atoms, size);
+            // Pick render style: cartoon ribbon for proteins, CPK
+            // for everything else. Detection is cheap (count CA
+            // atoms in standard amino acids).
+            using var bmp = RibbonRenderer.LooksLikeProtein(atoms)
+                            ? RibbonRenderer.Render(atoms, size)
+                            : CpkRenderer.Render(atoms, size);
             // Hand Explorer the HBITMAP. GetHbitmap allocates a new
             // GDI bitmap that the SHELL is responsible for releasing
             // (via DeleteObject) - which is exactly what Explorer
@@ -180,6 +185,10 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
         var head = System.Text.Encoding.UTF8.GetString(data, 0, n);
 
         if (head.Contains("@<TRIPOS>"))               return "mol2";
+        // CDJSON: ChemDoodle JSON has a top-level "a":[ ... ] array
+        // of atom objects with x/y/z/l fields. Highly distinctive.
+        if (head.Contains("\"a\":[") && head.Contains("\"l\""))
+            return "cdjson";
         // CIF / mmCIF: starts with "data_" and contains "_atom_site"
         // somewhere in the header. We check both because some PDB
         // files have stray "data_" in their REMARK lines.
@@ -218,6 +227,16 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
             return "gro";
         }
 
+        // VASP / POSCAR: line 2 is a single float (lattice scale),
+        // lines 3-5 are 3-vector floats. Check AFTER PDB because some
+        // PDB headers have lines that match by coincidence.
+        if (lines.Length >= 6
+            && SingleFloat(lines[1])
+            && IsThreeFloats(lines[2]) && IsThreeFloats(lines[3]) && IsThreeFloats(lines[4]))
+        {
+            return "vasp";
+        }
+
         // XYZ: first line is just an integer. Check this AFTER the
         // GRO check to avoid false positives (GRO's line 2 is also
         // an integer).
@@ -225,6 +244,23 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
         if (int.TryParse(firstLine, out _))           return "xyz";
 
         return "pdb";  // best-effort fallback
+    }
+
+    private static bool SingleFloat(string line)
+    {
+        var parts = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 1
+            && float.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _);
+    }
+
+    private static bool IsThreeFloats(string line)
+    {
+        var parts = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 3) return false;
+        for (int i = 0; i < 3; i++)
+            if (!float.TryParse(parts[i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                return false;
+        return true;
     }
 
     private static bool LooksLikeCubeCountsLine(string line)

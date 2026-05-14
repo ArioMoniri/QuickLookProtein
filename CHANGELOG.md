@@ -4,6 +4,48 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.16] — 2026-05-14
+
+### 🆕 Added — thumbnail completeness pass
+
+- **VASP / POSCAR parser**. Handles both old (no element line) and
+  new (element symbols on line 6) VASP formats, fractional + Cartesian
+  coordinate modes, optional "Selective dynamics" line, scale factor.
+  Multiplies fractional coords by the lattice matrix to get Ångströms
+  so the renderer's existing scale logic applies unchanged.
+- **CDJSON parser**. Hand-rolled scanner over the ChemDoodle JSON
+  `"a":[ ... ]` atom array - reads `x`/`y`/`z`/`l` fields without
+  pulling in a JSON NuGet. Atom-count capped via the shared
+  `MaxAtoms = 5000` so a hostile file can't stall thumbcache.
+- **Cartoon-ribbon renderer for proteins**
+  ([Windows/QuickLookProtein.Thumbnail/RibbonRenderer.cs](Windows/QuickLookProtein.Thumbnail/RibbonRenderer.cs)).
+  When ≥10 alpha-carbon atoms in standard amino-acid residues are
+  found, the thumbnail switches from CPK to a Catmull-Rom-splined
+  tube through the CA backbone, colored N→C with a 3Dmol-style
+  spectrum scheme. Same isometric pose + dark background as the
+  CPK path, so a folder of mixed proteins and small molecules
+  reads consistently. Matches what the macOS QLThumbnail.appex
+  does in Swift.
+- **Sniff-format** now recognises VASP (single-float line 2 + three
+  three-float lines) and CDJSON (`"a":[...] + "l"` markers), so even
+  renamed-extension files thumb correctly.
+
+### 🪟 Windows
+
+- **Augmented PDB parser** to capture atom name, residue name, chain
+  ID, and residue sequence number. Required for protein-backbone
+  detection in the new ribbon renderer; ignored by the CPK path.
+
+### 📝 Intentionally not done
+
+- **MMTF thumbnails** dropped from the registered extensions list.
+  Parsing MMTF needs either ~500 KB of `MessagePack-CSharp` NuGet
+  baggage loaded into every thumbnail-cache process or ~300 LoC of
+  hand-rolled binary parser. Neither is worth shipping for a format
+  that's vanishingly rare in practice. The Space-bar QuickLook
+  preview still handles `.mmtf` via 3Dmol.js's JavaScript-side
+  parser — only thumbnails fall back to the generic file icon.
+
 ## [1.7.15] — 2026-05-14
 
 ### 🐛 Fixed

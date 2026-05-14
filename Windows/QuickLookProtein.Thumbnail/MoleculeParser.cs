@@ -20,7 +20,24 @@ internal readonly struct Atom
 {
     public readonly float X, Y, Z;
     public readonly string Element;
-    public Atom(float x, float y, float z, string e) { X = x; Y = y; Z = z; Element = e; }
+    // Optional extra metadata captured from PDB only (other parsers
+    // leave these defaults). The thumbnail renderer uses these to
+    // detect protein backbone for cartoon-ribbon rendering: a CA atom
+    // with a recognised amino-acid residue name flags the row as part
+    // of a protein chain.
+    public readonly string AtomName;     // e.g. "CA", "N", "O", "C"
+    public readonly string ResidueName;  // e.g. "ALA", "MET"
+    public readonly char   ChainId;      // e.g. 'A'
+    public readonly int    ResidueSeq;   // residue number
+
+    public Atom(float x, float y, float z, string e,
+                string atomName = "", string residueName = "",
+                char chainId = ' ', int residueSeq = 0)
+    {
+        X = x; Y = y; Z = z; Element = e;
+        AtomName = atomName; ResidueName = residueName;
+        ChainId = chainId; ResidueSeq = residueSeq;
+    }
 }
 
 internal static class MoleculeParser
@@ -43,8 +60,205 @@ internal static class MoleculeParser
             "gro"                 => ParseGro(reader),
             "cif" or "mmcif"      => ParseCif(reader),
             "cube" or "cub"       => ParseCube(reader),
+            "vasp" or "poscar"    => ParseVasp(reader),
+            "cdjson" or "json"    => ParseCdjson(reader),
             _                     => null,
         };
+    }
+
+    /// <summary>
+    /// Parse a VASP POSCAR / CONTCAR / .vasp file. The format is
+    /// Fortran-flavoured fixed-column-ish: lattice vectors, optional
+    /// element symbol line, atom counts per element, "Direct" or
+    /// "Cartesian" mode flag, then coordinates. We handle both
+    /// fractional ("Direct") and Cartesian modes - in the fractional
+    /// case we multiply by the lattice matrix to get Angstroms.
+    /// </summary>
+    private static List<Atom> ParseVasp(StreamReader r)
+    {
+        var atoms = new List<Atom>();
+        var comment = r.ReadLine();                          // line 1
+        var scaleLine = r.ReadLine();                        // line 2
+        if (scaleLine == null) return atoms;
+        if (!float.TryParse(scaleLine.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var scale)) scale = 1f;
+
+        // Lattice vectors (3 lines, three floats each).
+        var lattice = new float[3, 3];
+        for (int i = 0; i < 3; i++)
+        {
+            var line = r.ReadLine();
+            if (line == null) return atoms;
+            var p = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (p.Length < 3) return atoms;
+            for (int j = 0; j < 3; j++)
+                float.TryParse(p[j], NumberStyles.Float, CultureInfo.InvariantCulture, out lattice[i, j]);
+        }
+
+        // Next line is either element symbols (VASP 5+) or atom
+        // counts (older format). Distinguish by trying to parse the
+        // first token as an integer.
+        var nextLine = r.ReadLine();
+        if (nextLine == null) return atoms;
+        var nextParts = nextLine.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        string[]? elementSymbols = null;
+        string[] countParts;
+        if (nextParts.Length > 0 && int.TryParse(nextParts[0], out _))
+        {
+            // Older format: no element line, counts are here. We'll
+            // use the comment line as a hint - VASP convention is to
+            // put space-separated element names there. Best-effort
+            // only; if the comment isn't elements, we fall back to
+            // "C" for everything.
+            countParts = nextParts;
+            if (!string.IsNullOrWhiteSpace(comment))
+            {
+                var c = comment!.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (c.Length == countParts.Length) elementSymbols = c;
+            }
+        }
+        else
+        {
+            elementSymbols = nextParts;
+            var countLine = r.ReadLine();
+            if (countLine == null) return atoms;
+            countParts = countLine.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        }
+        var counts = new int[countParts.Length];
+        for (int i = 0; i < countParts.Length; i++)
+            int.TryParse(countParts[i], out counts[i]);
+
+        // Optional "Selective dynamics" line; skip it.
+        var modeLine = r.ReadLine();
+        if (modeLine != null && modeLine.Trim().StartsWith("S", StringComparison.OrdinalIgnoreCase))
+            modeLine = r.ReadLine();
+        if (modeLine == null) return atoms;
+        bool fractional = modeLine.Trim().StartsWith("D", StringComparison.OrdinalIgnoreCase);
+
+        // Read atom coordinates.
+        for (int e = 0; e < counts.Length; e++)
+        {
+            string element = (elementSymbols != null && e < elementSymbols.Length)
+                ? elementSymbols[e] : "C";
+            for (int j = 0; j < counts[e] && atoms.Count < MaxAtoms; j++)
+            {
+                var line = r.ReadLine();
+                if (line == null) return atoms;
+                var p = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (p.Length < 3) continue;
+                if (!float.TryParse(p[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var a)) continue;
+                if (!float.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var b)) continue;
+                if (!float.TryParse(p[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var c)) continue;
+                float x, y, z;
+                if (fractional)
+                {
+                    // (a,b,c) are fractional - multiply by lattice.
+                    x = scale * (a * lattice[0, 0] + b * lattice[1, 0] + c * lattice[2, 0]);
+                    y = scale * (a * lattice[0, 1] + b * lattice[1, 1] + c * lattice[2, 1]);
+                    z = scale * (a * lattice[0, 2] + b * lattice[1, 2] + c * lattice[2, 2]);
+                }
+                else
+                {
+                    x = a * scale; y = b * scale; z = c * scale;
+                }
+                atoms.Add(new Atom(x, y, z, element));
+            }
+        }
+        return atoms;
+    }
+
+    /// <summary>
+    /// Parse ChemDoodle JSON (.cdjson). The format is small enough
+    /// that a hand-rolled scanner beats pulling in a full JSON
+    /// library - we only need the `a` array (atoms) with x/y/z/l
+    /// (label = element). DataContractJsonSerializer would also work
+    /// but adds boilerplate type definitions for what's effectively
+    /// five fields.
+    /// </summary>
+    private static List<Atom> ParseCdjson(StreamReader r)
+    {
+        var atoms = new List<Atom>();
+        var text = r.ReadToEnd();
+        if (string.IsNullOrWhiteSpace(text)) return atoms;
+        // Find the "a":[ ... ] section.
+        int aStart = IndexOfRegexLike(text, "\"a\"");
+        if (aStart < 0) return atoms;
+        int bracket = text.IndexOf('[', aStart);
+        if (bracket < 0) return atoms;
+        int depth = 0;
+        int i = bracket;
+        for (; i < text.Length; i++)
+        {
+            char ch = text[i];
+            if (ch == '[') depth++;
+            else if (ch == ']') { depth--; if (depth == 0) { i++; break; } }
+            else if (ch == '{' && depth == 1)
+            {
+                int objStart = i;
+                int objDepth = 0;
+                int j = i;
+                for (; j < text.Length; j++)
+                {
+                    if (text[j] == '{') objDepth++;
+                    else if (text[j] == '}') { objDepth--; if (objDepth == 0) { j++; break; } }
+                }
+                var atomObj = text.Substring(objStart, j - objStart);
+                if (TryParseCdjsonAtom(atomObj, out var atom))
+                {
+                    atoms.Add(atom);
+                    if (atoms.Count >= MaxAtoms) return atoms;
+                }
+                i = j - 1;
+            }
+        }
+        return atoms;
+    }
+
+    private static bool TryParseCdjsonAtom(string obj, out Atom atom)
+    {
+        atom = default;
+        float x = 0, y = 0, z = 0;
+        string el = "C";
+        if (TryReadJsonFloat(obj, "\"x\"", out var fx)) x = fx;
+        if (TryReadJsonFloat(obj, "\"y\"", out var fy)) y = fy;
+        if (TryReadJsonFloat(obj, "\"z\"", out var fz)) z = fz;
+        if (TryReadJsonString(obj, "\"l\"", out var lbl)) el = lbl;
+        atom = new Atom(x, y, z, el);
+        return true;
+    }
+
+    private static int IndexOfRegexLike(string text, string needle)
+    {
+        // Plain IndexOf wrapper - kept as its own method so the name
+        // documents intent. Case-sensitive (JSON keys are).
+        return text.IndexOf(needle, StringComparison.Ordinal);
+    }
+
+    private static bool TryReadJsonFloat(string obj, string key, out float value)
+    {
+        value = 0;
+        int idx = obj.IndexOf(key, StringComparison.Ordinal);
+        if (idx < 0) return false;
+        int colon = obj.IndexOf(':', idx);
+        if (colon < 0) return false;
+        int end = obj.IndexOfAny(new[] { ',', '}' }, colon + 1);
+        if (end < 0) end = obj.Length;
+        var s = obj.Substring(colon + 1, end - colon - 1).Trim();
+        return float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+    }
+
+    private static bool TryReadJsonString(string obj, string key, out string value)
+    {
+        value = "";
+        int idx = obj.IndexOf(key, StringComparison.Ordinal);
+        if (idx < 0) return false;
+        int colon = obj.IndexOf(':', idx);
+        if (colon < 0) return false;
+        int q1 = obj.IndexOf('"', colon + 1);
+        if (q1 < 0) return false;
+        int q2 = obj.IndexOf('"', q1 + 1);
+        if (q2 < 0) return false;
+        value = obj.Substring(q1 + 1, q2 - q1 - 1);
+        return true;
     }
 
     /// <summary>
@@ -237,18 +451,27 @@ internal static class MoleculeParser
             if (!float.TryParse(line.Substring(30, 8), NumberStyles.Float, CultureInfo.InvariantCulture, out var x)) continue;
             if (!float.TryParse(line.Substring(38, 8), NumberStyles.Float, CultureInfo.InvariantCulture, out var y)) continue;
             if (!float.TryParse(line.Substring(46, 8), NumberStyles.Float, CultureInfo.InvariantCulture, out var z)) continue;
+            var atomName = line.Substring(12, 4).Trim();
             string element;
             if (line.Length >= 78)
             {
                 element = line.Substring(76, 2).Trim();
                 if (string.IsNullOrEmpty(element))
-                    element = ExtractElementFromAtomName(line.Substring(12, 4).Trim());
+                    element = ExtractElementFromAtomName(atomName);
             }
             else
             {
-                element = ExtractElementFromAtomName(line.Substring(12, 4).Trim());
+                element = ExtractElementFromAtomName(atomName);
             }
-            atoms.Add(new Atom(x, y, z, element));
+            // Capture residue + chain so the renderer can spot
+            // protein backbones (CA atoms in standard amino acids).
+            string residueName = line.Length >= 20 ? line.Substring(17, 3).Trim() : "";
+            char chainId = line.Length >= 22 ? line[21] : ' ';
+            int residueSeq = 0;
+            if (line.Length >= 26)
+                int.TryParse(line.Substring(22, 4).Trim(), out residueSeq);
+            atoms.Add(new Atom(x, y, z, element,
+                               atomName, residueName, chainId, residueSeq));
         }
         return atoms;
     }

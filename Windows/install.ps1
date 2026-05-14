@@ -305,9 +305,15 @@ function Register-ThumbnailHandler {
     # also updating ThumbnailProvider.cs's [Guid] attribute.
     $clsid     = "{B7E4A6F1-2D6E-4F58-9B1B-2E5A1F0B97A1}"
     $thumbIid  = "{E357FCCD-A995-4576-B01F-234630154E96}"
+    # NOTE: .mmtf is intentionally NOT registered here. MMTF is a
+    # binary MessagePack format and parsing it requires either the
+    # MessagePack-CSharp NuGet (~500 KB shipped into every thumbnail
+    # cache process) or ~300 LoC of hand-rolled parser. The Space-bar
+    # QuickLook preview still handles .mmtf via 3Dmol.js's JS-side
+    # parser; only thumbnails skip it.
     $extensions = @(".pdb", ".ent", ".pdbqt", ".pqr", ".cif", ".mmcif",
                     ".sdf", ".mol", ".mol2", ".xyz", ".gro",
-                    ".cube", ".cub", ".vasp", ".poscar", ".cdjson", ".mmtf")
+                    ".cube", ".cub", ".vasp", ".poscar", ".cdjson")
 
     # 1) Register the CLSID -> InProcServer32 (= our DLL).
     #    mscoree.dll is the .NET Framework COM bridge; ThreadingModel
