@@ -836,11 +836,25 @@ func prepare3DmolHTML(htmlPath: String,
     let lowerExt = pdbPath.lowercased().components(separatedBy: ".").last ?? ""
     let isCryoEM = (lowerExt == "ccp4" || lowerExt == "mrc" || lowerExt == "map")
                    && options.cryoEMRender
+    let isTrajectory = (lowerExt == "dcd" || lowerExt == "xtc" || lowerExt == "trr")
 
     let rawOriginal: String
     if isCryoEM, let binary = try? Data(contentsOf: URL(fileURLWithPath: pdbPath)),
        let cube = convertCCP4ToCube(binary) {
         rawOriginal = cube
+    } else if isTrajectory {
+        // Trajectories are binary, no useful text representation. Branch to
+        // a dedicated reader that emits the first frame as XYZ.
+        if let xyz = readTrajectoryFirstFrame(path: pdbPath, ext: lowerExt) {
+            rawOriginal = xyz
+        } else {
+            return errorHTML(
+                title: "Trajectory format not previewable",
+                detail: "\(lowerExt.uppercased()) trajectory could not be parsed. " +
+                        "DCD is supported (CHARMM/NAMD); XTC/TRR are not yet readable " +
+                        "without GROMACS-side decompression. Add a sibling .pdb or .psf " +
+                        "topology file to get element-aware atom labels.")
+        }
     } else {
         do {
             rawOriginal = try readMolecularTextFile(pdbPath)
@@ -873,11 +887,14 @@ func prepare3DmolHTML(htmlPath: String,
         // ignored - rendering a CCP4 without isosurface would just
         // produce an empty viewport.
         workingFormat = "cube"
+    } else if isTrajectory {
+        // First-frame XYZ; bio-assembly / comp-chem pre-passes don't apply.
+        workingFormat = "xyz"
     } else if options.bioAssembly, let expanded = expandBiologicalAssembly(working, extension: ext) {
         working = expanded
         workingFormat = "pdb"   // multi-MODEL PDB regardless of source
     }
-    if !isCryoEM, let conv = parseComputationalChem(working, extension: ext) {
+    if !isCryoEM, !isTrajectory, let conv = parseComputationalChem(working, extension: ext) {
         working = conv.xyz
         workingFormat = "xyz"
     }
@@ -1253,4 +1270,246 @@ func convertColorToRGB(color: Color) -> (rgbHex: String, alpha: String) {
     let bHex = String(format: "%02X", bInt)
 
     return (rHex + gHex + bHex, "\(alpha)")
+}
+
+// MARK: - Molecular dynamics trajectory readers (1.7.36+)
+//
+// The goal is a first-frame preview — not full trajectory playback. So we read
+// the topology of the trajectory enough to know how many atoms there are, pull
+// the first frame's xyz coordinates, and emit XYZ-format text that 3Dmol can
+// render via its existing parser. Element types come from a sibling .pdb / .psf
+// if present; otherwise we default everything to "C".
+//
+// Supported now:
+//   .dcd  — CHARMM / NAMD binary; Fortran-record framing. We detect endianness
+//           via the leading record marker (84) and walk header → title → natoms
+//           → first-frame X/Y/Z.
+//
+// Not yet supported (returns nil so the caller emits a friendly error HTML):
+//   .xtc  — GROMACS XDR-encoded with custom 3D-vector compression (libxdrfile).
+//           Implementable in Swift but a few hundred lines for the bit-unpacker.
+//   .trr  — GROMACS XDR-encoded full-precision floats. Simpler than XTC but
+//           still requires an XDR walker and integration tests.
+
+/// Top-level dispatcher. Returns first-frame XYZ text, or nil if the format
+/// isn't decodable yet.
+internal func readTrajectoryFirstFrame(path: String, ext: String) -> String? {
+    guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
+    switch ext {
+    case "dcd":
+        return parseDCDFirstFrame(data: data, dcdURL: URL(fileURLWithPath: path))
+    case "xtc", "trr":
+        return nil  // explicit unsupported — caller shows an info panel
+    default:
+        return nil
+    }
+}
+
+/// DCD reader. Walks Fortran-record-wrapped blocks:
+///   - header: 4-byte length=84, "CORD" + 20 int32 + 4-byte length=84
+///   - title:  4-byte length + ntitle*80 chars + 4-byte length
+///   - natoms: 4-byte length=4 + int32 + 4-byte length=4
+///   - per frame (we read only frame 0):
+///       optional unit cell: 4-byte length=48 + 6×double + 4-byte length=48
+///       X: 4-byte length=4*N + N×float32 + 4-byte length=4*N
+///       Y: same
+///       Z: same
+private func parseDCDFirstFrame(data: Data, dcdURL: URL) -> String? {
+    guard data.count >= 100 else { return nil }
+    var offset = 0
+    // Endianness probe: the first 4 bytes should decode to 84 in one of the
+    // two endian readings. If neither does it's not a DCD.
+    let littleFirst = readInt32LE(data, offset: 0)
+    let bigFirst    = readInt32BE(data, offset: 0)
+    let little: Bool
+    if littleFirst == 84 { little = true }
+    else if bigFirst == 84 { little = false }
+    else { return nil }
+
+    // Walk header (84 bytes payload).
+    offset = 4
+    let cord = data.subdata(in: offset..<(offset + 4))
+    guard String(data: cord, encoding: .ascii) == "CORD" else { return nil }
+    offset += 4
+    // Skip nset (1) … and the rest of the 20-int32 header.
+    offset += 80  // (84 - 4 for "CORD")
+    // hasUnitCell lives at int32[11] (0-based), i.e. offset+44 inside the
+    // header payload. Header start = 8; so byte offset = 8 + 44 = 52.
+    let hasUnitCell = readInt32(data, offset: 52, little: little) != 0
+    // Trailing record marker (4 bytes) — skip.
+    offset += 4
+
+    // Title block.
+    let titleLen = Int(readInt32(data, offset: offset, little: little))
+    offset += 4
+    offset += titleLen   // skip title body
+    offset += 4          // trailing marker
+
+    // Natoms block (length=4 + int32 + length=4).
+    offset += 4
+    let natoms = Int(readInt32(data, offset: offset, little: little))
+    offset += 4
+    offset += 4
+    guard natoms > 0 && natoms < 10_000_000 else { return nil }
+
+    // First frame — skip the per-frame unit cell if the flag is set.
+    if hasUnitCell {
+        // 4-byte marker (should equal 48) + 6 doubles + 4-byte marker.
+        offset += 4
+        offset += 48
+        offset += 4
+    }
+
+    // Read X / Y / Z coordinate blocks.
+    let frameByteLen = 4 + natoms * 4 + 4
+    guard offset + 3 * frameByteLen <= data.count else { return nil }
+    var xs = [Float](repeating: 0, count: natoms)
+    var ys = [Float](repeating: 0, count: natoms)
+    var zs = [Float](repeating: 0, count: natoms)
+    if !readFloatArray(data, offset: &offset, count: natoms, into: &xs, little: little) { return nil }
+    if !readFloatArray(data, offset: &offset, count: natoms, into: &ys, little: little) { return nil }
+    if !readFloatArray(data, offset: &offset, count: natoms, into: &zs, little: little) { return nil }
+
+    // Element labels: prefer a sibling .pdb / .psf / .gro topology.
+    let elements = readSiblingElements(dcdURL: dcdURL, count: natoms)
+        ?? Array(repeating: "C", count: natoms)
+
+    // Emit XYZ text.
+    var xyz = "\(natoms)\nFirst frame from \(dcdURL.lastPathComponent)\n"
+    for i in 0..<natoms {
+        xyz += "\(elements[i]) \(xs[i]) \(ys[i]) \(zs[i])\n"
+    }
+    return xyz
+}
+
+/// Look for a sibling topology file with the same base name and .pdb/.psf/.gro.
+/// Returns one element symbol per atom, or nil if no usable sibling was found.
+private func readSiblingElements(dcdURL: URL, count: Int) -> [String]? {
+    let dir = dcdURL.deletingLastPathComponent()
+    let base = dcdURL.deletingPathExtension().lastPathComponent
+    for ext in ["pdb", "psf", "gro"] {
+        let candidate = dir.appendingPathComponent("\(base).\(ext)")
+        if let text = try? String(contentsOf: candidate, encoding: .utf8) {
+            let parsed = parseElementsFromTopology(text: text, ext: ext)
+            if parsed.count == count { return parsed }
+        }
+    }
+    return nil
+}
+
+private func parseElementsFromTopology(text: String, ext: String) -> [String] {
+    var out = [String]()
+    switch ext {
+    case "pdb":
+        for raw in text.split(separator: "\n") {
+            let line = String(raw)
+            guard line.count >= 78 else {
+                if (line.hasPrefix("ATOM") || line.hasPrefix("HETATM")) && line.count >= 16 {
+                    // No element column — guess from atom name (cols 13-16).
+                    let start = line.index(line.startIndex, offsetBy: 12)
+                    let end   = line.index(line.startIndex, offsetBy: min(16, line.count))
+                    let name = String(line[start..<end]).trimmingCharacters(in: .whitespaces)
+                    out.append(guessElementFromName(name))
+                }
+                continue
+            }
+            if line.hasPrefix("ATOM") || line.hasPrefix("HETATM") {
+                let s = line.index(line.startIndex, offsetBy: 76)
+                let e = line.index(line.startIndex, offsetBy: 78)
+                let el = String(line[s..<e]).trimmingCharacters(in: .whitespaces)
+                out.append(el.isEmpty ? "C" : el)
+            }
+        }
+    case "psf":
+        // PSF !NATOM section: each atom line has 8+ whitespace tokens; col 5
+        // is the atom name (first letter is usually the element).
+        var inAtoms = false
+        for raw in text.split(separator: "\n") {
+            let line = String(raw)
+            if line.contains("!NATOM") { inAtoms = true; continue }
+            if !inAtoms { continue }
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("!") { break }
+            let parts = trimmed.split(whereSeparator: { $0.isWhitespace })
+            if parts.count >= 5 { out.append(guessElementFromName(String(parts[4]))) }
+        }
+    case "gro":
+        // .gro atoms are lines 3..3+natoms; cols 11-15 hold the atom name.
+        let lines = text.split(separator: "\n").map(String.init)
+        guard lines.count >= 3 else { return [] }
+        for i in 2..<lines.count {
+            let line = lines[i]
+            if line.count < 15 { continue }
+            let s = line.index(line.startIndex, offsetBy: 10)
+            let e = line.index(line.startIndex, offsetBy: 15)
+            let name = String(line[s..<e]).trimmingCharacters(in: .whitespaces)
+            if name.isEmpty { continue }
+            out.append(guessElementFromName(name))
+        }
+    default: break
+    }
+    return out
+}
+
+private func guessElementFromName(_ name: String) -> String {
+    // PDB/PSF atom names are space-padded to 4 chars: leading digit if any,
+    // then 1-2 element letters, then position indicator. Strip leading digits,
+    // take the first 1-2 alpha chars, normalize to title case.
+    let stripped = String(name.drop(while: { $0.isNumber }))
+    guard let first = stripped.first else { return "C" }
+    if stripped.count >= 2 {
+        let second = stripped[stripped.index(after: stripped.startIndex)]
+        // Two-letter elements that start with the first letter (Cl, Br, etc.).
+        let two = String(first).uppercased() + String(second).lowercased()
+        let twoLetterElements: Set<String> = [
+            "He", "Li", "Be", "Ne", "Na", "Mg", "Al", "Si", "Cl", "Ar",
+            "Ca", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Br", "Mo", "Ag",
+            "Sn", "Au", "Hg", "Pb"
+        ]
+        if twoLetterElements.contains(two) { return two }
+    }
+    return String(first).uppercased()
+}
+
+// MARK: - DCD byte helpers
+
+private func readInt32(_ data: Data, offset: Int, little: Bool) -> Int32 {
+    return little ? readInt32LE(data, offset: offset) : readInt32BE(data, offset: offset)
+}
+private func readInt32LE(_ data: Data, offset: Int) -> Int32 {
+    return Int32(bitPattern:
+        UInt32(data[data.startIndex + offset])           |
+        UInt32(data[data.startIndex + offset + 1]) << 8  |
+        UInt32(data[data.startIndex + offset + 2]) << 16 |
+        UInt32(data[data.startIndex + offset + 3]) << 24)
+}
+private func readInt32BE(_ data: Data, offset: Int) -> Int32 {
+    return Int32(bitPattern:
+        UInt32(data[data.startIndex + offset]) << 24     |
+        UInt32(data[data.startIndex + offset + 1]) << 16 |
+        UInt32(data[data.startIndex + offset + 2]) << 8  |
+        UInt32(data[data.startIndex + offset + 3]))
+}
+
+private func readFloatArray(_ data: Data, offset: inout Int, count: Int,
+                            into out: inout [Float], little: Bool) -> Bool {
+    // Skip leading length marker.
+    offset += 4
+    guard offset + count * 4 + 4 <= data.count else { return false }
+    for i in 0..<count {
+        let u32: UInt32 = little
+            ? UInt32(data[data.startIndex + offset])           |
+              UInt32(data[data.startIndex + offset + 1]) << 8  |
+              UInt32(data[data.startIndex + offset + 2]) << 16 |
+              UInt32(data[data.startIndex + offset + 3]) << 24
+            : UInt32(data[data.startIndex + offset]) << 24     |
+              UInt32(data[data.startIndex + offset + 1]) << 16 |
+              UInt32(data[data.startIndex + offset + 2]) << 8  |
+              UInt32(data[data.startIndex + offset + 3])
+        out[i] = Float(bitPattern: u32)
+        offset += 4
+    }
+    // Trailing length marker.
+    offset += 4
+    return true
 }

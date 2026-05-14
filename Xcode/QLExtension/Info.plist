@@ -67,6 +67,10 @@
 				<string>com.ariomoniri.QuickLookProtein.ccp4</string>
 				<string>com.ariomoniri.QuickLookProtein.mrc</string>
 				<string>com.ariomoniri.QuickLookProtein.map</string>
+				<!-- MD trajectories (1.7.36+); first-frame preview only -->
+				<string>com.ariomoniri.QuickLookProtein.dcd</string>
+				<string>com.ariomoniri.QuickLookProtein.xtc</string>
+				<string>com.ariomoniri.QuickLookProtein.trr</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

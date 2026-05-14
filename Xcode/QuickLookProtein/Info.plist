@@ -413,6 +413,45 @@
 				<array><string>map</string></array>
 			</dict>
 		</dict>
+		<!-- Molecular dynamics trajectories (1.7.36+). First-frame preview only;
+		     companion topology (.pdb/.psf next to the trajectory) is required for
+		     atom records. -->
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.dcd</string>
+			<key>UTTypeDescription</key>
+			<string>CHARMM/NAMD DCD Trajectory</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key>
+				<array><string>dcd</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.xtc</string>
+			<key>UTTypeDescription</key>
+			<string>GROMACS XTC Trajectory</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key>
+				<array><string>xtc</string></array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.trr</string>
+			<key>UTTypeDescription</key>
+			<string>GROMACS TRR Trajectory</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key>
+				<array><string>trr</string></array>
+			</dict>
+		</dict>
 	</array>
 </dict>
 </plist>
