@@ -131,6 +131,8 @@ struct ContentView: View {
                             Toggle("Hide hydrogens",                  isOn: $userSettings.hideHydrogens)
                             Toggle("Show unit cell (CIF)",            isOn: $userSettings.showUnitCell)
                             Toggle("Show info overlay",               isOn: $userSettings.showInfoOverlay)
+                            Toggle("Show interactive controls",       isOn: $userSettings.showControlsInPreview)
+                                .help("Adds a small bottom-right toolbar in every Quick Look preview with one-click buttons for Stick / Line / Sphere / Cartoon style, Surface, Color SS, Label αC, and Recenter.")
                         }
 
                         // MARK: Info-overlay fields - which bits of info appear

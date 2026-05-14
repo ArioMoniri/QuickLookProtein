@@ -185,6 +185,7 @@ public partial class MoleculePanel : UserControl, IDisposable
         var infoMolWeight     = QuickLookProtein.Shared.SettingsStore.GetInfoShowMolWeight();
         var infoBondCount     = QuickLookProtein.Shared.SettingsStore.GetInfoShowBondCount();
         var infoPdbTitle      = QuickLookProtein.Shared.SettingsStore.GetInfoShowPDBTitle();
+        var showControls      = QuickLookProtein.Shared.SettingsStore.GetShowControlsInPreview();
         var pdbTitle          = ExtractPdbTitle(moleculeData);
 
         // Order matters: insert the molecule data block LAST so
@@ -210,6 +211,7 @@ public partial class MoleculePanel : UserControl, IDisposable
             .Replace("{INFO_MOL_WEIGHT}",        infoMolWeight     ? "true" : "false")
             .Replace("{INFO_BOND_COUNT}",        infoBondCount     ? "true" : "false")
             .Replace("{INFO_PDB_TITLE}",         infoPdbTitle      ? "true" : "false")
+            .Replace("{SHOW_CONTROLS}",          showControls      ? "true" : "false")
             .Replace("{PDB_TITLE}",         EscapeForJsString(pdbTitle))
             .Replace("{EXTRA_MODELS_JSON}", "[]")
             .Replace("{EXTRA_MODELS_HTML}", "")

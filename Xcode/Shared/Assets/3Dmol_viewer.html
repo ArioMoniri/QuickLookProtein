@@ -31,11 +31,32 @@
                          padding: 24px; text-align: center; color: #b00;
                          font-size: 13px; line-height: 1.4; }
             #error .title { font-weight: 600; margin-bottom: 6px; color: #800; }
+            /* Interactive 3Dmol toolbar (1.7.27+). Shown when
+               {SHOW_CONTROLS} is true. Flat row of small pills the
+               user can tap during a Quick Look preview to re-style,
+               toggle surfaces, recenter, etc. without leaving QL. */
+            #controls  { position: absolute; bottom: 8px; right: 8px; z-index: 12;
+                         display: flex; flex-wrap: wrap; gap: 4px;
+                         max-width: calc(100% - 16px); justify-content: flex-end; }
+            #controls button {
+                font: 500 11px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+                background: rgba(255,255,255,0.85); color: #222;
+                border: 1px solid rgba(0,0,0,0.18); border-radius: 5px;
+                padding: 3px 9px; cursor: pointer;
+                transition: background 0.12s ease; }
+            #controls button:hover  { background: rgba(255,255,255,1.0); }
+            #controls button.active { background: rgba(0,120,215,0.85);
+                                       color: #fff; border-color: rgba(0,120,215,0.95); }
             @media (prefers-color-scheme: dark) {
                 #info  { color: #ddd; background: rgba(30,30,30,0.70); }
                 #label { color: #fff; background: rgba(30,30,30,0.92); }
                 #error { color: #ff8a8a; }
                 #error .title { color: #ffb0b0; }
+                #controls button { background: rgba(40,40,42,0.85); color: #ddd;
+                                   border-color: rgba(255,255,255,0.18); }
+                #controls button:hover  { background: rgba(60,60,62,0.95); }
+                #controls button.active { background: rgba(58,145,235,0.85);
+                                          color: #fff; border-color: rgba(58,145,235,0.95); }
             }
         </style>
     </head>
@@ -47,6 +68,22 @@
         <div style="height: 100vh; width: 100%; position: relative;" id="3dviewer"></div>
         <div id="info"></div>
         <div id="label"></div>
+        <!-- Interactive 3Dmol controls (1.7.27+). Bottom-right pill
+             toolbar visible only when {SHOW_CONTROLS} is true. The JS
+             below wires each button to the corresponding 3Dmol API
+             call. Buttons that act like radios (the style group)
+             share the .active highlight; toggles (surface, labels)
+             flip themselves on each click. -->
+        <div id="controls" style="display: none;">
+            <button data-cmd="style:stick">Stick</button>
+            <button data-cmd="style:line">Line</button>
+            <button data-cmd="style:sphere">Sphere</button>
+            <button data-cmd="style:cartoon">Cartoon</button>
+            <button data-cmd="surface">Surface</button>
+            <button data-cmd="colorss">Color SS</button>
+            <button data-cmd="labelca">Label αC</button>
+            <button data-cmd="recenter">Recenter</button>
+        </div>
         <script type="text/plain" id="mol-data">{MOL_DATA}</script>
         <!-- Merge mode (multi-file Quick Look) extras. Each sibling
              structure rides along in its own script block; the JS
@@ -441,6 +478,133 @@
                                 });
                             });
                         } catch (e) {}
+                    }
+
+                    // === interactive controls (1.7.27+) ====================
+                    // Bottom-right toolbar visible only when the user
+                    // enabled it in Settings. Each button reaches into
+                    // the same `viewer` we built above and re-styles /
+                    // toggles in-place without a re-load. We DON'T
+                    // touch the smart-styling logic above - the user
+                    // can override it and the heuristics will re-apply
+                    // on the next preview if they re-open the file.
+                    if ({SHOW_CONTROLS}) {
+                        (function () {
+                            var bar = document.getElementById('controls');
+                            if (!bar) return;
+                            bar.style.display = 'flex';
+                            var styleButtons = bar.querySelectorAll('button[data-cmd^="style:"]');
+                            var surfaceState = false;
+                            var surfaceID = null;
+                            var labelState = false;
+                            var labelHandles = [];
+                            var ssColored = false;
+                            // Mark the button matching the current
+                            // ATOM_STYLE so the user can see where we
+                            // started.
+                            function syncStyleActive(active) {
+                                styleButtons.forEach(function (b) {
+                                    b.classList.toggle('active', b === active);
+                                });
+                            }
+                            var initialStyle = '{ATOM_STYLE}';
+                            styleButtons.forEach(function (b) {
+                                if (b.getAttribute('data-cmd') === 'style:' + initialStyle) {
+                                    b.classList.add('active');
+                                }
+                            });
+
+                            function setStyleAll(name) {
+                                viewer.removeAllSurfaces();
+                                surfaceState = false;
+                                surfaceID = null;
+                                bar.querySelector('[data-cmd="surface"]').classList.remove('active');
+                                var s = {};
+                                if (name === 'stick')    s = { stick: {} };
+                                if (name === 'line')     s = { line: { linewidth: 2 } };
+                                if (name === 'sphere')   s = { sphere: {} };
+                                if (name === 'cartoon')  s = { cartoon: ssColored
+                                                                ? { colorscheme: 'ssJmol' }
+                                                                : { color: 'spectrum' } };
+                                viewer.setStyle({}, s);
+                                viewer.render();
+                            }
+                            function toggleSurface(btn) {
+                                if (surfaceState) {
+                                    viewer.removeAllSurfaces();
+                                    surfaceID = null;
+                                    surfaceState = false;
+                                    btn.classList.remove('active');
+                                } else {
+                                    try {
+                                        viewer.addSurface($3Dmol.SurfaceType.VDW,
+                                            { opacity: 0.78, color: 'whiteCarbon' });
+                                        surfaceState = true;
+                                        btn.classList.add('active');
+                                    } catch (e) { console.warn(e); }
+                                }
+                                viewer.render();
+                            }
+                            function toggleSSColor(btn) {
+                                ssColored = !ssColored;
+                                btn.classList.toggle('active', ssColored);
+                                if (ssColored) {
+                                    viewer.setStyle({ cartoon: true },
+                                                    { cartoon: { colorscheme: 'ssJmol' } });
+                                } else {
+                                    viewer.setStyle({ cartoon: true },
+                                                    { cartoon: { color: 'spectrum' } });
+                                }
+                                viewer.render();
+                            }
+                            function toggleLabels(btn) {
+                                if (labelState) {
+                                    labelHandles.forEach(function (h) {
+                                        try { viewer.removeLabel(h); } catch (e) {}
+                                    });
+                                    labelHandles = [];
+                                    labelState = false;
+                                    btn.classList.remove('active');
+                                } else {
+                                    var caAtoms = viewer.selectedAtoms({ atom: 'CA' });
+                                    caAtoms.forEach(function (a) {
+                                        try {
+                                            var h = viewer.addLabel(
+                                                (a.resn || '') + ' ' + (a.resi || ''),
+                                                { position: { x: a.x, y: a.y, z: a.z },
+                                                  fontSize: 9, backgroundOpacity: 0.6,
+                                                  backgroundColor: 'black',
+                                                  fontColor: 'white' });
+                                            labelHandles.push(h);
+                                        } catch (e) {}
+                                    });
+                                    labelState = true;
+                                    btn.classList.add('active');
+                                }
+                                viewer.render();
+                            }
+
+                            bar.addEventListener('click', function (e) {
+                                var b = e.target.closest('button');
+                                if (!b) return;
+                                var cmd = b.getAttribute('data-cmd');
+                                if (cmd && cmd.indexOf('style:') === 0) {
+                                    syncStyleActive(b);
+                                    setStyleAll(cmd.substring(6));
+                                    return;
+                                }
+                                if (cmd === 'surface')  return toggleSurface(b);
+                                if (cmd === 'colorss')  return toggleSSColor(b);
+                                if (cmd === 'labelca')  return toggleLabels(b);
+                                if (cmd === 'recenter') {
+                                    try {
+                                        viewer.center();
+                                        viewer.zoomTo();
+                                        viewer.render();
+                                    } catch (e) {}
+                                }
+                            });
+                        })();
                     }
 
                     // === window-resize → canvas-resize =======================

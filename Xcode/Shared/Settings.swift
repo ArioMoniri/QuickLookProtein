@@ -91,6 +91,12 @@ class SettingsStorage: ObservableObject {
     @Published var infoShowBondCount:       Bool { didSet { Self.preferencesStore.set(infoShowBondCount,       forKey: "infoShowBondCount") } }
     @Published var infoShowPDBTitle:        Bool { didSet { Self.preferencesStore.set(infoShowPDBTitle,        forKey: "infoShowPDBTitle") } }
 
+    // Interactive 3Dmol control toolbar shown bottom-right of every
+    // Quick Look preview (1.7.27+). Lets the user re-style, toggle
+    // surface, color by secondary structure, label alpha-carbons, or
+    // recenter without leaving Quick Look. Default ON.
+    @Published var showControlsInPreview: Bool { didSet { Self.preferencesStore.set(showControlsInPreview, forKey: "showControlsInPreview") } }
+
     // MARK: - Multi-file Quick Look behaviour
     //
     // Persisted preference for what to do when the user spacebars
@@ -147,6 +153,7 @@ class SettingsStorage: ObservableObject {
         self.infoShowMolWeight        = store.object(forKey: "infoShowMolWeight")        as? Bool ?? false
         self.infoShowBondCount        = store.object(forKey: "infoShowBondCount")        as? Bool ?? false
         self.infoShowPDBTitle         = store.object(forKey: "infoShowPDBTitle")         as? Bool ?? false
+        self.showControlsInPreview    = store.object(forKey: "showControlsInPreview")    as? Bool ?? true
 
         self.multiFilePreviewMode = Self.read(forKey: "multiFilePreviewMode", default: .separate)
 

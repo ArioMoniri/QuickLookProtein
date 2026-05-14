@@ -303,6 +303,10 @@
                             <CheckBox x:Name="ShowInfoOverlayCheck"
                                       Content="Show info overlay"
                                       Margin="0,4"/>
+                            <CheckBox x:Name="ShowControlsInPreviewCheck"
+                                      Content="Show interactive controls"
+                                      ToolTip="Adds a small bottom-right toolbar in every Quick Look preview with one-click buttons for Stick / Line / Sphere / Cartoon style, Surface, Color SS, Label alpha-C, and Recenter."
+                                      Margin="0,4"/>
                         </StackPanel>
                     </Border>
 

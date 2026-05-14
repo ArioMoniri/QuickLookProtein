@@ -247,10 +247,22 @@ jobs:
                      --entitlements "$ents_file" \
                      --sign "$IDENTITY" "$svc"
           done
-          # Re-sign the whole app so the parent's signature covers the
-          # XPC services we just added.
+          # Re-sign the whole app so the parent's signature covers
+          # the XPC services we just added.
+          #
+          # CRITICAL: use --preserve-metadata=entitlements, NOT
+          # --entitlements <file>. The xcodebuild archive step
+          # already signed the .app with entitlements where
+          # $(TeamIdentifierPrefix) was expanded to the team ID
+          # (e.g. FF68N39FU5.group...). Passing the raw .entitlements
+          # file to codesign here would re-write those with the
+          # literal unexpanded $(TeamIdentifierPrefix)group... string,
+          # breaking App Group membership (Sparkle's updater fails to
+          # start, the QL extension stops seeing main-app settings,
+          # multi-file merge mode never fires - all symptoms of the
+          # app + extension no longer sharing their UserDefaults).
           codesign --force --options runtime --timestamp \
-                   --entitlements Xcode/QuickLookProtein/QuickLookProtein.entitlements \
+                   --preserve-metadata=entitlements,requirements \
                    --sign "$IDENTITY" "$APP"
 
       - name: Verify signature
@@ -316,8 +328,81 @@ jobs:
           # icon and the /Applications symlink (added by create-dmg).
           /usr/bin/ditto build/export/QuickLookProtein.app build/dmg-stage/QuickLookProtein.app
 
+          # ------------------------------------------------------------
+          # DMG visual polish: volume icon + background image
+          # ------------------------------------------------------------
+          # The .app's AppIcon.icns becomes the disk's icon while it's
+          # mounted (instead of the generic white drive). Fall back
+          # silently if the .app doesn't ship one for some reason.
+          VOLICON_FLAG=""
+          ICNS=$(/usr/bin/find build/export/QuickLookProtein.app/Contents/Resources -maxdepth 1 -name "*.icns" | head -1)
+          if [ -n "$ICNS" ]; then
+            VOLICON_FLAG="--volicon $ICNS"
+            echo "Using volume icon: $ICNS"
+          fi
+
+          # Generate a 640x400 background image with the title +
+          # "Drag to Applications" arrow. Done at workflow time via a
+          # one-shot Python script using PIL/Pillow so we don't have
+          # to commit a binary PNG. Falls back to no-background if
+          # Pillow isn't on the runner.
+          BG_FLAG=""
+          BG_PATH="build/dmg-background.png"
+          python3 - <<'PY' || true
+          import sys
+          try:
+              from PIL import Image, ImageDraw, ImageFont
+          except Exception:
+              sys.exit(0)
+          W, H = 640, 400
+          img = Image.new("RGBA", (W, H), (245, 246, 249, 255))
+          d = ImageDraw.Draw(img)
+          # Subtle gradient band so the bg has depth instead of flat
+          # paper. Two thin lines + a soft top stripe.
+          for y in range(0, H):
+              t = y / float(H - 1)
+              r = int(245 - 30 * t); g = int(246 - 28 * t); b = int(249 - 22 * t)
+              d.line([(0, y), (W, y)], fill=(r, g, b, 255))
+          # Drop arrow between app icon and /Applications shortcut.
+          # create-dmg places the .app icon at (170,200) and the
+          # /Applications shortcut at (460,200) - the arrow midpoint
+          # is at (315,200). Render a thick semitransparent arrow
+          # head + tail.
+          arrow_color = (60, 60, 70, 200)
+          # Tail
+          d.rectangle([(225, 190), (385, 210)], fill=arrow_color)
+          # Head (right-pointing triangle)
+          d.polygon([(385, 170), (425, 200), (385, 230)], fill=arrow_color)
+          # Title at the top.
+          title = "QuickLookProtein"
+          subtitle = "Drag the app to your Applications folder"
+          try:
+              font_t = ImageFont.truetype("/System/Library/Fonts/SFNS.ttf", 28)
+              font_s = ImageFont.truetype("/System/Library/Fonts/SFNS.ttf", 13)
+          except Exception:
+              font_t = ImageFont.load_default()
+              font_s = ImageFont.load_default()
+          tw = d.textlength(title, font=font_t)
+          d.text(((W - tw) / 2, 38), title, fill=(40, 42, 50, 255), font=font_t)
+          sw = d.textlength(subtitle, font=font_s)
+          d.text(((W - sw) / 2, 76), subtitle, fill=(110, 112, 125, 255), font=font_s)
+          # Tag line at the bottom.
+          tag = "3D molecule preview for macOS Quick Look - rendered by 3Dmol.js"
+          tw = d.textlength(tag, font=font_s)
+          d.text(((W - tw) / 2, 360), tag, fill=(140, 142, 155, 255), font=font_s)
+          img.save("build/dmg-background.png", "PNG")
+          PY
+          if [ -f "$BG_PATH" ]; then
+            BG_FLAG="--background $BG_PATH"
+            echo "Using generated DMG background: $BG_PATH ($(du -h $BG_PATH | cut -f1))"
+          else
+            echo "::warning::DMG background generation failed - shipping without one."
+          fi
+
           create-dmg \
               --volname "QuickLookProtein ${VERSION}" \
+              $VOLICON_FLAG \
+              $BG_FLAG \
               --window-pos 200 120 \
               --window-size 640 400 \
               --icon-size 110 \

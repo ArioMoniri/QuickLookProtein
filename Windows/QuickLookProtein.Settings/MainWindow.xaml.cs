@@ -94,7 +94,8 @@ public partial class MainWindow : Window
         ShowSurfaceCheck.IsChecked     = SettingsStore.GetShowSurface();
         HideHydrogensCheck.IsChecked   = SettingsStore.GetHideHydrogens();
         ShowUnitCellCheck.IsChecked    = SettingsStore.GetShowUnitCell();
-        ShowInfoOverlayCheck.IsChecked = SettingsStore.GetShowInfoOverlay();
+        ShowInfoOverlayCheck.IsChecked        = SettingsStore.GetShowInfoOverlay();
+        ShowControlsInPreviewCheck.IsChecked  = SettingsStore.GetShowControlsInPreview();
 
         InfoFileNameCheck.IsChecked         = SettingsStore.GetInfoShowFileName();
         InfoAtomCountCheck.IsChecked        = SettingsStore.GetInfoShowAtomCount();
@@ -132,7 +133,8 @@ public partial class MainWindow : Window
         ShowSurfaceCheck.Click     += (_, _) => Save(() => SettingsStore.SetShowSurface(ShowSurfaceCheck.IsChecked == true));
         HideHydrogensCheck.Click   += (_, _) => Save(() => SettingsStore.SetHideHydrogens(HideHydrogensCheck.IsChecked == true));
         ShowUnitCellCheck.Click    += (_, _) => Save(() => SettingsStore.SetShowUnitCell(ShowUnitCellCheck.IsChecked == true));
-        ShowInfoOverlayCheck.Click += (_, _) => Save(() => SettingsStore.SetShowInfoOverlay(ShowInfoOverlayCheck.IsChecked == true));
+        ShowInfoOverlayCheck.Click        += (_, _) => Save(() => SettingsStore.SetShowInfoOverlay(ShowInfoOverlayCheck.IsChecked == true));
+        ShowControlsInPreviewCheck.Click  += (_, _) => Save(() => SettingsStore.SetShowControlsInPreview(ShowControlsInPreviewCheck.IsChecked == true));
 
         InfoFileNameCheck.Click         += (_, _) => Save(() => SettingsStore.SetInfoShowFileName(InfoFileNameCheck.IsChecked == true));
         InfoAtomCountCheck.Click        += (_, _) => Save(() => SettingsStore.SetInfoShowAtomCount(InfoAtomCountCheck.IsChecked == true));
@@ -476,6 +478,7 @@ public partial class MainWindow : Window
             .Replace("{INFO_MOL_WEIGHT}",        QuickLookProtein.Shared.SettingsStore.GetInfoShowMolWeight()        ? "true" : "false")
             .Replace("{INFO_BOND_COUNT}",        QuickLookProtein.Shared.SettingsStore.GetInfoShowBondCount()        ? "true" : "false")
             .Replace("{INFO_PDB_TITLE}",         QuickLookProtein.Shared.SettingsStore.GetInfoShowPDBTitle()         ? "true" : "false")
+            .Replace("{SHOW_CONTROLS}",          QuickLookProtein.Shared.SettingsStore.GetShowControlsInPreview()    ? "true" : "false")
             .Replace("{PDB_TITLE}",              "")
             .Replace("{EXTRA_MODELS_JSON}",      "[]")
             .Replace("{EXTRA_MODELS_HTML}",      "")

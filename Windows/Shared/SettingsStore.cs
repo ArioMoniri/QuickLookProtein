@@ -143,6 +143,12 @@ public static class SettingsStore
     public static bool GetInfoShowBondCount()        => ReadBool("InfoShowBondCount",        false);
     public static bool GetInfoShowPDBTitle()         => ReadBool("InfoShowPDBTitle",         false);
 
+    /// Interactive 3Dmol control toolbar (Stick / Line / Sphere /
+    /// Cartoon / Surface / Color SS / Label αC / Recenter) shown
+    /// bottom-right of every Quick Look preview. Default ON.
+    public static bool GetShowControlsInPreview()    => ReadBool("ShowControlsInPreview",    true);
+    public static void SetShowControlsInPreview(bool v) => WriteBool("ShowControlsInPreview", v);
+
     public static void SetInfoShowFileName(bool v)         => WriteBool("InfoShowFileName",         v);
     public static void SetInfoShowAtomCount(bool v)        => WriteBool("InfoShowAtomCount",        v);
     public static void SetInfoShowChainCount(bool v)       => WriteBool("InfoShowChainCount",       v);

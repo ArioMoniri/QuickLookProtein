@@ -4,6 +4,74 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.27] — 2026-05-14
+
+### 🐛 Fixed — App Group regression introduced in v1.7.24
+
+User reported v1.7.26 broke three things at once: Sparkle's
+"Updater failed to start" dialog, Info-overlay field toggles that
+didn't change anything in the preview, and Multiple-file preview
+"Merge all in same folder" doing nothing. All three were the same
+bug — codesign inspection of v1.7.26's parent .app showed the
+App Group string as the literal
+$(TeamIdentifierPrefix)group.com.ariomoniri.QuickLookProtein
+instead of FF68N39FU5.group.com.ariomoniri.QuickLookProtein.
+
+The "Embed Sparkle XPC services" step's parent re-sign passed the
+raw Xcode/QuickLookProtein/QuickLookProtein.entitlements file to
+codesign. Xcode normally expands $(TeamIdentifierPrefix) during
+archive; passing the file directly to codesign bypasses that. The
+literal unexpanded variable goes into the binary's entitlements
+blob, App Group membership silently fails, and everything that
+depends on the main app + extension sharing a UserDefaults
+container (Sparkle's update flow, the info-overlay field setting,
+the multi-file-mode setting) breaks at once.
+
+Fix: parent re-sign now uses
+`--preserve-metadata=entitlements,requirements` instead of
+`--entitlements <file>`, keeping whatever Xcode's archive step
+embedded (which has the variable already expanded).
+
+### 🆕 Added — interactive 3Dmol toolbar inside Quick Look
+
+The buttons 3Dmol.js's stock HTML helper shows
+(Stick / Line / Sphere / Cartoon / Surface / Color SS / Label αC
+/ Recenter) are now available inside every Quick Look preview,
+not just in the standalone main app. Bottom-right pill toolbar,
+flat row, light/dark theme aware, active-state highlight on the
+currently-selected style.
+- New `showControlsInPreview` setting (defaults ON) gates
+  visibility. Toggle in Settings -> Rendering options.
+- Wired through both code paths: the single-file
+  prepare3DmolHTML and the merge-mode prepare3DmolHTMLMulti, plus
+  the Windows plugin's MoleculePanel.FillTemplate and the Settings
+  WPF live-preview tile.
+
+### 🆕 Added — Windows Settings parity
+
+- Windows/Shared/SettingsStore.cs gains ShowControlsInPreview
+  (default ON), persisted under
+  HKCU\Software\QuickLookProtein\Settings.
+- QuickLookProtein.Settings.exe Rendering options card gains a
+  "Show interactive controls" checkbox matching the macOS toggle.
+
+### 🆕 Added — DMG visual polish
+
+QuickLookProtein-1.7.27.dmg opens with a proper drag-to-Applications
+window: app icon on the left, an arrow, an /Applications shortcut
+on the right, "QuickLookProtein" title at the top, and the app's
+own icon on the disk image itself instead of the generic white
+volume icon. The background image is generated on the fly during
+release via a small Python+Pillow step.
+
+### ⚠️ For users currently on a broken release
+
+Users stuck on v1.7.24 / v1.7.25 / v1.7.26 whose Sparkle updater
+errors out need to download
+[QuickLookProtein.dmg](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.dmg)
+manually and drag-replace /Applications/QuickLookProtein.app once.
+After that single swap, in-app Sparkle updates resume working.
+
 ## [1.7.24] — 2026-05-14
 
 ### 🐛 Fixed — Sparkle "An error occurred while launching the installer"

@@ -35,6 +35,9 @@ struct ViewerOptions {
     var infoShowBondCount:        Bool
     var infoShowPDBTitle:         Bool
 
+    // Interactive 3Dmol toolbar (1.7.27+).
+    var showControlsInPreview:    Bool
+
     static func from(_ s: SettingsStorage, fileExtension ext: String, fileName: String) -> ViewerOptions {
         ViewerOptions(
             atomStyle:       s.atomStyle(forExtension: ext),
@@ -56,7 +59,8 @@ struct ViewerOptions {
             infoShowElementBreakdown: s.infoShowElementBreakdown,
             infoShowMolWeight:        s.infoShowMolWeight,
             infoShowBondCount:        s.infoShowBondCount,
-            infoShowPDBTitle:         s.infoShowPDBTitle
+            infoShowPDBTitle:         s.infoShowPDBTitle,
+            showControlsInPreview:    s.showControlsInPreview
         )
     }
 }
@@ -146,6 +150,7 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{INFO_MOL_WEIGHT}",    with: options.infoShowMolWeight        ? "true" : "false")
     html = html.replacingOccurrences(of: "{INFO_BOND_COUNT}",    with: options.infoShowBondCount        ? "true" : "false")
     html = html.replacingOccurrences(of: "{INFO_PDB_TITLE}",     with: options.infoShowPDBTitle         ? "true" : "false")
+    html = html.replacingOccurrences(of: "{SHOW_CONTROLS}",      with: options.showControlsInPreview    ? "true" : "false")
     // PDB TITLE record contents, if any. Always passed but only shown
     // when {INFO_PDB_TITLE} is true. Safe-escape so weird titles can't
     // break out of the JS string literal.
@@ -311,6 +316,7 @@ func prepare3DmolHTMLMulti(htmlPath: String,
     html = html.replacingOccurrences(of: "{INFO_MOL_WEIGHT}",        with: options.infoShowMolWeight        ? "true" : "false")
     html = html.replacingOccurrences(of: "{INFO_BOND_COUNT}",        with: options.infoShowBondCount        ? "true" : "false")
     html = html.replacingOccurrences(of: "{INFO_PDB_TITLE}",         with: options.infoShowPDBTitle         ? "true" : "false")
+    html = html.replacingOccurrences(of: "{SHOW_CONTROLS}",          with: options.showControlsInPreview    ? "true" : "false")
     let pdbTitle = extractPDBTitle(from: primary.data) ?? ""
     html = html.replacingOccurrences(of: "{PDB_TITLE}", with: escapeForJSStringLiteral(pdbTitle))
     html = html.replacingOccurrences(of: "{ZOOM_FACTOR}",       with: String(options.defaultZoom.factor))
