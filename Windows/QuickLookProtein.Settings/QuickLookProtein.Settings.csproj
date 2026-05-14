@@ -35,4 +35,78 @@
       <Link>Shared\SettingsStore.cs</Link>
     </Compile>
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- WebView2 for the live-preview tiles. Same package version as
+         the plugin uses so a future bump only happens in one place. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Sample structure files + shared 3Dmol viewer template + JS.
+         These ride along in the Settings install dir so the live-
+         preview tiles can render the same way the plugin does, with
+         zero duplication of the renderer code. -->
+    <Content Include="..\..\Xcode\Shared\Assets\3Dmol.js">
+      <Link>SampleAssets\3Dmol.js</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\Shared\Assets\3Dmol_viewer.html">
+      <Link>SampleAssets\viewer.html</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\6oc6.pdb">
+      <Link>SampleAssets\sample.pdb</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\1565673.cif">
+      <Link>SampleAssets\sample.cif</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\PQQ.sdf">
+      <Link>SampleAssets\sample.sdf</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\methane.mol">
+      <Link>SampleAssets\sample.mol</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\caffeine.mol2">
+      <Link>SampleAssets\sample.mol2</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\benzene.xyz">
+      <Link>SampleAssets\sample.xyz</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\water.gro">
+      <Link>SampleAssets\sample.gro</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\water.cube">
+      <Link>SampleAssets\sample.cube</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\methane.pqr">
+      <Link>SampleAssets\sample.pqr</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\Xcode\QuickLookProtein\Assets\diamond.vasp">
+      <Link>SampleAssets\sample.vasp</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Promote WebView2Loader.dll's native bridge into OutputPath
+       the same way the Plugin csproj does. .NET 6+ does this
+       automatically; .NET Framework doesn't. -->
+  <Target Name="CopyWebView2LoaderNativeSettings" AfterTargets="Build">
+    <ItemGroup>
+      <_WebView2NativeS Include="$(NuGetPackageRoot)microsoft.web.webview2\1.0.2792.45\runtimes\win-x64\native\WebView2Loader.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WebView2NativeS)"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('%(_WebView2NativeS.Identity)')" />
+  </Target>
 </Project>

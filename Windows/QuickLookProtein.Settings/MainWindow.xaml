@@ -1,9 +1,10 @@
 <Window x:Class="QuickLookProtein.Settings.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="QuickLookProtein Settings"
-        Height="640" Width="780"
-        MinHeight="540" MinWidth="640"
+        Height="780" Width="900"
+        MinHeight="640" MinWidth="760"
         WindowStartupLocation="CenterScreen"
         Background="#16181C"
         FontFamily="Segoe UI Variable, Segoe UI"
@@ -113,6 +114,48 @@
 
                 <!-- LEFT COLUMN: per-format atom style + rendering + appearance -->
                 <StackPanel Grid.Column="0">
+
+                    <!-- Live preview tiles. Mirrors the macOS app's
+                         tile grid: a single WebView2 hosting 3Dmol.js
+                         (same renderer the QL plugin uses), with a
+                         row of format buttons that swap in different
+                         sample files. Settings changes apply on the
+                         next "Reload" click so users can sanity-check
+                         how their preferences affect a real preview. -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="Live preview"
+                                           Style="{StaticResource SectionTitle}"/>
+                                <Button Grid.Column="1"
+                                        Content="Reload"
+                                        Padding="10,4" Margin="0,8,0,0"
+                                        Cursor="Hand"
+                                        Click="ReloadPreview_Click"/>
+                            </Grid>
+                            <TextBlock Style="{StaticResource Caption}"
+                                       Text="Click a file format to render one of the bundled samples right here. Uses the same 3Dmol.js the Space-bar preview uses, with the settings you have above."/>
+
+                            <!-- Tile row: one button per format -->
+                            <WrapPanel x:Name="FormatTilesWrap" Margin="0,4,0,8"/>
+
+                            <!-- The live viewport -->
+                            <Border Background="#0E0E10"
+                                    BorderBrush="#2A2E36" BorderThickness="1"
+                                    CornerRadius="8" Height="320">
+                                <wv2:WebView2 x:Name="PreviewWebView"/>
+                            </Border>
+
+                            <TextBlock x:Name="PreviewCaption"
+                                       Style="{StaticResource Caption}"
+                                       Text="Loading..." Margin="0,6,0,0"/>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Per-format atom style -->
                     <Border Style="{StaticResource Card}">

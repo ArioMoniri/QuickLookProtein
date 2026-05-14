@@ -4,6 +4,38 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.21] — 2026-05-14
+
+### 🆕 Added — Live preview tiles in Windows Settings
+
+- **WebView2 live preview grid** in the Settings app, the missing
+  parity piece with the macOS app. The Mac settings panel has always
+  shown ten little 3D preview tiles (one per format) so users can
+  immediately see how their settings affect rendering. The Windows
+  Settings app now has the same: a row of format buttons (PDB / CIF
+  / SDF / MOL / MOL2 / XYZ / GRO / CUBE / PQR / VASP), each loading
+  a bundled sample into a single WebView2 panel using the same
+  `3Dmol.js` + `viewer.html` the plugin uses.
+- **Settings honored in preview**. The preview reads the same
+  registry hive the plugin reads on every Space-bar press, so
+  flipping a setting in the Settings UI → clicking *Reload* renders
+  the change instantly. No round-trip to QuickLook needed to A/B
+  the look.
+- **Sample files bundled** as `<Content Include>` items in
+  `QuickLookProtein.Settings.csproj`: `6oc6.pdb`, `1565673.cif`,
+  `PQQ.sdf`, `methane.mol`, `caffeine.mol2`, `benzene.xyz`,
+  `water.gro`, `water.cube`, `methane.pqr`, `diamond.vasp`. All
+  reused from the macOS app's `Assets/` folder via `<Link>` so
+  there's a single source of truth — no duplicate sample data.
+- **WebView2 NuGet dependency** added to `QuickLookProtein.Settings.csproj`
+  pinned to the same `1.0.2792.45` the plugin uses. The same
+  `CopyWebView2LoaderNative` MSBuild target promotes
+  `WebView2Loader.dll` into the output so the .NET Framework auto-
+  deploy gap is closed for Settings too.
+- **Window size** bumped to 900 × 780 (up from 780 × 640) to make
+  room for the preview panel without cramping the existing left/right
+  column layout.
+
 ## [1.7.20] — 2026-05-14
 
 ### 🪟 Windows — diagnostics & integration pass
