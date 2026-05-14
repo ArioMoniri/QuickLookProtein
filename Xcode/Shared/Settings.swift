@@ -158,6 +158,16 @@ class SettingsStorage: ObservableObject {
     // PNG without leaving QuickLook). Default ON.
     @Published var showShareButton: Bool { didSet { Self.preferencesStore.set(showShareButton, forKey: "showShareButton") } }
 
+    // Include USDZ in the share payload (1.7.42+). When ON and the
+    // share button is used, we also export a `.usdz` file alongside
+    // the PNG so AirDropping to an iPad lets the recipient open the
+    // molecule in AR Quick Look. Skipped automatically for structures
+    // above USDZExporter.softAtomCap to keep file size sane. Default
+    // ON — the USDZ file is small (a few hundred KB for typical
+    // small molecules / protein chains) and the AR demo is the
+    // marquee 1.7.42 feature.
+    @Published var includeUSDZInShare: Bool { didSet { Self.preferencesStore.set(includeUSDZInShare, forKey: "includeUSDZInShare") } }
+
     // Animated APNG thumbnails (1.7.35+). Default OFF. macOS Finder does NOT
     // animate APNG thumbnails in stock builds, so this is shipped as an
     // experimental toggle: the file is a valid APNG (animates anywhere that
@@ -245,6 +255,7 @@ class SettingsStorage: ObservableObject {
         self.cryoEMRender     = store.object(forKey: "cryoEMRender")     as? Bool ?? true
         self.cryoEMSigma      = (store.object(forKey: "cryoEMSigma")     as? Double) ?? 2.5
         self.showShareButton  = store.object(forKey: "showShareButton")  as? Bool ?? true
+        self.includeUSDZInShare = store.object(forKey: "includeUSDZInShare") as? Bool ?? true
         self.animatedThumbnails = store.object(forKey: "animatedThumbnails") as? Bool ?? false
         self.thumbnailStyle     = Self.read(forKey: "thumbnailStyle", default: .auto)
 

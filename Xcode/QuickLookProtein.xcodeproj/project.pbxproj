@@ -26,6 +26,10 @@
 		4B20116F26D2D43B00B77CEF /* 3Dmol_viewer.html in Resources */ = {isa = PBXBuildFile; fileRef = 4B0FDFA826C9A45B00C94DDE /* 3Dmol_viewer.html */; };
 		4B450AC326D2D6D1007F0A39 /* SharedFunctions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B450AC226D2D6D1007F0A39 /* SharedFunctions.swift */; };
 		4B450AC426D2D6D1007F0A39 /* SharedFunctions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B450AC226D2D6D1007F0A39 /* SharedFunctions.swift */; };
+		MM010001AAAA00000000A001 /* MoleculeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MM010000AAAA00000000A000 /* MoleculeModel.swift */; };
+		MM010002AAAA00000000A002 /* MoleculeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MM010000AAAA00000000A000 /* MoleculeModel.swift */; };
+		UZ010001AAAA00000000B001 /* USDZExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = UZ010000AAAA00000000B000 /* USDZExporter.swift */; };
+		UZ010002AAAA00000000B002 /* USDZExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = UZ010000AAAA00000000B000 /* USDZExporter.swift */; };
 		4B99E5C526E4FD7200B44AD9 /* VersionCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B99E5C426E4FD7200B44AD9 /* VersionCheck.swift */; };
 		4BE18E02281F38DA00034BE4 /* PQQ.sdf in Resources */ = {isa = PBXBuildFile; fileRef = 4BE18E01281F38D900034BE4 /* PQQ.sdf */; };
 		4BE18E04281F3B4900034BE4 /* 1565673.cif in Resources */ = {isa = PBXBuildFile; fileRef = 4BE18E03281F3B4900034BE4 /* 1565673.cif */; };
@@ -103,6 +107,8 @@
 		4B0FDFA826C9A45B00C94DDE /* 3Dmol_viewer.html */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.html; path = 3Dmol_viewer.html; sourceTree = "<group>"; };
 		4B20116026D2692200B77CEF /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		4B450AC226D2D6D1007F0A39 /* SharedFunctions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFunctions.swift; sourceTree = "<group>"; };
+		MM010000AAAA00000000A000 /* MoleculeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoleculeModel.swift; sourceTree = "<group>"; };
+		UZ010000AAAA00000000B000 /* USDZExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USDZExporter.swift; sourceTree = "<group>"; };
 		4B99E5C426E4FD7200B44AD9 /* VersionCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionCheck.swift; sourceTree = "<group>"; };
 		4BE18E01281F38D900034BE4 /* PQQ.sdf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PQQ.sdf; sourceTree = "<group>"; };
 		4BE18E03281F3B4900034BE4 /* 1565673.cif */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 1565673.cif; sourceTree = "<group>"; };
@@ -296,6 +302,8 @@
 				4B0FDFA726C9A45400C94DDE /* Assets */,
 				4B20116026D2692200B77CEF /* Settings.swift */,
 				4B450AC226D2D6D1007F0A39 /* SharedFunctions.swift */,
+				MM010000AAAA00000000A000 /* MoleculeModel.swift */,
+				UZ010000AAAA00000000B000 /* USDZExporter.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -507,6 +515,8 @@
 				A1AR10AA1A2B3C4D00000001 /* Updater.swift in Sources */,
 				4B99E5C526E4FD7200B44AD9 /* VersionCheck.swift in Sources */,
 				4B450AC326D2D6D1007F0A39 /* SharedFunctions.swift in Sources */,
+				MM010001AAAA00000000A001 /* MoleculeModel.swift in Sources */,
+				UZ010001AAAA00000000B001 /* USDZExporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -517,6 +527,8 @@
 				4B20116226D2692200B77CEF /* Settings.swift in Sources */,
 				4B0FDF9826C9A38000C94DDE /* PreviewViewController.swift in Sources */,
 				4B450AC426D2D6D1007F0A39 /* SharedFunctions.swift in Sources */,
+				MM010002AAAA00000000A002 /* MoleculeModel.swift in Sources */,
+				UZ010002AAAA00000000B002 /* USDZExporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -578,7 +590,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.41;
+				MARKETING_VERSION = 1.7.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLThumbnail;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -617,7 +629,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.41;
+				MARKETING_VERSION = 1.7.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLThumbnail;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -655,7 +667,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.41;
+				MARKETING_VERSION = 1.7.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLActions;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -694,7 +706,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.41;
+				MARKETING_VERSION = 1.7.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLActions;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -846,7 +858,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.41;
+				MARKETING_VERSION = 1.7.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -874,7 +886,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.41;
+				MARKETING_VERSION = 1.7.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -897,7 +909,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.41;
+				MARKETING_VERSION = 1.7.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -921,7 +933,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.41;
+				MARKETING_VERSION = 1.7.42;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

@@ -36,6 +36,11 @@ class PreviewViewController: NSViewController,
 
     var webView: WKWebView?
     private var pendingHandler: ((Error?) -> Void)?
+    /// Path of the most recently previewed file. Used by the Share
+    /// handler to re-parse atoms for USDZ export (1.7.42+) without
+    /// keeping the full atom array in memory between preview load
+    /// and share click.
+    private var currentSourceURL: URL?
 
     // Settings are intentionally NOT cached on the view controller. The
     // Quick Look daemon keeps an extension process warm across many
@@ -82,6 +87,7 @@ class PreviewViewController: NSViewController,
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
         os_log("preparePreviewOfFile called for %{public}@", log: qlLog, type: .info, url.path)
+        self.currentSourceURL = url
 
         guard let htmlPath = Bundle.main.path(forResource: "3Dmol_viewer", ofType: "html") else {
             os_log("Viewer template missing from bundle", log: qlLog, type: .error)
@@ -196,17 +202,53 @@ class PreviewViewController: NSViewController,
         // sandbox permits NSTemporaryDirectory() too and the
         // Sharing picker reads the URL we hand it directly.
         let stamp = String(format: "%.0f", Date().timeIntervalSince1970)
-        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+        let pngURL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("QuickLookProtein-\(stamp).png")
         do {
-            try pngData.write(to: tmp, options: .atomic)
+            try pngData.write(to: pngURL, options: .atomic)
         } catch {
             os_log("share: could not write temp png: %{public}@", log: qlLog, type: .error, error.localizedDescription)
             return
         }
+
+        // 1.7.42+ USDZ export: re-parse the source file (the roadmap's
+        // recommended "no lifecycle state" option — ~20ms for typical
+        // proteins) and write a `.usdz` next to the PNG. When the user
+        // AirDrops both files to an iPad, the receiving Files app picks
+        // the USDZ for AR Quick Look. Soft-cap structures over
+        // USDZExporter.softAtomCap so we don't ship 10+ MB archives.
+        var items: [URL] = [pngURL]
+        let userSettings = SettingsStorage()
+        if userSettings.includeUSDZInShare,
+           let sourceURL = self.currentSourceURL {
+            let ext = sourceURL.pathExtension.lowercased()
+            if let atoms = MoleculeModel.parseAtoms(from: sourceURL, ext: ext),
+               !atoms.isEmpty {
+                if atoms.count > USDZExporter.softAtomCap {
+                    os_log("share: skipping USDZ for %{public}d atoms (over soft cap %{public}d)",
+                           log: qlLog, type: .info, atoms.count, USDZExporter.softAtomCap)
+                } else {
+                    let usdzURL = pngURL.deletingPathExtension().appendingPathExtension("usdz")
+                    do {
+                        try USDZExporter.export(atoms: atoms, to: usdzURL)
+                        items.append(usdzURL)
+                        os_log("share: wrote USDZ (%{public}d atoms) at %{public}@",
+                               log: qlLog, type: .info, atoms.count, usdzURL.path)
+                    } catch {
+                        os_log("share: USDZ export failed: %{public}@",
+                               log: qlLog, type: .error, String(describing: error))
+                    }
+                }
+            } else {
+                os_log("share: USDZ skipped — could not parse atoms from %{public}@",
+                       log: qlLog, type: .info, sourceURL.lastPathComponent)
+            }
+        }
+
         guard let webView = self.webView else { return }
+        let shareItems = items
         DispatchQueue.main.async {
-            let picker = NSSharingServicePicker(items: [tmp])
+            let picker = NSSharingServicePicker(items: shareItems)
             picker.show(relativeTo: NSRect(x: webView.bounds.maxX - 80,
                                            y: webView.bounds.maxY - 80,
                                            width: 1, height: 1),
