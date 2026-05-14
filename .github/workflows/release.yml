@@ -225,9 +225,26 @@ jobs:
             echo "::error::Could not find Developer ID Application identity in keychain."
             exit 1
           fi
+          # Re-sign each XPC service with its OWN entitlements file.
+          # Without --entitlements the re-sign strips whatever Sparkle
+          # baked in, and a sandboxed host can no longer talk to the
+          # services - the user sees "An error occurred while
+          # launching the installer." when clicking Install Update.
+          # Per https://sparkle-project.org/documentation/sandboxing/
+          # each .xpc needs distinct entitlements:
+          #   Installer.xpc   -> sandbox + group + read/write /Applications
+          #   Downloader.xpc  -> sandbox + group + network.client
           for svc in "$DST"/*.xpc; do
             [ -d "$svc" ] || continue
+            base=$(basename "$svc" .xpc)
+            ents_file="Xcode/Sparkle/${base}.entitlements"
+            if [ ! -f "$ents_file" ]; then
+              echo "::error::Missing entitlements file for $base: $ents_file"
+              exit 1
+            fi
+            echo "Re-signing $svc with $ents_file"
             codesign --force --options runtime --timestamp \
+                     --entitlements "$ents_file" \
                      --sign "$IDENTITY" "$svc"
           done
           # Re-sign the whole app so the parent's signature covers the

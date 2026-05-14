@@ -4,6 +4,44 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.24] — 2026-05-14
+
+### 🐛 Fixed — Sparkle "An error occurred while launching the installer"
+
+User got the dreaded "Update Error / An error occurred while
+launching the installer" dialog when running the in-app updater
+from v1.7.x. v1.7.2 supposedly fixed this by embedding the Sparkle
+XPC services into `Contents/XPCServices/`, and `codesign -d
+--entitlements` against v1.7.23 confirms both services are present
+and signed — but they have **no entitlements at all**.
+
+The "Embed Sparkle XPC services" workflow step was re-signing each
+`.xpc` with `codesign --force --sign` and no `--entitlements`
+argument. That strips any entitlements baked in by Sparkle. For a
+sandboxed host, the Installer / Downloader services need specific
+entitlements (sandbox + App Group + write-access to `/Applications/`
+for the installer, sandbox + App Group + network.client for the
+downloader). Without them, `xpc_connection_resume` fails on the
+host side and Sparkle surfaces the generic "error launching
+installer" message.
+
+Fix:
+- New entitlements files [Xcode/Sparkle/Installer.entitlements](Xcode/Sparkle/Installer.entitlements)
+  and [Xcode/Sparkle/Downloader.entitlements](Xcode/Sparkle/Downloader.entitlements) following
+  the Sparkle sandboxing guide.
+- Workflow re-sign loop now picks the matching `.entitlements` file
+  per service and passes it to `codesign --entitlements`, so the
+  shipped XPC services have the entitlements they need.
+
+### ⚠️ Action for users currently on a broken release
+
+This fix only helps **future** Sparkle updates (from v1.7.24
+onwards) because the broken installer-launcher is in the *currently
+installed* app. If you're stuck on a release whose installer
+launcher fails, download [QuickLookProtein.dmg](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.dmg)
+manually and drag-replace `QuickLookProtein.app` in `/Applications`.
+After that one manual swap, Sparkle will work normally.
+
 ## [1.7.23] — 2026-05-14
 
 ### 🆕 Added — multi-file merge mode (Mac)
