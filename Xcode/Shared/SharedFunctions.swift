@@ -47,6 +47,7 @@ struct ViewerOptions {
     var ctlShowColorSS:  Bool
     var ctlShowLabelCA:  Bool
     var ctlShowRecenter: Bool
+    var ctlShowRotation: Bool
     var outlineShading:  Bool
     var ambientOcclusion: Bool
     var autoOrient:      Bool
@@ -87,6 +88,7 @@ struct ViewerOptions {
             ctlShowColorSS:  s.ctlShowColorSS,
             ctlShowLabelCA:  s.ctlShowLabelCA,
             ctlShowRecenter: s.ctlShowRecenter,
+            ctlShowRotation: s.ctlShowRotation,
             outlineShading:  s.outlineShading,
             ambientOcclusion: s.ambientOcclusion,
             autoOrient:      s.autoOrient,
@@ -942,6 +944,7 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{CTL_SHOW_COLORSS}",  with: options.ctlShowColorSS  ? "true" : "false")
     html = html.replacingOccurrences(of: "{CTL_SHOW_LABELCA}",  with: options.ctlShowLabelCA  ? "true" : "false")
     html = html.replacingOccurrences(of: "{CTL_SHOW_RECENTER}", with: options.ctlShowRecenter ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_ROTATION}", with: options.ctlShowRotation ? "true" : "false")
     html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",   with: options.outlineShading  ? "true" : "false")
     html = html.replacingOccurrences(of: "{AMBIENT_OCCLUSION}", with: options.ambientOcclusion ? "true" : "false")
     html = html.replacingOccurrences(of: "{AUTO_ORIENT}",       with: options.autoOrient      ? "true" : "false")
@@ -1126,6 +1129,7 @@ func prepare3DmolHTMLMulti(htmlPath: String,
     html = html.replacingOccurrences(of: "{CTL_SHOW_COLORSS}",       with: options.ctlShowColorSS  ? "true" : "false")
     html = html.replacingOccurrences(of: "{CTL_SHOW_LABELCA}",       with: options.ctlShowLabelCA  ? "true" : "false")
     html = html.replacingOccurrences(of: "{CTL_SHOW_RECENTER}",      with: options.ctlShowRecenter ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CTL_SHOW_ROTATION}",      with: options.ctlShowRotation ? "true" : "false")
     html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",        with: options.outlineShading  ? "true" : "false")
     html = html.replacingOccurrences(of: "{AMBIENT_OCCLUSION}",      with: options.ambientOcclusion ? "true" : "false")
     html = html.replacingOccurrences(of: "{AUTO_ORIENT}",            with: options.autoOrient      ? "true" : "false")

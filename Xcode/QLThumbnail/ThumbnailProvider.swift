@@ -31,6 +31,26 @@ import os.log
 private let thumbLog = OSLog(subsystem: "com.ariomoniri.QuickLookProtein.QLThumbnail",
                              category: "thumbnail")
 
+/// Read a Bool from whichever defaults container the host app actually
+/// wrote it to. Tries the App Group suite first; falls back to
+/// UserDefaults.standard for the case where App Group provisioning failed
+/// on the host side and Settings.swift's probe-key fallback redirected
+/// writes to .standard. Returns `def` when neither container has the key.
+fileprivate func sharedBool(forKey key: String, default def: Bool) -> Bool {
+    let group = UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein")
+    if let v = group?.object(forKey: key) as? Bool { return v }
+    if let v = UserDefaults.standard.object(forKey: key) as? Bool { return v }
+    return def
+}
+
+/// String equivalent of sharedBool — same fallback chain.
+fileprivate func sharedString(forKey key: String) -> String? {
+    let group = UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein")
+    if let v = group?.string(forKey: key) { return v }
+    if let v = UserDefaults.standard.string(forKey: key) { return v }
+    return nil
+}
+
 @objc(QLThumbnailThumbnailProvider)
 final class ThumbnailProvider: QLThumbnailProvider {
 
@@ -72,11 +92,15 @@ final class ThumbnailProvider: QLThumbnailProvider {
         // Animated APNG path: opt-in via Settings, only at sizes ≥ 128 px
         // (smaller icons aren't worth the 12x render cost). On failure we
         // fall through to the single-frame still.
-        // Read settings directly from the App Group container — QLThumbnail
-        // doesn't link Settings.swift to keep the extension's footprint tiny.
-        let defaults = UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein")
-            ?? .standard
-        let animatedOn = defaults.object(forKey: "animatedThumbnails") as? Bool ?? false
+        // Read settings from whichever container actually has the key set.
+        // On signed builds where App Group provisioning fails, Settings.swift
+        // in the host app silently falls back to UserDefaults.standard — if
+        // the extension reads only the App Group suite it sees an empty
+        // store and the user's toggles never take effect (this was the root
+        // cause of "Animated thumbnails / Thumbnail style don't change
+        // anything" up through v1.7.43). Try both, prefer the one with a
+        // non-nil value.
+        let animatedOn = sharedBool(forKey: "animatedThumbnails", default: false)
         if animatedOn,
            min(size.width, size.height) >= 128,
            let atoms = atoms, !atoms.isEmpty,
@@ -443,8 +467,8 @@ final class ThumbnailProvider: QLThumbnailProvider {
                    ending:   NSColor(white: 0.06, alpha: 1.0))?.draw(in: rect, angle: -90)
 
         // Resolve thumbnail style: explicit user override beats heuristic.
-        let style = UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein")?
-            .string(forKey: "thumbnailStyle") ?? "Auto (detect)"
+        // See sharedString() comment for why we don't just read App Group.
+        let style = sharedString(forKey: "thumbnailStyle") ?? "Auto (detect)"
         let caAtoms = atoms.filter { $0.name == "CA" && ($0.element == "C" || $0.element == "") }
 
         switch style {

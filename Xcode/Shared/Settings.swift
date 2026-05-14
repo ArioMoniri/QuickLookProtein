@@ -108,6 +108,7 @@ class SettingsStorage: ObservableObject {
     @Published var ctlShowColorSS:  Bool { didSet { Self.preferencesStore.set(ctlShowColorSS,  forKey: "ctlShowColorSS") } }
     @Published var ctlShowLabelCA:  Bool { didSet { Self.preferencesStore.set(ctlShowLabelCA,  forKey: "ctlShowLabelCA") } }
     @Published var ctlShowRecenter: Bool { didSet { Self.preferencesStore.set(ctlShowRecenter, forKey: "ctlShowRecenter") } }
+    @Published var ctlShowRotation: Bool { didSet { Self.preferencesStore.set(ctlShowRotation, forKey: "ctlShowRotation") } }
 
     // Outline shading: 3Dmol's `style: { outline: true }` flag. Adds a
     // thin black border around each atom/bond, makes the preview
@@ -247,6 +248,7 @@ class SettingsStorage: ObservableObject {
         self.ctlShowColorSS   = store.object(forKey: "ctlShowColorSS")   as? Bool ?? true
         self.ctlShowLabelCA   = store.object(forKey: "ctlShowLabelCA")   as? Bool ?? true
         self.ctlShowRecenter  = store.object(forKey: "ctlShowRecenter")  as? Bool ?? true
+        self.ctlShowRotation  = store.object(forKey: "ctlShowRotation")  as? Bool ?? true
         self.outlineShading   = store.object(forKey: "outlineShading")   as? Bool ?? false
         self.ambientOcclusion = store.object(forKey: "ambientOcclusion") as? Bool ?? true
         self.autoOrient       = store.object(forKey: "autoOrient")       as? Bool ?? false

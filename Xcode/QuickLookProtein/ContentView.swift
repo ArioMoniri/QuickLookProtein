@@ -174,6 +174,8 @@ struct ContentView: View {
                             Toggle("Color SS",  isOn: $userSettings.ctlShowColorSS)
                             Toggle("Label αC",  isOn: $userSettings.ctlShowLabelCA)
                             Toggle("Recenter",  isOn: $userSettings.ctlShowRecenter)
+                            Toggle("Spin (auto-rotation toggle)", isOn: $userSettings.ctlShowRotation)
+                                .help("Adds a Spin button to the in-preview toolbar that toggles auto-rotation on/off, using the global Rotation setting as the rate.")
                         }
                         .disabled(!userSettings.showControlsInPreview)
                         .opacity(userSettings.showControlsInPreview ? 1 : 0.4)

@@ -116,7 +116,6 @@
              the defaults from Settings. -->
         <div id="hide-pill">
             <button data-target="info"     title="Toggle info strip">i</button>
-            <button data-target="label"    title="Toggle label badge">L</button>
             <button data-target="controls" title="Toggle controls">⋯</button>
         </div>
         <!-- Interactive 3Dmol controls (1.7.27+). Bottom-right pill
@@ -134,6 +133,7 @@
             <button data-cmd="colorss"       data-show="{CTL_SHOW_COLORSS}">Color SS</button>
             <button data-cmd="labelca"       data-show="{CTL_SHOW_LABELCA}">Label αC</button>
             <button data-cmd="recenter"      data-show="{CTL_SHOW_RECENTER}">Recenter</button>
+            <button data-cmd="rotation"      data-show="{CTL_SHOW_ROTATION}" title="Toggle auto-rotation">Spin</button>
             <button data-cmd="share"         data-show="{SHOW_SHARE_BUTTON}" title="Share rendering">Share</button>
         </div>
         <script type="text/plain" id="mol-data">{MOL_DATA}</script>
@@ -448,7 +448,15 @@
                     if ({HIDE_H}) viewer.setStyle({ elem: 'H' }, {});
 
                     // === surface (capped + thumbnail-mode override) ==========
-                    var doSurface = {SHOW_SURFACE} || ({THUMBNAIL_MODE} && hasProtein);
+                    // Floor of 30 atoms (1.7.44+): 3Dmol's VDW surface
+                    // generator produces visibly malformed meshes — half-
+                    // floating shadow blobs offset from the molecule — when
+                    // run on very small ligand-only structures (~50 atoms).
+                    // Small molecules don't gain anything from a surface
+                    // anyway, so silently skip it; the toolbar Surface
+                    // button can still force one if the user really wants.
+                    var doSurface = ({SHOW_SURFACE} && atoms.length >= 30)
+                                  || ({THUMBNAIL_MODE} && hasProtein);
                     if (doSurface && atoms.length <= 3000) {
                         try {
                             var surfSel = hasPolymer ? { serial: polySerials } : {};
@@ -456,6 +464,9 @@
                                 ? { opacity: 1.0, colorscheme: 'whiteCarbon' }
                                 : { opacity: 0.50, color: 'white' };
                             viewer.addSurface($3Dmol.SurfaceType.VDW, surfStyle, surfSel);
+                            // Explicit render commits the mesh before auto-
+                            // orient rotations, avoiding a half-drawn surface.
+                            viewer.render();
                         } catch (e) {}
                     }
 
@@ -671,7 +682,12 @@
                     // === EXACTLY upstream's render+spin pattern ==============
                     viewer.render();
                     var spin = {ROTATION_SPEED};
-                    if (spin > 0) viewer.spin('y', spin);
+                    if (spin > 0) {
+                        viewer.spin('y', spin);
+                        window._qlpSpinning = true;
+                    } else {
+                        window._qlpSpinning = false;
+                    }
 
                     // === thumbnail bridge ====================================
                     if ({THUMBNAIL_MODE}) {
@@ -827,6 +843,27 @@
                                         viewer.center();
                                         viewer.zoomTo();
                                         viewer.render();
+                                    } catch (e) {}
+                                }
+                                if (cmd === 'rotation') {
+                                    // Toggle auto-spin. Resumes at the
+                                    // user's configured rate ({ROTATION_SPEED})
+                                    // — falls back to 1.0 if the setting is
+                                    // 0 (i.e. "No rotation" globally; the
+                                    // in-preview button still lets the user
+                                    // kickstart it manually).
+                                    try {
+                                        if (!window._qlpSpinning) {
+                                            var s = {ROTATION_SPEED};
+                                            if (s <= 0) s = 1.0;
+                                            viewer.spin('y', s);
+                                            window._qlpSpinning = true;
+                                            b.classList.add('active');
+                                        } else {
+                                            viewer.spin(false);
+                                            window._qlpSpinning = false;
+                                            b.classList.remove('active');
+                                        }
                                     } catch (e) {}
                                 }
                                 if (cmd === 'share') {
