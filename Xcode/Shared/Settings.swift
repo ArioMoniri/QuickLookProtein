@@ -159,6 +159,12 @@ class SettingsStorage: ObservableObject {
     // thumbnail, so the user should opt in deliberately.
     @Published var animatedThumbnails: Bool { didSet { Self.preferencesStore.set(animatedThumbnails, forKey: "animatedThumbnails") } }
 
+    // Thumbnail style override (1.7.37+). Default `.auto` preserves the
+    // existing heuristic; users can pin to CPK or ribbon for every file.
+    @Published var thumbnailStyle: Settings.ThumbnailStyle {
+        didSet { Self.write(thumbnailStyle, forKey: "thumbnailStyle") }
+    }
+
     // MARK: - Multi-file Quick Look behaviour
     //
     // Persisted preference for what to do when the user spacebars
@@ -232,6 +238,7 @@ class SettingsStorage: ObservableObject {
         self.cryoEMSigma      = (store.object(forKey: "cryoEMSigma")     as? Double) ?? 2.5
         self.showShareButton  = store.object(forKey: "showShareButton")  as? Bool ?? true
         self.animatedThumbnails = store.object(forKey: "animatedThumbnails") as? Bool ?? false
+        self.thumbnailStyle     = Self.read(forKey: "thumbnailStyle", default: .auto)
 
         self.multiFilePreviewMode = Self.read(forKey: "multiFilePreviewMode", default: .separate)
 
@@ -374,6 +381,17 @@ struct Settings {
         case mergeFolder  = "Merge all in same folder"
 
         var id: MultiFilePreviewMode { return self }
+    }
+
+    /// Thumbnail render style override. `.auto` keeps the existing Cα-count
+    /// heuristic (ribbon for ≥25 Cα, otherwise CPK spheres). The explicit
+    /// modes let power users pick what shows in Finder for every structure.
+    enum ThumbnailStyle: String, CaseIterable, Identifiable {
+        case auto   = "Auto (detect)"
+        case cpk    = "CPK spheres"
+        case ribbon = "Cartoon ribbon"
+
+        var id: ThumbnailStyle { return self }
     }
 
     enum DefaultZoom: String, CaseIterable, Identifiable {

@@ -147,6 +147,12 @@ struct ContentView: View {
                                 .help("Adds a Share button to the in-preview toolbar that captures the current rendering as PNG and presents the system Sharing picker.")
                             Toggle("Animated thumbnails (experimental)", isOn: $userSettings.animatedThumbnails)
                                 .help("Encode Finder thumbnails as 12-frame spinning APNGs (≥128 px only). Renders ~12x slower per thumbnail. macOS Finder displays the first frame statically — visible animation requires third-party viewers that honour APNG.")
+                            Picker("Thumbnail style", selection: $userSettings.thumbnailStyle) {
+                                ForEach(Settings.ThumbnailStyle.allCases) { style in
+                                    Text(style.rawValue).tag(style)
+                                }
+                            }
+                            .help("Pin the Finder thumbnail render style. Auto picks ribbon for proteins (≥25 Cα) and CPK spheres for everything else.")
                         }
 
                         // Per-button toolbar visibility - gated on the master

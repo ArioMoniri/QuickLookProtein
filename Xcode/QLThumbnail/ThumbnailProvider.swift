@@ -442,16 +442,27 @@ final class ThumbnailProvider: QLThumbnailProvider {
         NSGradient(starting: NSColor(white: 0.13, alpha: 1.0),
                    ending:   NSColor(white: 0.06, alpha: 1.0))?.draw(in: rect, angle: -90)
 
-        // If the file looks like a protein (enough Cα atoms grouped into
-        // chains), render a cartoon-style ribbon trace. Otherwise fall
-        // through to CPK space-filling.
+        // Resolve thumbnail style: explicit user override beats heuristic.
+        let style = UserDefaults(suiteName: "FF68N39FU5.group.com.ariomoniri.QuickLookProtein")?
+            .string(forKey: "thumbnailStyle") ?? "Auto (detect)"
         let caAtoms = atoms.filter { $0.name == "CA" && ($0.element == "C" || $0.element == "") }
-        if caAtoms.count >= proteinCAThreshold {
-            drawCartoonTrace(caAtoms: caAtoms,
-                             allAtoms: atoms,
-                             ext: ext, in: rect)
-        } else {
+
+        switch style {
+        case "CPK spheres":
             drawCPKSpheres(atoms: atoms, ext: ext, in: rect)
+        case "Cartoon ribbon":
+            if !caAtoms.isEmpty {
+                drawCartoonTrace(caAtoms: caAtoms, allAtoms: atoms, ext: ext, in: rect)
+            } else {
+                // Ribbon picked but no Cα — degrade to CPK rather than draw nothing.
+                drawCPKSpheres(atoms: atoms, ext: ext, in: rect)
+            }
+        default: // "Auto (detect)" or unrecognized
+            if caAtoms.count >= proteinCAThreshold {
+                drawCartoonTrace(caAtoms: caAtoms, allAtoms: atoms, ext: ext, in: rect)
+            } else {
+                drawCPKSpheres(atoms: atoms, ext: ext, in: rect)
+            }
         }
 
         drawFormatLabel(ext: ext, in: rect)

@@ -149,6 +149,18 @@
                     }
                     viewer.setBackgroundColor(0x{BG_COLOR}, {BG_ALPHA});
 
+                    // High-DPI render path (1.7.37+). 3Dmol leaves the WebGL
+                    // renderer at devicePixelRatio = 1, which makes Retina
+                    // previews look soft. Bump to the display ratio (capped
+                    // at 2× so 4K displays don't blow up the pixel budget).
+                    try {
+                        var renderer = viewer.getRenderer && viewer.getRenderer();
+                        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+                        if (renderer && renderer.setPixelRatio) {
+                            renderer.setPixelRatio(dpr);
+                        }
+                    } catch (e) { /* not fatal — older 3Dmol builds */ }
+
                     // === parse model =========================================
                     var format  = "{DATA_FORMAT}";
                     var addOpts = { keepH: true, multimodel: false };
