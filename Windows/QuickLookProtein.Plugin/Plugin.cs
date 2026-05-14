@@ -46,8 +46,13 @@ public sealed class Plugin : IViewer
 
     public void Init()
     {
-        // Nothing to pre-warm — WebView2 boots fast enough that doing
-        // it eagerly here would just slow QL-Win's startup.
+        // Init is the first sign of life - if it's in the log, we
+        // know QL-Win discovered our DLL, loaded it, instantiated
+        // the IViewer class, and dispatched. If it's missing, the
+        // plugin failed earlier - usually a TypeLoadException from
+        // a missing dependency, which QL-Win logs to its own
+        // App.log at %LocalAppData%\QuickLook\App.log.
+        PluginLog.Info($"Plugin.Init - assembly={typeof(Plugin).Assembly.Location}");
     }
 
     public bool CanHandle(string path)
@@ -55,11 +60,17 @@ public sealed class Plugin : IViewer
         if (string.IsNullOrEmpty(path) || Directory.Exists(path))
             return false;
         var ext = Path.GetExtension(path).ToLowerInvariant();
-        return SupportedExtensions.Contains(ext);
+        var ok = SupportedExtensions.Contains(ext);
+        // Log every CanHandle call so we can spot the case where
+        // QL-Win consults us but doesn't pick us (e.g. another
+        // plugin returned true at a higher priority).
+        PluginLog.Info($"CanHandle({path}) ext='{ext}' -> {ok}");
+        return ok;
     }
 
     public void Prepare(string path, ContextObject context)
     {
+        PluginLog.Info($"Prepare({path}) - QL-Win is about to call View()");
         // Same default size as the macOS preview window so the spacebar
         // experience feels consistent across platforms. Users can resize.
         context.PreferredSize = new Size(960, 720);
@@ -67,16 +78,26 @@ public sealed class Plugin : IViewer
 
     public void View(string path, ContextObject context)
     {
-        _panel = new MoleculePanel();
-        context.ViewerContent = _panel;
-        context.Title = Path.GetFileName(path);
-        // The panel turns IsBusy off itself once the WebView signals
-        // the navigation has committed.
-        _panel.LoadFile(path, context);
+        PluginLog.Info($"View({path}) - building MoleculePanel");
+        try
+        {
+            _panel = new MoleculePanel();
+            context.ViewerContent = _panel;
+            context.Title = Path.GetFileName(path);
+            // The panel turns IsBusy off itself once the WebView signals
+            // the navigation has committed.
+            _panel.LoadFile(path, context);
+        }
+        catch (Exception ex)
+        {
+            PluginLog.Exception("View() threw before handoff", ex);
+            throw;
+        }
     }
 
     public void Cleanup()
     {
+        PluginLog.Info("Cleanup");
         GC.SuppressFinalize(this);
         _panel?.Dispose();
         _panel = null;

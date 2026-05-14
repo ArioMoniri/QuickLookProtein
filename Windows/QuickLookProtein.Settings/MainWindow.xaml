@@ -312,6 +312,30 @@
                                     Click="OpenPluginFolderButton_Click"/>
                         </StackPanel>
                     </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Diagnostics"
+                                       Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Style="{StaticResource Caption}"
+                                       Text="If Space-bar still shows a file as plain text, the plugin didn't load. Open the logs below and check for TypeLoadException or missing-dependency errors."/>
+                            <Button Content="Open plugin log"
+                                    HorizontalAlignment="Left"
+                                    Padding="10,4" Margin="0,2"
+                                    Cursor="Hand"
+                                    Click="OpenPluginLog_Click"/>
+                            <Button Content="Open QuickLook log"
+                                    HorizontalAlignment="Left"
+                                    Padding="10,4" Margin="0,2"
+                                    Cursor="Hand"
+                                    Click="OpenQuickLookLog_Click"/>
+                            <Button Content="Restart QuickLook tray"
+                                    HorizontalAlignment="Left"
+                                    Padding="10,4" Margin="0,2"
+                                    Cursor="Hand"
+                                    Click="RestartQuickLookTray_Click"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Grid>
         </ScrollViewer>

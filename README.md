@@ -22,30 +22,32 @@
 
 **macOS:** open the disk image, drag **QuickLookProtein.app** into **Applications**, then hit <kbd>Space</kbd> on any `.pdb` / `.cif` / `.mol2` / etc. file in Finder.
 
-### 🪟 Windows — one click
+### 🪟 Windows
 
-1. Click the **Download for Windows** button at the top (or [grab `QuickLookProtein-Setup.exe` directly](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein-Setup.exe)).
-2. Double-click **`QuickLookProtein-Setup.exe`**. SmartScreen warns the first time — click **More info → Run anyway**.
-3. The installer prompts: *"Install QuickLookProtein 3D molecule preview for Windows Explorer?"* — click **Yes**.
-4. It installs [QuickLook](https://github.com/QL-Win/QuickLook) for you if missing, drops the plugin into your user profile, and restarts the QuickLook tray.
-5. Press <kbd>Space</kbd> on any `.pdb` / `.cif` / `.sdf` / `.mol` / `.mol2` / `.xyz` / `.gro` / `.cube` / `.pqr` / `.vasp` / `.cdjson` / `.mmtf` file in Explorer.
+**Install.** Download [`QuickLookProtein-Setup.exe`](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein-Setup.exe), double-click it, click **More info → Run anyway** on SmartScreen, click **Install**. Done.
 
-No admin rights, no PowerShell knowledge, no unzip step.
+The installer bundles QuickLook (QL-Win) and installs it for you if you don't already have it. The Settings app opens automatically on first install; you can re-open it any time via **Start Menu → QuickLookProtein Settings**, or uninstall via **Settings → Apps → QuickLookProtein**.
+
+**Use.** Press <kbd>Space</kbd> on any of these in Explorer:
+`.pdb` `.ent` `.cif` `.mmcif` `.sdf` `.mol` `.mol2` `.xyz` `.gro` `.cube` `.pqr` `.vasp` `.cdjson` `.mmtf`
+
+Switch a folder to **Icon / Tile / Gallery view** to see CPK / cartoon-ribbon thumbnails of every supported file.
 
 <details>
-<summary>Other Windows install options</summary>
-
-**PowerShell one-liner — no download UI:**
+<summary>Other install paths (PowerShell, manual, troubleshooting)</summary>
 
 ```powershell
+# One-liner — same effect as Setup.exe, no UI:
 irm https://raw.githubusercontent.com/ArioMoniri/QuickLookProtein/feature/ario-signed/Windows/install.ps1 | iex
 ```
 
-**Installer zip** — same scripts as the `.exe` setup, exposed for inspection. Grab `QuickLookProtein-Windows-Installer.zip` from the [latest release's assets](https://github.com/ArioMoniri/QuickLookProtein/releases/latest), unpack, double-click `install.bat`.
+[`QuickLookProtein-Windows-Installer.zip`](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein-Windows-Installer.zip) — unpack, double-click `install.bat`. Same scripts as Setup.exe; bring this one if you want to read the install steps before running.
 
-**Fully manual** — install [QuickLook for Windows](https://github.com/QL-Win/QuickLook/releases/latest), download [`QuickLookProtein.qlplugin`](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.qlplugin), double-click the plugin while QuickLook is running, restart QuickLook from the tray.
+[`QuickLookProtein.qlplugin`](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.qlplugin) — bare plugin file. Requires [QuickLook](https://github.com/QL-Win/QuickLook/releases/latest) installed *first*; with QuickLook running in the tray, double-click the `.qlplugin` to register it.
 
-⚠️ The Windows installer is **unsigned** — SmartScreen will warn on first launch. The plugin itself runs inside QuickLook (not as a standalone exe), so the only signed-binary path on Windows is via QuickLook itself.
+**If Space-bar still shows raw text after install**, open **Start Menu → QuickLookProtein Settings → Diagnostics → Open plugin log**. The plugin writes a trace on every preview attempt; an empty file means QL-Win never even loaded our DLL (check **Open QuickLook log** in the same card for the host-side reason). Restarting the QuickLook tray from the same card is also one click.
+
+The Windows installer is **unsigned** — SmartScreen warns on first launch. The plugin runs inside QuickLook, not as a standalone exe.
 
 </details>
 

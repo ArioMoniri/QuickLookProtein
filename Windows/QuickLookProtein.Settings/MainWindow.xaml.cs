@@ -206,5 +206,93 @@ public partial class MainWindow : Window
         catch { }
     }
 
+    // ---- Diagnostics card --------------------------------------------
+
+    private void OpenPluginLog_Click(object sender, RoutedEventArgs e)
+    {
+        var log = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "QuickLookProtein", "plugin.log");
+        if (!File.Exists(log))
+        {
+            MessageBox.Show(
+                "No plugin log yet. Open a .pdb / .cif / etc. with Space-bar in Explorer once - the plugin writes here on every preview attempt.\n\nExpected path:\n" + log,
+                "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try { Process.Start(new ProcessStartInfo { FileName = log, UseShellExecute = true }); }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Could not open log: " + ex.Message,
+                            "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OpenQuickLookLog_Click(object sender, RoutedEventArgs e)
+    {
+        // QL-Win's own log lives at %LocalAppData%\QuickLook\App.log.
+        // If our plugin failed to load entirely (TypeLoadException at
+        // discovery time), QL-Win's log is the only place it shows up
+        // - our plugin.log is empty because Init() was never called.
+        var log = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "QuickLook", "App.log");
+        if (!File.Exists(log))
+        {
+            MessageBox.Show(
+                "QuickLook log not found at:\n" + log + "\n\nIs QuickLook actually installed?",
+                "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try { Process.Start(new ProcessStartInfo { FileName = log, UseShellExecute = true }); }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Could not open log: " + ex.Message,
+                            "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void RestartQuickLookTray_Click(object sender, RoutedEventArgs e)
+    {
+        // Politely-then-firmly restart QuickLook so the user doesn't
+        // have to dig through the tray themselves. CloseMainWindow
+        // first (no elevation needed for same-integrity case), wait,
+        // then re-launch from the standard install location.
+        foreach (var p in Process.GetProcessesByName("QuickLook"))
+        {
+            try { p.CloseMainWindow(); } catch { }
+        }
+        System.Threading.Thread.Sleep(1000);
+        foreach (var p in Process.GetProcessesByName("QuickLook"))
+        {
+            try { p.Kill(); } catch { }
+        }
+
+        var candidates = new[]
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                         "Programs", "QuickLook", "QuickLook.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                         "QuickLook", "QuickLook.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                         "QuickLook", "QuickLook.exe"),
+        };
+        foreach (var p in candidates)
+        {
+            if (File.Exists(p))
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo { FileName = p, UseShellExecute = true });
+                    StatusLabel.Text = "QuickLook restarted.";
+                    return;
+                }
+                catch { }
+            }
+        }
+        MessageBox.Show("Could not find QuickLook.exe. Launch it manually from the Start Menu.",
+                        "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 }

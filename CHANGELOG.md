@@ -4,6 +4,49 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.20] — 2026-05-14
+
+### 🪟 Windows — diagnostics & integration pass
+
+User reported v1.7.18's Setup.exe runs through cleanly but Space-bar
+still shows .pdb files as raw text. This release focuses on making
+the failure observable instead of mysterious, and on finishing the
+"feel like a real Windows app" loop.
+
+- **Plugin diagnostic log**.
+  [Windows/QuickLookProtein.Plugin/PluginLog.cs](Windows/QuickLookProtein.Plugin/PluginLog.cs)
+  writes a trace to `%LocalAppData%\QuickLookProtein\plugin.log` on
+  every IViewer lifecycle call (Init / CanHandle / Prepare / View /
+  Cleanup) and on every exception in the WebView2 load path.
+  Auto-rotates at 1 MB. If the file is *missing* after a Space-bar
+  attempt, the host (QL-Win) never even called us — meaning the DLL
+  failed to load and `%LocalAppData%\QuickLook\App.log` has the
+  TypeLoadException details.
+- **Settings auto-launch on first install**. `install.ps1` detects
+  a fresh install (Settings folder didn't exist) and opens
+  `QuickLookProtein.Settings.exe` after the install completes.
+  Upgrades stay silent so a re-run from the installer zip doesn't
+  keep popping windows.
+- **Add/Remove Programs entry**. New `Register-AddRemoveProgramsEntry`
+  step in `install.ps1` writes the per-user
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\QuickLookProtein`
+  key with `DisplayName`, `DisplayVersion`, `Publisher`,
+  `InstallLocation`, `DisplayIcon`, and an `UninstallString` pointing
+  at a generated `uninstall.ps1` that wipes the plugin folder, the
+  thumbnail-handler registry entries, the Start Menu shortcut, and
+  the Settings install dir. QuickLookProtein now appears in
+  **Settings → Apps → Installed apps** like any other Windows app.
+- **Diagnostics card in Settings**. New section in the Settings UI
+  with three buttons: *Open plugin log*, *Open QuickLook log*,
+  *Restart QuickLook tray*. The restart button goes through the same
+  three-strategy escalation as install.ps1 (CloseMainWindow → Stop
+  → taskkill) and re-launches QuickLook from the standard install
+  location.
+- **README terseness pass**. Windows install section trimmed to one
+  sentence + one button. PowerShell one-liner, installer zip, manual
+  install, troubleshooting all moved under a single `<details>`
+  block so the surface area on the first scroll is *download → run*.
+
 ## [1.7.19] — 2026-05-14
 
 ### 🆕 Added — Mac info overlay extras

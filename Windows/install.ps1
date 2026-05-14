@@ -283,6 +283,106 @@ function Try-StopQuickLook {
     return $false
 }
 
+function Register-AddRemoveProgramsEntry {
+    # Write the per-user Uninstall key so QuickLookProtein appears in
+    # Settings > Apps > Installed apps and the legacy Add/Remove
+    # Programs control panel. Per-user (HKCU) so no admin needed.
+    #
+    # The UninstallString points at a small uninstall.ps1 we drop
+    # alongside the Settings app; install.ps1 itself isn't reliable
+    # as an uninstaller because it can be wiped between install and
+    # uninstall.
+    $uninstallRoot = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\QuickLookProtein"
+    $appDir = Join-Path $env:LocalAppData "QuickLookProtein\Settings"
+    $uninstallScript = Join-Path $appDir "uninstall.ps1"
+    $iconPath = Join-Path $appDir "QuickLookProtein.Settings.exe"
+
+    try {
+        New-Item -Path $uninstallRoot -Force | Out-Null
+        Set-ItemProperty -Path $uninstallRoot -Name "DisplayName"     -Value "QuickLookProtein"
+        Set-ItemProperty -Path $uninstallRoot -Name "DisplayVersion"  -Value (Get-PluginInstalledVersion)
+        Set-ItemProperty -Path $uninstallRoot -Name "Publisher"       -Value "Ariorad Moniri"
+        Set-ItemProperty -Path $uninstallRoot -Name "URLInfoAbout"    -Value "https://github.com/ArioMoniri/QuickLookProtein"
+        Set-ItemProperty -Path $uninstallRoot -Name "InstallLocation" -Value $appDir
+        if (Test-Path $iconPath) {
+            Set-ItemProperty -Path $uninstallRoot -Name "DisplayIcon" -Value $iconPath
+        }
+        Set-ItemProperty -Path $uninstallRoot -Name "NoModify"       -Value 1 -Type DWord
+        Set-ItemProperty -Path $uninstallRoot -Name "NoRepair"       -Value 1 -Type DWord
+        Set-ItemProperty -Path $uninstallRoot -Name "EstimatedSize"  -Value 3072 -Type DWord  # ~3 MB
+        Set-ItemProperty -Path $uninstallRoot -Name "UninstallString" -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$uninstallScript`""
+
+        # Drop the uninstall.ps1 next to the Settings app. We DO NOT
+        # write it inside the plugin folder because that whole tree
+        # gets wiped by re-installs.
+        if (Test-Path $appDir) {
+            $uninstallContent = @'
+# QuickLookProtein uninstaller. Per-user; no admin needed.
+$ErrorActionPreference = 'SilentlyContinue'
+
+# 1. Stop QuickLook so we can remove the plugin folder.
+Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue | ForEach-Object {
+    try { $_.CloseMainWindow() | Out-Null } catch { }
+    Start-Sleep -Milliseconds 600
+    try { $_ | Stop-Process -Force -ErrorAction SilentlyContinue } catch { }
+}
+
+# 2. Plugin folder.
+$pluginDir = Join-Path $env:LocalAppData "QuickLook\plugins\QuickLookProtein"
+if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }
+
+# 3. Thumbnail handler registry entries.
+$clsid = '{B7E4A6F1-2D6E-4F58-9B1B-2E5A1F0B97A1}'
+$thumbIid = '{E357FCCD-A995-4576-B01F-234630154E96}'
+$extensions = @('.pdb','.ent','.pdbqt','.pqr','.cif','.mmcif','.sdf','.mol','.mol2','.xyz','.gro','.cube','.cub','.vasp','.poscar','.cdjson')
+foreach ($ext in $extensions) {
+    Remove-Item -Path "HKCU:\Software\Classes\$ext\ShellEx\$thumbIid" -Recurse -Force -ErrorAction SilentlyContinue
+}
+Remove-Item -Path "HKCU:\Software\Classes\CLSID\$clsid" -Recurse -Force -ErrorAction SilentlyContinue
+
+# 4. Settings + uninstall entry.
+$appDir = Join-Path $env:LocalAppData "QuickLookProtein\Settings"
+$shortcut = Join-Path $env:AppData "Microsoft\Windows\Start Menu\Programs\QuickLookProtein Settings.lnk"
+if (Test-Path $shortcut) { Remove-Item -Force $shortcut }
+Remove-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\QuickLookProtein" -Recurse -Force -ErrorAction SilentlyContinue
+
+# 5. User preferences hive (optional - kept by default so re-install
+#    finds them; pass -Purge to wipe it too).
+param([switch]$Purge)
+if ($Purge) {
+    Remove-Item -Path "HKCU:\Software\QuickLookProtein" -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# 6. Settings install dir last (since it contains this script).
+if (Test-Path $appDir) {
+    Start-Process powershell.exe -ArgumentList "-NoProfile -Command Start-Sleep 1; Remove-Item -Recurse -Force '$appDir'"
+}
+
+# 7. Try to restart QuickLook so other plugins still work.
+$qlExe = Join-Path $env:LocalAppData "Programs\QuickLook\QuickLook.exe"
+if (Test-Path $qlExe) { Start-Process -FilePath $qlExe }
+'@
+            Set-Content -Path $uninstallScript -Value $uninstallContent -Encoding UTF8
+        }
+    } catch {
+        Write-Host "  Could not register Add/Remove Programs entry: $($_.Exception.Message)"
+    }
+}
+
+function Get-PluginInstalledVersion {
+    # Read the plugin DLL's file version so the Uninstall key shows
+    # the right number in Settings > Apps. Fall back to "1.0.0.0"
+    # if we can't read it.
+    try {
+        $dll = Join-Path $pluginDir "QuickLook.Plugin.Protein.dll"
+        if (Test-Path $dll) {
+            $vi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dll)
+            if ($vi.FileVersion) { return $vi.FileVersion }
+        }
+    } catch { }
+    return "1.0.0.0"
+}
+
 function Install-SettingsApp {
     # Look for the Settings WPF app + dependencies in the script's
     # own folder (the Setup.exe payload puts everything alongside
@@ -505,10 +605,19 @@ if (-not (Test-QuickLookInstalled)) {
 Install-Plugin
 
 # Best-effort: install the Settings WPF app + Start Menu shortcut.
+$wasFirstInstall = -not (Test-Path (Join-Path $env:LocalAppData "QuickLookProtein\Settings\QuickLookProtein.Settings.exe"))
 try { Install-SettingsApp } catch {
     Write-Host ""
     Write-Host "  Could not install Settings app: $($_.Exception.Message)"
     Write-Host "  Plugin and thumbnails will still work."
+}
+
+# Add/Remove Programs entry so the app shows up in Settings > Apps
+# and gets a proper uninstall path. Best-effort - registry writes
+# can fail for various reasons (locked profile, antivirus) but the
+# functional install above doesn't depend on it.
+try { Register-AddRemoveProgramsEntry } catch {
+    Write-Host "  Could not register Add/Remove Programs entry: $($_.Exception.Message)"
 }
 
 # Best-effort: register the Windows Explorer thumbnail handler. Same
@@ -541,3 +650,17 @@ Write-Host ""
 Write-Host "Done." -ForegroundColor Green
 Write-Host "Hit <Space> on a .pdb / .cif / .sdf / .mol / .mol2 / .xyz / .gro / .cube / .pqr / .vasp / .cdjson / .mmtf file in Explorer."
 Write-Host ""
+
+# Launch the Settings app on a fresh install so the user immediately
+# sees the control panel and the file-format preview tiles. Upgrades
+# stay quiet so a `gh release download` -> re-run doesn't keep
+# popping windows.
+if ($wasFirstInstall) {
+    $settingsExe = Join-Path $env:LocalAppData "QuickLookProtein\Settings\QuickLookProtein.Settings.exe"
+    if (Test-Path $settingsExe) {
+        Write-Host "Opening QuickLookProtein Settings..."
+        try { Start-Process -FilePath $settingsExe } catch {
+            Write-Host "  Could not launch Settings: $($_.Exception.Message)"
+        }
+    }
+}

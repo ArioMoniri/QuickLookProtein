@@ -39,15 +39,18 @@ public partial class MoleculePanel : UserControl, IDisposable
 
     public async void LoadFile(string path, ContextObject context)
     {
+        PluginLog.Info($"MoleculePanel.LoadFile({path}) - start");
         // Surface the filename on the splash before WebView2 starts —
         // gives the user something to recognise while the renderer warms.
-        SplashTitle.Text = $"Loading {Path.GetFileName(path)}…";
+        SplashTitle.Text = $"Loading {Path.GetFileName(path)}";
         try
         {
             await LoadFileAsync(path, context);
+            PluginLog.Info($"MoleculePanel.LoadFile({path}) - LoadFileAsync returned cleanly");
         }
         catch (Exception ex)
         {
+            PluginLog.Exception($"MoleculePanel.LoadFile({path})", ex);
             // Surface the failure in the preview itself rather than
             // ending up with a silent blank window. QL-Win doesn't have
             // a built-in "error sheet" we can pop, so we render an
