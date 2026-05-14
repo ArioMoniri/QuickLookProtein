@@ -171,6 +171,22 @@ public partial class MoleculePanel : UserControl, IDisposable
         var (br, bg, bb, ba) = QuickLookProtein.Shared.SettingsStore.GetBgColor();
         var bgHex = ResolveBgHex(br, bg, bb);
 
+        // Info-overlay field toggles (1.7.23+ parity with macOS).
+        // Each piece of the overlay - file name, atom count, residue
+        // count, element breakdown, molecular weight, bond count,
+        // PDB title, format - is gated individually. Defaults match
+        // the macOS path: original four fields ON, new five OFF.
+        var infoFileName      = QuickLookProtein.Shared.SettingsStore.GetInfoShowFileName();
+        var infoAtomCount     = QuickLookProtein.Shared.SettingsStore.GetInfoShowAtomCount();
+        var infoChainCount    = QuickLookProtein.Shared.SettingsStore.GetInfoShowChainCount();
+        var infoFormat        = QuickLookProtein.Shared.SettingsStore.GetInfoShowFormat();
+        var infoResCount      = QuickLookProtein.Shared.SettingsStore.GetInfoShowResidueCount();
+        var infoElementBkdown = QuickLookProtein.Shared.SettingsStore.GetInfoShowElementBreakdown();
+        var infoMolWeight     = QuickLookProtein.Shared.SettingsStore.GetInfoShowMolWeight();
+        var infoBondCount     = QuickLookProtein.Shared.SettingsStore.GetInfoShowBondCount();
+        var infoPdbTitle      = QuickLookProtein.Shared.SettingsStore.GetInfoShowPDBTitle();
+        var pdbTitle          = ExtractPdbTitle(moleculeData);
+
         // Order matters: insert the molecule data block LAST so
         // {…} sequences inside it can't be mistaken for placeholders.
         var html = template
@@ -185,6 +201,18 @@ public partial class MoleculePanel : UserControl, IDisposable
             .Replace("{HIDE_H}",            hideHydrogens ? "true" : "false")
             .Replace("{SHOW_UNIT_CELL}",    showUnitCell  ? "true" : "false")
             .Replace("{SHOW_INFO}",         showInfo      ? "true" : "false")
+            .Replace("{INFO_FILE_NAME}",         infoFileName      ? "true" : "false")
+            .Replace("{INFO_ATOM_COUNT}",        infoAtomCount     ? "true" : "false")
+            .Replace("{INFO_CHAIN_COUNT}",       infoChainCount    ? "true" : "false")
+            .Replace("{INFO_FORMAT}",            infoFormat        ? "true" : "false")
+            .Replace("{INFO_RES_COUNT}",         infoResCount      ? "true" : "false")
+            .Replace("{INFO_ELEMENT_BREAKDOWN}", infoElementBkdown ? "true" : "false")
+            .Replace("{INFO_MOL_WEIGHT}",        infoMolWeight     ? "true" : "false")
+            .Replace("{INFO_BOND_COUNT}",        infoBondCount     ? "true" : "false")
+            .Replace("{INFO_PDB_TITLE}",         infoPdbTitle      ? "true" : "false")
+            .Replace("{PDB_TITLE}",         EscapeForJsString(pdbTitle))
+            .Replace("{EXTRA_MODELS_JSON}", "[]")
+            .Replace("{EXTRA_MODELS_HTML}", "")
             .Replace("{FILE_NAME}",         safeName)
             .Replace("{ZOOM_FACTOR}",       zoomFactor)
             .Replace("{ZOOM_IS_AUTO}",      zoomIsAuto ? "true" : "false")
@@ -257,6 +285,47 @@ public partial class MoleculePanel : UserControl, IDisposable
         sb.Replace("</script", @"<\/script");
         sb.Replace("<!--",    @"<\!--");
         sb.Replace("-->",     @"--\>");
+        return sb.ToString();
+    }
+
+    /// Pull the first PDB TITLE record (continuation lines collapsed)
+    /// from the raw molecule data. Mirrors `extractPDBTitle` in
+    /// Xcode/Shared/SharedFunctions.swift so Windows and macOS show
+    /// the same string for the info-overlay PDB-title field.
+    private static string ExtractPdbTitle(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return string.Empty;
+        var lines = raw.Split('\n');
+        var max = Math.Min(lines.Length, 200);
+        var title = new StringBuilder();
+        for (int i = 0; i < max; i++)
+        {
+            var line = lines[i];
+            if (line.StartsWith("TITLE ", StringComparison.Ordinal))
+            {
+                if (line.Length >= 11) title.Append(line.Substring(10).Trim()).Append(' ');
+            }
+            else if (line.StartsWith("ATOM", StringComparison.Ordinal)
+                  || line.StartsWith("HETATM", StringComparison.Ordinal))
+            {
+                break;
+            }
+        }
+        return title.ToString().Trim();
+    }
+
+    /// Escape for inclusion inside a JS double-quoted literal. Same
+    /// substitutions as `escapeForJSStringLiteral` in the Swift side.
+    private static string EscapeForJsString(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return string.Empty;
+        var sb = new StringBuilder(s);
+        sb.Replace("\\", "\\\\");
+        sb.Replace("\"", "\\\"");
+        sb.Replace("\n", " ");
+        sb.Replace("\r", " ");
+        sb.Replace("{",  "\\u007b");
+        sb.Replace("}",  "\\u007d");
         return sb.ToString();
     }
 

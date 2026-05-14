@@ -94,12 +94,33 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
                 fileExtension: fileExtension,
                 fileName: url.lastPathComponent
             )
-            html = prepare3DmolHTML(
-                htmlPath: htmlPath,
-                pdbPath: url.path,
-                dataFormat: dataFormat,
-                options: options
-            )
+
+            // Multi-file merge: when the user picked "Merge all in
+            // same folder" in Settings, find every sibling structure
+            // file we can read (App-Sandbox permitting) and hand the
+            // whole set to the multi-model viewer template. Reads
+            // that fail in the sandbox are silently dropped - we
+            // still render the originally-requested file, just
+            // without its neighbours.
+            let mergeMode = userSettings.multiFilePreviewMode == .mergeFolder
+            if mergeMode,
+               let siblings = collectMergeSiblings(forFileAt: url),
+               siblings.count > 1 {
+                os_log("merge mode: combining %{public}d files",
+                       log: qlLog, type: .info, siblings.count)
+                html = prepare3DmolHTMLMulti(
+                    htmlPath: htmlPath,
+                    files: siblings,
+                    options: options
+                )
+            } else {
+                html = prepare3DmolHTML(
+                    htmlPath: htmlPath,
+                    pdbPath: url.path,
+                    dataFormat: dataFormat,
+                    options: options
+                )
+            }
         }
 
         // Quick Look can re-invoke this method on rapid scrubs through Finder. Fire any

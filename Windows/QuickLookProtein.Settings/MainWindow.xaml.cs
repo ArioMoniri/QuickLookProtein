@@ -96,6 +96,16 @@ public partial class MainWindow : Window
         ShowUnitCellCheck.IsChecked    = SettingsStore.GetShowUnitCell();
         ShowInfoOverlayCheck.IsChecked = SettingsStore.GetShowInfoOverlay();
 
+        InfoFileNameCheck.IsChecked         = SettingsStore.GetInfoShowFileName();
+        InfoAtomCountCheck.IsChecked        = SettingsStore.GetInfoShowAtomCount();
+        InfoChainCountCheck.IsChecked       = SettingsStore.GetInfoShowChainCount();
+        InfoResidueCountCheck.IsChecked     = SettingsStore.GetInfoShowResidueCount();
+        InfoElementBreakdownCheck.IsChecked = SettingsStore.GetInfoShowElementBreakdown();
+        InfoMolWeightCheck.IsChecked        = SettingsStore.GetInfoShowMolWeight();
+        InfoBondCountCheck.IsChecked        = SettingsStore.GetInfoShowBondCount();
+        InfoPDBTitleCheck.IsChecked         = SettingsStore.GetInfoShowPDBTitle();
+        InfoFormatCheck.IsChecked           = SettingsStore.GetInfoShowFormat();
+
         UpdateBgSwatchFromStore();
     }
 
@@ -123,6 +133,16 @@ public partial class MainWindow : Window
         HideHydrogensCheck.Click   += (_, _) => Save(() => SettingsStore.SetHideHydrogens(HideHydrogensCheck.IsChecked == true));
         ShowUnitCellCheck.Click    += (_, _) => Save(() => SettingsStore.SetShowUnitCell(ShowUnitCellCheck.IsChecked == true));
         ShowInfoOverlayCheck.Click += (_, _) => Save(() => SettingsStore.SetShowInfoOverlay(ShowInfoOverlayCheck.IsChecked == true));
+
+        InfoFileNameCheck.Click         += (_, _) => Save(() => SettingsStore.SetInfoShowFileName(InfoFileNameCheck.IsChecked == true));
+        InfoAtomCountCheck.Click        += (_, _) => Save(() => SettingsStore.SetInfoShowAtomCount(InfoAtomCountCheck.IsChecked == true));
+        InfoChainCountCheck.Click       += (_, _) => Save(() => SettingsStore.SetInfoShowChainCount(InfoChainCountCheck.IsChecked == true));
+        InfoResidueCountCheck.Click     += (_, _) => Save(() => SettingsStore.SetInfoShowResidueCount(InfoResidueCountCheck.IsChecked == true));
+        InfoElementBreakdownCheck.Click += (_, _) => Save(() => SettingsStore.SetInfoShowElementBreakdown(InfoElementBreakdownCheck.IsChecked == true));
+        InfoMolWeightCheck.Click        += (_, _) => Save(() => SettingsStore.SetInfoShowMolWeight(InfoMolWeightCheck.IsChecked == true));
+        InfoBondCountCheck.Click        += (_, _) => Save(() => SettingsStore.SetInfoShowBondCount(InfoBondCountCheck.IsChecked == true));
+        InfoPDBTitleCheck.Click         += (_, _) => Save(() => SettingsStore.SetInfoShowPDBTitle(InfoPDBTitleCheck.IsChecked == true));
+        InfoFormatCheck.Click           += (_, _) => Save(() => SettingsStore.SetInfoShowFormat(InfoFormatCheck.IsChecked == true));
     }
 
     private void Save(Action action)
@@ -447,16 +467,18 @@ public partial class MainWindow : Window
             .Replace("{HIDE_H}",            QuickLookProtein.Shared.SettingsStore.GetHideHydrogens()  ? "true" : "false")
             .Replace("{SHOW_UNIT_CELL}",    QuickLookProtein.Shared.SettingsStore.GetShowUnitCell()   ? "true" : "false")
             .Replace("{SHOW_INFO}",         QuickLookProtein.Shared.SettingsStore.GetShowInfoOverlay()? "true" : "false")
-            .Replace("{INFO_FILE_NAME}",         "true")
-            .Replace("{INFO_ATOM_COUNT}",        "true")
-            .Replace("{INFO_CHAIN_COUNT}",       "true")
-            .Replace("{INFO_FORMAT}",            "true")
-            .Replace("{INFO_RES_COUNT}",         "false")
-            .Replace("{INFO_ELEMENT_BREAKDOWN}", "false")
-            .Replace("{INFO_MOL_WEIGHT}",        "false")
-            .Replace("{INFO_BOND_COUNT}",        "false")
-            .Replace("{INFO_PDB_TITLE}",         "false")
-            .Replace("{PDB_TITLE}",         "")
+            .Replace("{INFO_FILE_NAME}",         QuickLookProtein.Shared.SettingsStore.GetInfoShowFileName()         ? "true" : "false")
+            .Replace("{INFO_ATOM_COUNT}",        QuickLookProtein.Shared.SettingsStore.GetInfoShowAtomCount()        ? "true" : "false")
+            .Replace("{INFO_CHAIN_COUNT}",       QuickLookProtein.Shared.SettingsStore.GetInfoShowChainCount()       ? "true" : "false")
+            .Replace("{INFO_FORMAT}",            QuickLookProtein.Shared.SettingsStore.GetInfoShowFormat()           ? "true" : "false")
+            .Replace("{INFO_RES_COUNT}",         QuickLookProtein.Shared.SettingsStore.GetInfoShowResidueCount()     ? "true" : "false")
+            .Replace("{INFO_ELEMENT_BREAKDOWN}", QuickLookProtein.Shared.SettingsStore.GetInfoShowElementBreakdown() ? "true" : "false")
+            .Replace("{INFO_MOL_WEIGHT}",        QuickLookProtein.Shared.SettingsStore.GetInfoShowMolWeight()        ? "true" : "false")
+            .Replace("{INFO_BOND_COUNT}",        QuickLookProtein.Shared.SettingsStore.GetInfoShowBondCount()        ? "true" : "false")
+            .Replace("{INFO_PDB_TITLE}",         QuickLookProtein.Shared.SettingsStore.GetInfoShowPDBTitle()         ? "true" : "false")
+            .Replace("{PDB_TITLE}",              "")
+            .Replace("{EXTRA_MODELS_JSON}",      "[]")
+            .Replace("{EXTRA_MODELS_HTML}",      "")
             .Replace("{FILE_NAME}",         safeName)
             .Replace("{ZOOM_FACTOR}",       zoomFactor)
             .Replace("{ZOOM_IS_AUTO}",      zoomIsAuto ? "true" : "false")

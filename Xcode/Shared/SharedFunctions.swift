@@ -155,6 +155,170 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{ZOOM_IS_AUTO}",      with: options.defaultZoom == .auto ? "true" : "false")
     html = html.replacingOccurrences(of: "{THUMBNAIL_MODE}",    with: thumbnailMode ? "true" : "false")
     html = html.replacingOccurrences(of: "{MOL_DATA}",          with: safeData)
+    // No extra models in the single-file path - just clear the
+    // placeholder so the JS array is empty.
+    html = html.replacingOccurrences(of: "{EXTRA_MODELS_JSON}",  with: "[]")
+    html = html.replacingOccurrences(of: "{EXTRA_MODELS_HTML}",  with: "")
+    return html
+}
+
+// MARK: - Multi-file merge mode (1.7.23+)
+
+/// File extensions the merge-mode siblings collector considers.
+/// Same set the main app & QL extension claim, minus formats whose
+/// 3Dmol parser doesn't compose well in a multi-model scene (MMTF
+/// is a binary container, CDJSON has its own scene semantics).
+private let mergeableExtensions: Set<String> = [
+    "pdb", "ent", "pdbqt", "pqr",
+    "cif", "mmcif",
+    "sdf", "mol", "mol2",
+    "xyz", "gro", "cube", "cub",
+]
+
+/// Cap on how many sibling files to merge. Beyond this the preview
+/// becomes a wall of overlapping atoms and the JS string grows huge.
+private let mergeMaxFiles = 25
+
+/// Cap on size of each sibling read - same per-preview budget the
+/// QL extension uses for the primary file.
+private let mergeMaxBytesPerFile = 5 * 1024 * 1024
+
+/// Bundle handed to `prepare3DmolHTMLMulti`. Each entry is one
+/// structure to layer into the combined 3Dmol scene.
+struct MergeInput {
+    let url: URL
+    let format: String   // 3Dmol parser key ("pdb", "mol2", ...)
+    let data: String     // raw text contents
+}
+
+/// Walk the directory containing `url`, return one `MergeInput` per
+/// supported sibling we can actually read. Returns nil if the
+/// directory enumeration itself fails (typically because the sandbox
+/// only granted us access to this single file). Returns an array
+/// with just the original file if nothing else is readable, so the
+/// caller can still render normally.
+func collectMergeSiblings(forFileAt url: URL) -> [MergeInput]? {
+    let fm = FileManager.default
+    let parent = url.deletingLastPathComponent()
+    let contents: [URL]
+    do {
+        contents = try fm.contentsOfDirectory(at: parent,
+                                              includingPropertiesForKeys: [.fileSizeKey],
+                                              options: [.skipsHiddenFiles])
+    } catch {
+        // Sandbox almost certainly refused the directory listing.
+        // Caller falls back to single-file rendering.
+        return nil
+    }
+    // Always include the requested file first so it stays the "primary"
+    // model and any settings driven by its extension still apply.
+    var inputs: [MergeInput] = []
+    if let primary = readMergeInput(at: url) {
+        inputs.append(primary)
+    } else {
+        return nil
+    }
+    let primaryPath = url.standardizedFileURL.path
+    for u in contents {
+        if inputs.count >= mergeMaxFiles { break }
+        if u.standardizedFileURL.path == primaryPath { continue }
+        let ext = u.pathExtension.lowercased()
+        guard mergeableExtensions.contains(ext) else { continue }
+        if let attr = try? fm.attributesOfItem(atPath: u.path),
+           let size = attr[.size] as? Int, size > mergeMaxBytesPerFile {
+            continue
+        }
+        if let m = readMergeInput(at: u) { inputs.append(m) }
+    }
+    return inputs
+}
+
+private func readMergeInput(at url: URL) -> MergeInput? {
+    let ext = url.pathExtension.lowercased()
+    let format = Settings.dataFormat(forExtension: ext) ?? "pdb"
+    do {
+        let raw = try readMolecularTextFile(url.path)
+        return MergeInput(url: url, format: format, data: raw)
+    } catch {
+        return nil
+    }
+}
+
+/// Render the multi-model variant of the 3Dmol HTML. Embeds each
+/// structure as its own `<script type="text/plain">` block and
+/// emits a JS array of `{id, format, name}` records for the viewer
+/// to iterate via `viewer.addModel`. The first model is the
+/// "primary" file - its extension drives ATOM_STYLE / DATA_FORMAT
+/// so single-file settings still apply unchanged.
+func prepare3DmolHTMLMulti(htmlPath: String,
+                           files: [MergeInput],
+                           options: ViewerOptions) -> String {
+    guard let primary = files.first else {
+        return errorHTML(title: "Internal error",
+                         detail: "Merge mode called with no files")
+    }
+    let template: String
+    do {
+        template = try String(contentsOfFile: htmlPath, encoding: .utf8)
+    } catch {
+        return errorHTML(title: "Internal error",
+                         detail: "Could not load viewer template: \(error.localizedDescription)")
+    }
+
+    // Build the extra-models HTML payload: one <script type="text/plain">
+    // per sibling, plus a JS array of {id, format, name} that the
+    // viewer iterates after loading the primary model.
+    var extraHtml = ""
+    var extraRecords: [String] = []
+    for (idx, file) in files.dropFirst().enumerated() {
+        let blockId = "qlp-extra-\(idx)"
+        let safeData = sanitizeForScriptBlock(file.data)
+        extraHtml += "<script id=\"\(blockId)\" type=\"text/plain\">\n"
+        extraHtml += safeData
+        extraHtml += "\n</script>\n"
+        let name = escapeForJSStringLiteral(file.url.lastPathComponent)
+        let fmt  = escapeForJSStringLiteral(file.format)
+        extraRecords.append("{id:\"\(blockId)\",format:\"\(fmt)\",name:\"\(name)\"}")
+    }
+    let extraJson = "[" + extraRecords.joined(separator: ",") + "]"
+
+    // Reuse the single-file fill path for the primary structure, then
+    // overwrite the multi-model placeholders.
+    let dataFormat = primary.format
+    let bg = convertColorToRGB(color: options.bgColor)
+    let safePrimary = sanitizeForScriptBlock(primary.data)
+
+    var html = template
+    html = html.replacingOccurrences(of: "{ATOM_STYLE}",        with: options.atomStyle.jsValue)
+    html = html.replacingOccurrences(of: "{COLOR_SCHEME}",      with: options.colorScheme.jsValue)
+    html = html.replacingOccurrences(of: "{BG_COLOR}",          with: bg.rgbHex)
+    html = html.replacingOccurrences(of: "{BG_ALPHA}",          with: bg.alpha)
+    html = html.replacingOccurrences(of: "{ROTATION_SPEED}",    with: String(options.rotationSpeed.rotationSpeedNumber()))
+    html = html.replacingOccurrences(of: "{DATA_FORMAT}",       with: dataFormat)
+    html = html.replacingOccurrences(of: "{AUTO_STYLE_HETERO}", with: options.autoStyleHetero ? "true" : "false")
+    html = html.replacingOccurrences(of: "{SHOW_SURFACE}",      with: options.showSurface      ? "true" : "false")
+    html = html.replacingOccurrences(of: "{HIDE_H}",            with: options.hideHydrogens    ? "true" : "false")
+    html = html.replacingOccurrences(of: "{SHOW_UNIT_CELL}",    with: options.showUnitCell     ? "true" : "false")
+    html = html.replacingOccurrences(of: "{SHOW_INFO}",         with: options.showInfoOverlay  ? "true" : "false")
+    let bigName = "\(primary.url.lastPathComponent) (+\(files.count - 1) merged)"
+    html = html.replacingOccurrences(of: "{FILE_NAME}",         with: escapeForHTMLAttribute(bigName))
+    html = html.replacingOccurrences(of: "{INFO_FILE_NAME}",         with: options.infoShowFileName         ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_ATOM_COUNT}",        with: options.infoShowAtomCount        ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_CHAIN_COUNT}",       with: options.infoShowChainCount       ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_FORMAT}",            with: options.infoShowFormat           ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_RES_COUNT}",         with: options.infoShowResidueCount     ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_ELEMENT_BREAKDOWN}", with: options.infoShowElementBreakdown ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_MOL_WEIGHT}",        with: options.infoShowMolWeight        ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_BOND_COUNT}",        with: options.infoShowBondCount        ? "true" : "false")
+    html = html.replacingOccurrences(of: "{INFO_PDB_TITLE}",         with: options.infoShowPDBTitle         ? "true" : "false")
+    let pdbTitle = extractPDBTitle(from: primary.data) ?? ""
+    html = html.replacingOccurrences(of: "{PDB_TITLE}", with: escapeForJSStringLiteral(pdbTitle))
+    html = html.replacingOccurrences(of: "{ZOOM_FACTOR}",       with: String(options.defaultZoom.factor))
+    html = html.replacingOccurrences(of: "{ZOOM_IS_AUTO}",      with: options.defaultZoom == .auto ? "true" : "false")
+    html = html.replacingOccurrences(of: "{THUMBNAIL_MODE}",    with: "false")
+    html = html.replacingOccurrences(of: "{MOL_DATA}",          with: safePrimary)
+    html = html.replacingOccurrences(of: "{EXTRA_MODELS_JSON}", with: extraJson)
+    html = html.replacingOccurrences(of: "{EXTRA_MODELS_HTML}", with: extraHtml)
     return html
 }
 

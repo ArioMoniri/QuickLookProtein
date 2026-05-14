@@ -129,6 +129,30 @@ public static class SettingsStore
     public static bool GetShowUnitCell()    => ReadBool("ShowUnitCell",    false);
     public static bool GetShowInfoOverlay() => ReadBool("ShowInfoOverlay", true);
 
+    // Info-overlay field toggles (1.7.23+ on Windows; v1.7.19 already
+    // shipped these on macOS). Defaults match the macOS path: the
+    // four pre-1.7.19 fields default ON, the five new ones default
+    // OFF so existing users don't get a wall of extra text.
+    public static bool GetInfoShowFileName()         => ReadBool("InfoShowFileName",         true);
+    public static bool GetInfoShowAtomCount()        => ReadBool("InfoShowAtomCount",        true);
+    public static bool GetInfoShowChainCount()       => ReadBool("InfoShowChainCount",       true);
+    public static bool GetInfoShowFormat()           => ReadBool("InfoShowFormat",           true);
+    public static bool GetInfoShowResidueCount()     => ReadBool("InfoShowResidueCount",     false);
+    public static bool GetInfoShowElementBreakdown() => ReadBool("InfoShowElementBreakdown", false);
+    public static bool GetInfoShowMolWeight()        => ReadBool("InfoShowMolWeight",        false);
+    public static bool GetInfoShowBondCount()        => ReadBool("InfoShowBondCount",        false);
+    public static bool GetInfoShowPDBTitle()         => ReadBool("InfoShowPDBTitle",         false);
+
+    public static void SetInfoShowFileName(bool v)         => WriteBool("InfoShowFileName",         v);
+    public static void SetInfoShowAtomCount(bool v)        => WriteBool("InfoShowAtomCount",        v);
+    public static void SetInfoShowChainCount(bool v)       => WriteBool("InfoShowChainCount",       v);
+    public static void SetInfoShowFormat(bool v)           => WriteBool("InfoShowFormat",           v);
+    public static void SetInfoShowResidueCount(bool v)     => WriteBool("InfoShowResidueCount",     v);
+    public static void SetInfoShowElementBreakdown(bool v) => WriteBool("InfoShowElementBreakdown", v);
+    public static void SetInfoShowMolWeight(bool v)        => WriteBool("InfoShowMolWeight",        v);
+    public static void SetInfoShowBondCount(bool v)        => WriteBool("InfoShowBondCount",        v);
+    public static void SetInfoShowPDBTitle(bool v)         => WriteBool("InfoShowPDBTitle",         v);
+
     public static void SetColorScheme(ColorScheme v)     => WriteEnum("ColorScheme",     v);
     public static void SetRotationSpeed(RotationSpeed v) => WriteEnum("RotationSpeed",   v);
     public static void SetDefaultZoom(DefaultZoom v)     => WriteEnum("DefaultZoom",     v);

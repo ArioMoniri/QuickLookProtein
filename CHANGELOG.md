@@ -4,6 +4,62 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.23] — 2026-05-14
+
+### 🆕 Added — multi-file merge mode (Mac)
+
+v1.7.19 added a `multiFilePreviewMode` setting (Separate / Merge in
+same folder) but the QL extension still only ever rendered one
+file. This release actually wires up *Merge in same folder*:
+
+- `Xcode/QLExtension/PreviewViewController.swift` checks the setting
+  on each `preparePreviewOfFile`. When merge mode is on, it calls a
+  new `collectMergeSiblings(forFileAt:)` helper that walks the
+  parent directory, picks up every supported structure file the
+  App-Sandbox lets us read, caps at 25 files / 5 MB each, and hands
+  the bundle to a new `prepare3DmolHTMLMulti(htmlPath:files:options:)`
+  builder. The original file always comes first so its extension
+  still drives the default atom style, color scheme, etc.
+- Multi-model rendering uses one `<script type="text/plain">` per
+  sibling plus a JS array of `{id, format, name}` records the viewer
+  iterates after loading the primary model. New `{EXTRA_MODELS_JSON}`
+  and `{EXTRA_MODELS_HTML}` template placeholders. Single-file mode
+  passes empty values so behaviour is identical to before.
+- `viewer.selectedAtoms({})` replaces `model.selectedAtoms({})` so
+  the atom-list smart-styling + info-overlay counts cover *all*
+  loaded models. Falls back to the old single-model path on builds
+  of 3Dmol where the viewer-level helper isn't available.
+- Failed siblings (unreadable, parse error) are logged and skipped
+  rather than blowing up the whole preview — the primary file plus
+  whichever siblings did parse still render cleanly.
+- Settings UI label updated to make it explicit this is the
+  "scan sibling structures in this folder" mode, not a fake
+  reimplementation of QuickLook's `<` / `>` arrows (those are
+  built into macOS itself and unchanged).
+
+### 🪟 Windows — info-overlay parity with Mac
+
+The 9 info-overlay field toggles that shipped on macOS in v1.7.19
+finally land on Windows:
+
+- `Windows/Shared/SettingsStore.cs` gains 9 new bools, defaults
+  matching the Mac (file name / atom count / chain count / format
+  default ON; residue count / element breakdown / molecular weight
+  / bond count / PDB title default OFF). Persisted under the same
+  `HKCU\Software\QuickLookProtein\Settings` hive both processes
+  read.
+- `MoleculePanel.FillTemplate` reads every flag, forwards them
+  through the new `{INFO_*}` template placeholders, and extracts
+  the PDB TITLE record on the fly via a new `ExtractPdbTitle`
+  helper (mirror of the Swift `extractPDBTitle`). `EscapeForJsString`
+  pairs with the Swift `escapeForJSStringLiteral` so weird PDB
+  titles can't break out of the JS literal.
+- `QuickLookProtein.Settings.exe` gets an **Info overlay fields**
+  card with 9 checkboxes, gated on the existing "Show info
+  overlay" master toggle (visually disabled when off). The live-
+  preview tile reads the same flags so users can A/B settings
+  against a real render.
+
 ## [1.7.22] — 2026-05-14
 
 ### 🐛 Fixed

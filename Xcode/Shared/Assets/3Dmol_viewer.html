@@ -48,6 +48,13 @@
         <div id="info"></div>
         <div id="label"></div>
         <script type="text/plain" id="mol-data">{MOL_DATA}</script>
+        <!-- Merge mode (multi-file Quick Look) extras. Each sibling
+             structure rides along in its own script block; the JS
+             below iterates the EXTRA_MODELS array and calls
+             viewer.addModel for each. In single-file mode both the
+             HTML payload and the JS array are empty so nothing extra
+             happens. -->
+        {EXTRA_MODELS_HTML}
         <script>
             // jQuery is bundled inside 3Dmol.js (verified: 3Dmol.js's first
             // 2000 lines are jQuery 3.6.0). Using $(…) DOMReady + $('#…')
@@ -124,8 +131,49 @@
                                          parseErr && parseErr.message ? parseErr.message : String(parseErr));
                     }
 
-                    var model = viewer.getModel();
-                    var atoms = model ? model.selectedAtoms({}) : [];
+                    // Multi-file merge mode (1.7.23+): when the user
+                    // picked "Merge all in same folder" in Settings,
+                    // the Swift side embeds one <script type="text/plain">
+                    // per sibling structure plus a JS array of
+                    // {id, format, name} records. Walk it and addModel
+                    // each. Empty array in single-file mode = no-op.
+                    var extraModels = {EXTRA_MODELS_JSON};
+                    for (var emI = 0; emI < extraModels.length; emI++) {
+                        var em = extraModels[emI];
+                        var emBlock = document.getElementById(em.id);
+                        if (!emBlock) continue;
+                        var emData = emBlock.textContent || emBlock.innerText;
+                        if (!emData || emData.length === 0) continue;
+                        var emOpts = { keepH: true, multimodel: false };
+                        if (em.format === 'xyz'  || em.format === 'vasp' ||
+                            em.format === 'cube' || em.format === 'cdjson') {
+                            emOpts.assignBonds = true;
+                        }
+                        try {
+                            viewer.addModel(emData, em.format, emOpts);
+                        } catch (extraErr) {
+                            // Don't blow up the whole preview if one
+                            // sibling has a parse error - log and
+                            // carry on so the primary file (and the
+                            // siblings that did parse) still render.
+                            console.warn('merge mode: addModel failed for',
+                                         em.name, extraErr);
+                        }
+                    }
+
+                    // Walk EVERY model the viewer knows about so merge
+                    // mode (multiple addModel calls above) gets a
+                    // unified atom list for styling + the info-overlay
+                    // chain/atom counts. Falls back to the single-
+                    // model path if the viewer's flat-atom helper
+                    // isn't available on this 3Dmol build.
+                    var atoms;
+                    try {
+                        atoms = viewer.selectedAtoms({}) || [];
+                    } catch (atomErr) {
+                        var model = viewer.getModel();
+                        atoms = model ? model.selectedAtoms({}) : [];
+                    }
                     if (!atoms || atoms.length === 0) {
                         return showError('No atoms found',
                                          'The file parsed successfully but contained no atoms.');

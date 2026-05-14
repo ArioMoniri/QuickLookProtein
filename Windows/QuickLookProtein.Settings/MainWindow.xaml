@@ -305,6 +305,39 @@
                                       Margin="0,4"/>
                         </StackPanel>
                     </Border>
+
+                    <!-- Info overlay fields. Each piece of the
+                         "filename · atoms · chains · format" pill is
+                         a separate toggle. Disabled visually when
+                         the master "Show info overlay" toggle above
+                         is off, but the user can still flip these in
+                         advance. Mirrors the macOS settings panel. -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Info overlay fields"
+                                       Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Style="{StaticResource Caption}"
+                                       Text="Which bits of information appear in the info pill at the top-left of every preview. Gated on the 'Show info overlay' toggle above."/>
+                            <CheckBox x:Name="InfoFileNameCheck"        Content="File name"          Margin="0,4"/>
+                            <CheckBox x:Name="InfoAtomCountCheck"       Content="Atom count"         Margin="0,4"/>
+                            <CheckBox x:Name="InfoChainCountCheck"      Content="Chain count"        Margin="0,4"/>
+                            <CheckBox x:Name="InfoResidueCountCheck"    Content="Residue count"      Margin="0,4"/>
+                            <CheckBox x:Name="InfoElementBreakdownCheck"
+                                      Content="Element breakdown"
+                                      ToolTip="Top four most abundant elements with counts, e.g. 'C:120 N:36 O:30 H:24'."
+                                      Margin="0,4"/>
+                            <CheckBox x:Name="InfoMolWeightCheck"
+                                      Content="Molecular weight"
+                                      ToolTip="Sum of standard atomic masses (Da / kDa above 1000)."
+                                      Margin="0,4"/>
+                            <CheckBox x:Name="InfoBondCountCheck"       Content="Bond count"         Margin="0,4"/>
+                            <CheckBox x:Name="InfoPDBTitleCheck"
+                                      Content="PDB title"
+                                      ToolTip="First TITLE record from the PDB header. Only meaningful for .pdb / .ent files."
+                                      Margin="0,4"/>
+                            <CheckBox x:Name="InfoFormatCheck"          Content="File format"        Margin="0,4"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <!-- RIGHT COLUMN: About + Tips -->
