@@ -145,6 +145,12 @@ class SettingsStorage: ObservableObject {
     /// for typical maps; users can override.
     @Published var cryoEMSigma:     Double { didSet { Self.preferencesStore.set(cryoEMSigma,  forKey: "cryoEMSigma") } }
 
+    // Share button in the preview (1.7.33+). When ON, the toolbar
+    // grows a 📤 button that hands the current render to macOS's
+    // NSSharingServicePicker (so users can airdrop / mail / save the
+    // PNG without leaving QuickLook). Default ON.
+    @Published var showShareButton: Bool { didSet { Self.preferencesStore.set(showShareButton, forKey: "showShareButton") } }
+
     // MARK: - Multi-file Quick Look behaviour
     //
     // Persisted preference for what to do when the user spacebars
@@ -216,6 +222,7 @@ class SettingsStorage: ObservableObject {
         self.bioAssembly      = store.object(forKey: "bioAssembly")      as? Bool ?? true
         self.cryoEMRender     = store.object(forKey: "cryoEMRender")     as? Bool ?? true
         self.cryoEMSigma      = (store.object(forKey: "cryoEMSigma")     as? Double) ?? 2.5
+        self.showShareButton  = store.object(forKey: "showShareButton")  as? Bool ?? true
 
         self.multiFilePreviewMode = Self.read(forKey: "multiFilePreviewMode", default: .separate)
 

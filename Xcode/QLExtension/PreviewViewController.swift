@@ -28,7 +28,11 @@ private let qlLog = OSLog(subsystem: "com.ariomoniri.QuickLookProtein.QLExtensio
 /// `qlmanage -p` rendered a doc icon for both 6oc6.pdb and methane.pqr.
 /// Keep `NSExtensionPrincipalClass` in Info.plist in sync with the name below.
 @objc(QLPreviewPreviewViewController)
-class PreviewViewController: NSViewController, QLPreviewingController, WKNavigationDelegate, WKUIDelegate {
+class PreviewViewController: NSViewController,
+                             QLPreviewingController,
+                             WKNavigationDelegate,
+                             WKUIDelegate,
+                             WKScriptMessageHandler {
 
     var webView: WKWebView?
     private var pendingHandler: ((Error?) -> Void)?
@@ -59,6 +63,13 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
         super.loadView()
 
         let webConfiguration = WKWebViewConfiguration()
+        // Share-button (1.7.33+) bridge: viewer.html posts the rendered
+        // PNG via window.webkit.messageHandlers.shareImage.postMessage,
+        // we receive it in userContentController(_:didReceive:) below,
+        // decode the data URI, drop it to a temp file, and present
+        // NSSharingServicePicker over the WebView so the user can
+        // AirDrop/Mail/Save without leaving Quick Look.
+        webConfiguration.userContentController.add(self, name: "shareImage")
         let webView = WKWebView(frame: view.bounds, configuration: webConfiguration)
         webView.autoresizingMask = [.height, .width]
         webView.setValue(false, forKeyPath: "drawsBackground")
@@ -164,5 +175,54 @@ class PreviewViewController: NSViewController, QLPreviewingController, WKNavigat
         os_log("WKWebView didFailProvisional: %{public}@", log: qlLog, type: .error, error.localizedDescription)
         pendingHandler?(nil)
         pendingHandler = nil
+    }
+
+    // MARK: - WKScriptMessageHandler (1.7.33+ Share button)
+
+    /// Receive the data-URI PNG from viewer.html's Share button,
+    /// drop it into a temp `.png` file, then present the system
+    /// Sharing picker anchored to the WebView so the user can
+    /// AirDrop / Mail / Save the rendering. Quick Look extensions
+    /// are sandboxed but `NSSharingServicePicker` is a documented
+    /// exception - the picker itself runs in a different process
+    /// and can read our temp file via the handle we pass it.
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        guard message.name == "shareImage",
+              let dataURI = message.body as? String,
+              let pngData = decodeDataURIPNG(dataURI) else { return }
+        // Write to <tmp>/QuickLookProtein-<timestamp>.png. Using the
+        // shared App Group container would be cleaner but our
+        // sandbox permits NSTemporaryDirectory() too and the
+        // Sharing picker reads the URL we hand it directly.
+        let stamp = String(format: "%.0f", Date().timeIntervalSince1970)
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("QuickLookProtein-\(stamp).png")
+        do {
+            try pngData.write(to: tmp, options: .atomic)
+        } catch {
+            os_log("share: could not write temp png: %{public}@", log: qlLog, type: .error, error.localizedDescription)
+            return
+        }
+        guard let webView = self.webView else { return }
+        DispatchQueue.main.async {
+            let picker = NSSharingServicePicker(items: [tmp])
+            picker.show(relativeTo: NSRect(x: webView.bounds.maxX - 80,
+                                           y: webView.bounds.maxY - 80,
+                                           width: 1, height: 1),
+                        of: webView,
+                        preferredEdge: .minY)
+        }
+    }
+
+    /// Decode `data:image/png;base64,...` -> Data. Returns nil on any
+    /// shape that isn't a base64-encoded PNG, so a malformed URI from
+    /// the JS side can't crash the extension.
+    private func decodeDataURIPNG(_ uri: String) -> Data? {
+        guard let comma = uri.firstIndex(of: ",") else { return nil }
+        let header = uri[..<comma]
+        guard header.contains("image/png"), header.contains("base64") else { return nil }
+        let b64 = uri[uri.index(after: comma)...]
+        return Data(base64Encoded: String(b64))
     }
 }

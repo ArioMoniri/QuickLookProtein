@@ -323,6 +323,14 @@
                                       Content="Biological assembly"
                                       ToolTip="Expand PDB / CIF files into their full biological assembly using REMARK 350 (PDB) or _pdbx_struct_oper_list (CIF) transformations. Off: show only the asymmetric unit."
                                       Margin="0,4"/>
+                            <CheckBox x:Name="CryoEMRenderCheck"
+                                      Content="Cryo-EM density isosurface"
+                                      ToolTip="Render .ccp4 / .mrc / .map files as a volumetric isosurface. (macOS-only for now; Windows still falls back to QL-Win's default viewer for these files.)"
+                                      Margin="0,4"/>
+                            <CheckBox x:Name="ShowShareButtonCheck"
+                                      Content="Share button in preview"
+                                      ToolTip="Adds a Share button to the toolbar that captures the current rendering as PNG and presents the system Sharing picker."
+                                      Margin="0,4"/>
                         </StackPanel>
                     </Border>
 

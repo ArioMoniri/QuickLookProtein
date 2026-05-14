@@ -189,6 +189,12 @@ public static class SettingsStore
     public static bool GetBioAssembly() => ReadBool("BioAssembly", true);
     public static void SetBioAssembly(bool v) => WriteBool("BioAssembly", v);
 
+    // Cryo-EM density + Share button (1.7.32 / 1.7.33+).
+    public static bool GetCryoEMRender() => ReadBool("CryoEMRender", true);
+    public static void SetCryoEMRender(bool v) => WriteBool("CryoEMRender", v);
+    public static bool GetShowShareButton() => ReadBool("ShowShareButton", true);
+    public static void SetShowShareButton(bool v) => WriteBool("ShowShareButton", v);
+
     public static void SetInfoShowFileName(bool v)         => WriteBool("InfoShowFileName",         v);
     public static void SetInfoShowAtomCount(bool v)        => WriteBool("InfoShowAtomCount",        v);
     public static void SetInfoShowChainCount(bool v)       => WriteBool("InfoShowChainCount",       v);

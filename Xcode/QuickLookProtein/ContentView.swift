@@ -141,6 +141,10 @@ struct ContentView: View {
                                 .help("Render Gaussian Cube files as ±isovalue isosurfaces (blue/red) instead of bare atoms. Useful for orbital / electron-density plots.")
                             Toggle("Biological assembly",             isOn: $userSettings.bioAssembly)
                                 .help("Expand PDB / CIF files into their full biological assembly using REMARK 350 (PDB) or _pdbx_struct_oper_list (CIF) transformations. Off: show only the asymmetric unit.")
+                            Toggle("Cryo-EM density isosurface",      isOn: $userSettings.cryoEMRender)
+                                .help("Render .ccp4 / .mrc / .map files as a volumetric isosurface. Off: those files fall back to the host's text viewer.")
+                            Toggle("Share button in preview",         isOn: $userSettings.showShareButton)
+                                .help("Adds a Share button to the in-preview toolbar that captures the current rendering as PNG and presents the system Sharing picker.")
                         }
 
                         // Per-button toolbar visibility - gated on the master

@@ -100,6 +100,8 @@ public partial class MainWindow : Window
         AutoOrientCheck.IsChecked             = SettingsStore.GetAutoOrient();
         CubeIsosurfaceCheck.IsChecked         = SettingsStore.GetCubeIsosurface();
         BioAssemblyCheck.IsChecked            = SettingsStore.GetBioAssembly();
+        CryoEMRenderCheck.IsChecked           = SettingsStore.GetCryoEMRender();
+        ShowShareButtonCheck.IsChecked        = SettingsStore.GetShowShareButton();
         CtlShowStickCheck.IsChecked    = SettingsStore.GetCtlShowStick();
         CtlShowLineCheck.IsChecked     = SettingsStore.GetCtlShowLine();
         CtlShowSphereCheck.IsChecked   = SettingsStore.GetCtlShowSphere();
@@ -151,6 +153,8 @@ public partial class MainWindow : Window
         AutoOrientCheck.Click             += (_, _) => Save(() => SettingsStore.SetAutoOrient(AutoOrientCheck.IsChecked == true));
         CubeIsosurfaceCheck.Click         += (_, _) => Save(() => SettingsStore.SetCubeIsosurface(CubeIsosurfaceCheck.IsChecked == true));
         BioAssemblyCheck.Click            += (_, _) => Save(() => SettingsStore.SetBioAssembly(BioAssemblyCheck.IsChecked == true));
+        CryoEMRenderCheck.Click           += (_, _) => Save(() => SettingsStore.SetCryoEMRender(CryoEMRenderCheck.IsChecked == true));
+        ShowShareButtonCheck.Click        += (_, _) => Save(() => SettingsStore.SetShowShareButton(ShowShareButtonCheck.IsChecked == true));
         CtlShowStickCheck.Click    += (_, _) => Save(() => SettingsStore.SetCtlShowStick(CtlShowStickCheck.IsChecked == true));
         CtlShowLineCheck.Click     += (_, _) => Save(() => SettingsStore.SetCtlShowLine(CtlShowLineCheck.IsChecked == true));
         CtlShowSphereCheck.Click   += (_, _) => Save(() => SettingsStore.SetCtlShowSphere(CtlShowSphereCheck.IsChecked == true));
@@ -515,6 +519,9 @@ public partial class MainWindow : Window
             .Replace("{AUTO_ORIENT}",            QuickLookProtein.Shared.SettingsStore.GetAutoOrient()      ? "true" : "false")
             .Replace("{CUBE_ISOSURFACE}",        QuickLookProtein.Shared.SettingsStore.GetCubeIsosurface()  ? "true" : "false")
             .Replace("{BIO_ASSEMBLY}",           QuickLookProtein.Shared.SettingsStore.GetBioAssembly()     ? "true" : "false")
+            .Replace("{IS_CRYO_EM}",             "false")
+            .Replace("{CRYO_EM_SIGMA}",          "2.5")
+            .Replace("{SHOW_SHARE_BUTTON}",      QuickLookProtein.Shared.SettingsStore.GetShowShareButton() ? "true" : "false")
             .Replace("{PDB_TITLE}",              "")
             .Replace("{EXTRA_MODELS_JSON}",      "[]")
             .Replace("{EXTRA_MODELS_HTML}",      "")

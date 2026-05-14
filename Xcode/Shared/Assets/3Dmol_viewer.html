@@ -83,6 +83,7 @@
             <button data-cmd="colorss"       data-show="{CTL_SHOW_COLORSS}">Color SS</button>
             <button data-cmd="labelca"       data-show="{CTL_SHOW_LABELCA}">Label αC</button>
             <button data-cmd="recenter"      data-show="{CTL_SHOW_RECENTER}">Recenter</button>
+            <button data-cmd="share"         data-show="{SHOW_SHARE_BUTTON}" title="Share rendering">Share</button>
         </div>
         <script type="text/plain" id="mol-data">{MOL_DATA}</script>
         <!-- Merge mode (multi-file Quick Look) extras. Each sibling
@@ -747,6 +748,29 @@
                                         viewer.zoomTo();
                                         viewer.render();
                                     } catch (e) {}
+                                }
+                                if (cmd === 'share') {
+                                    // Snap a PNG of the current frame and hand
+                                    // the data URI to native code. On macOS we
+                                    // post to webkit.messageHandlers.shareImage
+                                    // and PreviewViewController unpacks the
+                                    // base64 + presents NSSharingServicePicker.
+                                    // On Windows (WebView2) the same payload
+                                    // goes through webView.PostWebMessageAsString
+                                    // and MoleculePanel's WebMessageReceived
+                                    // handler.
+                                    try {
+                                        var uri = viewer.pngURI();
+                                        if (window.webkit && window.webkit.messageHandlers
+                                            && window.webkit.messageHandlers.shareImage) {
+                                            window.webkit.messageHandlers.shareImage.postMessage(uri);
+                                        } else if (window.chrome && window.chrome.webview
+                                                   && window.chrome.webview.postMessage) {
+                                            window.chrome.webview.postMessage({ kind: 'share', uri: uri });
+                                        }
+                                    } catch (shareErr) {
+                                        console.warn('share snapshot failed:', shareErr);
+                                    }
                                 }
                             });
 
