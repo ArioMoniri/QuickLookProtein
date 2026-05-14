@@ -53,6 +53,7 @@ struct ViewerOptions {
     var bioAssembly:     Bool
     var cryoEMRender:    Bool
     var cryoEMSigma:     Double
+    var showShareButton: Bool
 
     static func from(_ s: SettingsStorage, fileExtension ext: String, fileName: String) -> ViewerOptions {
         ViewerOptions(
@@ -90,7 +91,8 @@ struct ViewerOptions {
             cubeIsosurface:  s.cubeIsosurface,
             bioAssembly:     s.bioAssembly,
             cryoEMRender:    s.cryoEMRender,
-            cryoEMSigma:     s.cryoEMSigma
+            cryoEMSigma:     s.cryoEMSigma,
+            showShareButton: s.showShareButton
         )
     }
 }
@@ -927,6 +929,7 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{CUBE_ISOSURFACE}",   with: (options.cubeIsosurface || isCryoEM)  ? "true" : "false")
     html = html.replacingOccurrences(of: "{CRYO_EM_SIGMA}",     with: String(format: "%.2f", options.cryoEMSigma))
     html = html.replacingOccurrences(of: "{IS_CRYO_EM}",        with: isCryoEM ? "true" : "false")
+    html = html.replacingOccurrences(of: "{SHOW_SHARE_BUTTON}", with: options.showShareButton ? "true" : "false")
     html = html.replacingOccurrences(of: "{BIO_ASSEMBLY}",      with: options.bioAssembly     ? "true" : "false")
     // PDB TITLE record contents, if any. Always passed but only shown
     // when {INFO_PDB_TITLE} is true. Safe-escape so weird titles can't
@@ -1108,6 +1111,7 @@ func prepare3DmolHTMLMulti(htmlPath: String,
     html = html.replacingOccurrences(of: "{BIO_ASSEMBLY}",           with: options.bioAssembly     ? "true" : "false")
     html = html.replacingOccurrences(of: "{CRYO_EM_SIGMA}",          with: String(format: "%.2f", options.cryoEMSigma))
     html = html.replacingOccurrences(of: "{IS_CRYO_EM}",             with: "false")
+    html = html.replacingOccurrences(of: "{SHOW_SHARE_BUTTON}",      with: options.showShareButton ? "true" : "false")
     let pdbTitle = extractPDBTitle(from: primary.data) ?? ""
     html = html.replacingOccurrences(of: "{PDB_TITLE}", with: escapeForJSStringLiteral(pdbTitle))
     html = html.replacingOccurrences(of: "{ZOOM_FACTOR}",       with: String(options.defaultZoom.factor))
