@@ -177,6 +177,14 @@ public static class SettingsStore
     public static bool GetOutlineShading() => ReadBool("OutlineShading", false);
     public static void SetOutlineShading(bool v) => WriteBool("OutlineShading", v);
 
+    // Auto-orient by principal axes (1.7.30+).
+    public static bool GetAutoOrient() => ReadBool("AutoOrient", false);
+    public static void SetAutoOrient(bool v) => WriteBool("AutoOrient", v);
+
+    // Cube isosurface rendering (1.7.30+).
+    public static bool GetCubeIsosurface() => ReadBool("CubeIsosurface", false);
+    public static void SetCubeIsosurface(bool v) => WriteBool("CubeIsosurface", v);
+
     public static void SetInfoShowFileName(bool v)         => WriteBool("InfoShowFileName",         v);
     public static void SetInfoShowAtomCount(bool v)        => WriteBool("InfoShowAtomCount",        v);
     public static void SetInfoShowChainCount(bool v)       => WriteBool("InfoShowChainCount",       v);

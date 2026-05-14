@@ -311,6 +311,14 @@
                                       Content="Outline shading"
                                       ToolTip="Adds a thin dark border around every atom/bond. Makes the preview pop on light backgrounds."
                                       Margin="0,4"/>
+                            <CheckBox x:Name="AutoOrientCheck"
+                                      Content="Auto-orient (longest axis horizontal)"
+                                      ToolTip="Rotate the molecule so its longest principal axis is horizontal. Useful for screenshots; gives every preview a deterministic canonical pose."
+                                      Margin="0,4"/>
+                            <CheckBox x:Name="CubeIsosurfaceCheck"
+                                      Content="Cube isosurface"
+                                      ToolTip="Render Gaussian Cube files as +/- isovalue isosurfaces (blue/red) instead of bare atoms. Useful for orbital / electron-density plots."
+                                      Margin="0,4"/>
                         </StackPanel>
                     </Border>
 

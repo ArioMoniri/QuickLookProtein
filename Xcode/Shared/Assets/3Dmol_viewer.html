@@ -379,6 +379,85 @@
                     }
 
                     viewer.zoomTo();
+
+                    // === auto-orient by principal axes (1.7.30+) =============
+                    // Rotate the camera so the molecule's longest principal
+                    // axis is horizontal. Standard trick: compute the 3x3
+                    // covariance matrix of the centered atom coordinates,
+                    // then power-iterate (10 rounds is plenty for the
+                    // largest eigenvector) to find the dominant axis. Use
+                    // 3Dmol's `viewer.rotate` to align it with the X axis.
+                    if ({AUTO_ORIENT} && atoms.length > 4) {
+                        try {
+                            var cx = 0, cy = 0, cz = 0;
+                            for (var aoI = 0; aoI < atoms.length; aoI++) {
+                                cx += atoms[aoI].x;
+                                cy += atoms[aoI].y;
+                                cz += atoms[aoI].z;
+                            }
+                            cx /= atoms.length;
+                            cy /= atoms.length;
+                            cz /= atoms.length;
+                            var cxx=0, cxy=0, cxz=0, cyy=0, cyz=0, czz=0;
+                            for (var aoJ = 0; aoJ < atoms.length; aoJ++) {
+                                var dx = atoms[aoJ].x - cx;
+                                var dy = atoms[aoJ].y - cy;
+                                var dz = atoms[aoJ].z - cz;
+                                cxx += dx*dx; cxy += dx*dy; cxz += dx*dz;
+                                cyy += dy*dy; cyz += dy*dz; czz += dz*dz;
+                            }
+                            // Power iteration for the dominant eigenvector.
+                            var vx = 1, vy = 1, vz = 1;
+                            for (var pi = 0; pi < 10; pi++) {
+                                var nx = cxx*vx + cxy*vy + cxz*vz;
+                                var ny = cxy*vx + cyy*vy + cyz*vz;
+                                var nz = cxz*vx + cyz*vy + czz*vz;
+                                var n  = Math.sqrt(nx*nx + ny*ny + nz*nz);
+                                if (n < 1e-9) break;
+                                vx = nx/n; vy = ny/n; vz = nz/n;
+                            }
+                            // Align eigenvector with the X axis. Yaw around Y,
+                            // then pitch around Z. Angles in degrees because
+                            // that's what viewer.rotate expects.
+                            var yawDeg   = Math.atan2(vz, vx) * 180 / Math.PI;
+                            var pitchDeg = Math.atan2(vy,
+                                Math.sqrt(vx*vx + vz*vz)) * 180 / Math.PI;
+                            viewer.rotate(-yawDeg,   'y');
+                            viewer.rotate( pitchDeg, 'z');
+                        } catch (orientErr) {
+                            console.warn('auto-orient failed:', orientErr);
+                        }
+                    }
+
+                    // === cube isosurface (1.7.30+) ===========================
+                    // When the source file is a Gaussian Cube and the user
+                    // turned on Cube isosurface, render the volumetric data
+                    // as a real isosurface (3Dmol's VolumetricData -> surface
+                    // pipeline) instead of just showing the bare atoms. The
+                    // user can switch back via the Surface toolbar button
+                    // (the addSurface call here adds a named surface that
+                    // the toolbar's removeAllSurfaces respects).
+                    if ({CUBE_ISOSURFACE} && format === 'cube') {
+                        try {
+                            var rawMol = document.getElementById('mol-data');
+                            if (rawMol) {
+                                var vd = new $3Dmol.VolumeData(rawMol.textContent, 'cube');
+                                viewer.addIsosurface(vd, {
+                                    isoval: 0.02,
+                                    color: 'blue',
+                                    opacity: 0.7,
+                                });
+                                viewer.addIsosurface(vd, {
+                                    isoval: -0.02,
+                                    color: 'red',
+                                    opacity: 0.7,
+                                });
+                            }
+                        } catch (cubeErr) {
+                            console.warn('cube isosurface failed:', cubeErr);
+                        }
+                    }
+
                     // User-configurable default zoom: 3Dmol's zoomTo() picks a
                     // distance that fits the bounding sphere; a multiplicative
                     // viewer.zoom() afterwards tightens (>1) or loosens (<1)

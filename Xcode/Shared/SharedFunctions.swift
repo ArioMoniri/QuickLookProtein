@@ -48,6 +48,8 @@ struct ViewerOptions {
     var ctlShowLabelCA:  Bool
     var ctlShowRecenter: Bool
     var outlineShading:  Bool
+    var autoOrient:      Bool
+    var cubeIsosurface:  Bool
 
     static func from(_ s: SettingsStorage, fileExtension ext: String, fileName: String) -> ViewerOptions {
         ViewerOptions(
@@ -80,9 +82,216 @@ struct ViewerOptions {
             ctlShowColorSS:  s.ctlShowColorSS,
             ctlShowLabelCA:  s.ctlShowLabelCA,
             ctlShowRecenter: s.ctlShowRecenter,
-            outlineShading:  s.outlineShading
+            outlineShading:  s.outlineShading,
+            autoOrient:      s.autoOrient,
+            cubeIsosurface:  s.cubeIsosurface
         )
     }
+}
+
+// MARK: - Computational-chemistry output parsers (1.7.30+)
+//
+// Gaussian (.gjf input / .log + .out output), ORCA (.out), and
+// QChem (.out) produce well-defined Cartesian coordinate blocks
+// in their output text. We pre-parse the file in Swift, turn the
+// last optimization step into an XYZ-format string, and hand that
+// to 3Dmol which already knows how to render XYZ. This is much
+// simpler than writing a 3Dmol-side parser per format and lets us
+// reuse the existing distance-based bond perception.
+
+/// Try every computational-chem output parser in turn. Returns
+/// (xyzText, format="xyz") on success, nil on no match.
+internal func parseComputationalChem(_ raw: String, extension ext: String) -> (xyz: String, originalExt: String)? {
+    let head = String(raw.prefix(8192))
+    // ORCA: header line "* O   R   C   A *" appears within the first few KB.
+    if head.contains("* O   R   C   A *") || head.contains("ORCA terminated") {
+        if let xyz = parseOrcaOutput(raw) { return (xyz, ext) }
+    }
+    // Gaussian: "Gaussian, Inc." in the header, or "Standard orientation"
+    // / "Input orientation" blocks.
+    if head.contains("Gaussian, Inc.") || head.contains("Entering Link 1") || raw.contains("Standard orientation:") {
+        if let xyz = parseGaussianOutput(raw) { return (xyz, ext) }
+    }
+    // QChem: "Q-Chem" banner.
+    if head.contains("A Quantum Leap Into The Future Of Chemistry") || head.contains("Welcome to Q-Chem") {
+        if let xyz = parseQChemOutput(raw) { return (xyz, ext) }
+    }
+    // Gaussian input (.gjf / .com): blank-separated sections, atoms in
+    // a "C  x  y  z" block.
+    if ext == "gjf" || ext == "com" {
+        if let xyz = parseGaussianInput(raw) { return (xyz, ext) }
+    }
+    return nil
+}
+
+/// ORCA output: scan for "CARTESIAN COORDINATES (ANGSTROEM)" blocks.
+/// Each block starts with that header, then a separator line, then
+/// `<element>  x  y  z` rows. Use the LAST block found (= final
+/// optimized geometry).
+private func parseOrcaOutput(_ raw: String) -> String? {
+    let marker = "CARTESIAN COORDINATES (ANGSTROEM)"
+    var lastBlockStart: String.Index? = nil
+    var searchStart = raw.startIndex
+    while let r = raw.range(of: marker, range: searchStart..<raw.endIndex) {
+        lastBlockStart = r.upperBound
+        searchStart = r.upperBound
+    }
+    guard let start = lastBlockStart else { return nil }
+    let lines = raw[start...].split(separator: "\n", maxSplits: 4096, omittingEmptySubsequences: false)
+    var atoms: [(elem: String, x: String, y: String, z: String)] = []
+    var sawDataLine = false
+    for line in lines {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty {
+            if sawDataLine { break }
+            continue
+        }
+        if t.hasPrefix("---") { continue }
+        let parts = t.split(separator: " ", maxSplits: 16, omittingEmptySubsequences: true)
+        if parts.count < 4 { break }
+        if Double(parts[1]) == nil || Double(parts[2]) == nil || Double(parts[3]) == nil { break }
+        atoms.append((String(parts[0]), String(parts[1]), String(parts[2]), String(parts[3])))
+        sawDataLine = true
+    }
+    return atoms.isEmpty ? nil : buildXYZ(comment: "ORCA - final geometry", atoms: atoms)
+}
+
+/// Gaussian output: "Standard orientation:" or "Input orientation:"
+/// table. Format:
+///   Center  Atomic   Atomic   Coordinates
+///   Number  Number   Type     X    Y    Z
+///   ---
+///   1       6        0        0.0  0.0  0.0
+///   ...
+/// Use the LAST such block (final optimization step).
+private func parseGaussianOutput(_ raw: String) -> String? {
+    let markers = ["Standard orientation:", "Input orientation:"]
+    var lastBlockStart: String.Index? = nil
+    for marker in markers {
+        var searchStart = raw.startIndex
+        while let r = raw.range(of: marker, range: searchStart..<raw.endIndex) {
+            lastBlockStart = r.upperBound
+            searchStart = r.upperBound
+        }
+    }
+    guard let start = lastBlockStart else { return nil }
+    let lines = raw[start...].split(separator: "\n", maxSplits: 8192, omittingEmptySubsequences: false)
+    var atoms: [(elem: String, x: String, y: String, z: String)] = []
+    var dashCount = 0
+    var inDataRows = false
+    for line in lines {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        if t.hasPrefix("---") {
+            dashCount += 1
+            if dashCount == 2 { inDataRows = true; continue }
+            if dashCount >= 3 { break }   // end of the block
+            continue
+        }
+        if !inDataRows { continue }
+        let parts = t.split(separator: " ", maxSplits: 16, omittingEmptySubsequences: true)
+        if parts.count < 6 { continue }
+        guard let z   = Int(parts[1]),  // atomic number
+              let xv  = Double(parts[3]),
+              let yv  = Double(parts[4]),
+              let zv  = Double(parts[5])
+        else { continue }
+        let element = atomicNumberToElement(z)
+        atoms.append((element,
+                      String(format: "%.6f", xv),
+                      String(format: "%.6f", yv),
+                      String(format: "%.6f", zv)))
+    }
+    return atoms.isEmpty ? nil : buildXYZ(comment: "Gaussian - last geometry", atoms: atoms)
+}
+
+/// QChem output: "Standard Nuclear Orientation (Angstroms)" table.
+/// Format is similar to Gaussian but with element symbols rather
+/// than atomic numbers.
+private func parseQChemOutput(_ raw: String) -> String? {
+    let marker = "Standard Nuclear Orientation (Angstroms)"
+    var lastBlockStart: String.Index? = nil
+    var searchStart = raw.startIndex
+    while let r = raw.range(of: marker, range: searchStart..<raw.endIndex) {
+        lastBlockStart = r.upperBound
+        searchStart = r.upperBound
+    }
+    guard let start = lastBlockStart else { return nil }
+    let lines = raw[start...].split(separator: "\n", maxSplits: 8192, omittingEmptySubsequences: false)
+    var atoms: [(elem: String, x: String, y: String, z: String)] = []
+    var dashCount = 0
+    var inDataRows = false
+    for line in lines {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        if t.hasPrefix("---") {
+            dashCount += 1
+            if dashCount == 1 { inDataRows = true; continue }
+            if dashCount >= 2 { break }
+            continue
+        }
+        if !inDataRows { continue }
+        let parts = t.split(separator: " ", maxSplits: 16, omittingEmptySubsequences: true)
+        if parts.count < 5 { continue }
+        if Double(parts[2]) == nil || Double(parts[3]) == nil || Double(parts[4]) == nil { continue }
+        atoms.append((String(parts[1]), String(parts[2]), String(parts[3]), String(parts[4])))
+    }
+    return atoms.isEmpty ? nil : buildXYZ(comment: "QChem - final geometry", atoms: atoms)
+}
+
+/// Gaussian input file (.gjf / .com): a small text file with title +
+/// blank lines + charge/multiplicity line + atom block. Find the
+/// charge/mult line (two integers) and read the atom rows after it.
+private func parseGaussianInput(_ raw: String) -> String? {
+    let lines = raw.split(separator: "\n", maxSplits: 2048, omittingEmptySubsequences: false)
+    var inAtoms = false
+    var atoms: [(elem: String, x: String, y: String, z: String)] = []
+    for line in lines {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        if !inAtoms {
+            // Two-integer line marks charge + multiplicity, atom block
+            // starts on the next line.
+            let parts = t.split(separator: " ", omittingEmptySubsequences: true)
+            if parts.count == 2, Int(parts[0]) != nil, Int(parts[1]) != nil {
+                inAtoms = true
+                continue
+            }
+            continue
+        }
+        if t.isEmpty { break }
+        let parts = t.split(separator: " ", omittingEmptySubsequences: true)
+        if parts.count < 4 { break }
+        guard Double(parts[1]) != nil, Double(parts[2]) != nil, Double(parts[3]) != nil else { break }
+        atoms.append((String(parts[0]),
+                      String(parts[1]), String(parts[2]), String(parts[3])))
+    }
+    return atoms.isEmpty ? nil : buildXYZ(comment: "Gaussian input", atoms: atoms)
+}
+
+/// Build a standard XMol XYZ string from a list of atom tuples.
+private func buildXYZ(comment: String, atoms: [(elem: String, x: String, y: String, z: String)]) -> String {
+    var s = "\(atoms.count)\n"
+    s += "\(comment)\n"
+    for a in atoms {
+        s += "\(a.elem) \(a.x) \(a.y) \(a.z)\n"
+    }
+    return s
+}
+
+/// Periodic-table lookup for the first 86 elements. Used by the
+/// Gaussian-output parser (it reports atomic numbers, not symbols).
+private func atomicNumberToElement(_ z: Int) -> String {
+    let table = [
+        "H","He","Li","Be","B","C","N","O","F","Ne",
+        "Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca",
+        "Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn",
+        "Ga","Ge","As","Se","Br","Kr","Rb","Sr","Y","Zr",
+        "Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn",
+        "Sb","Te","I","Xe","Cs","Ba","La","Ce","Pr","Nd",
+        "Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb",
+        "Lu","Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg",
+        "Tl","Pb","Bi","Po","At","Rn",
+    ]
+    if z < 1 || z > table.count { return "C" }
+    return table[z - 1]
 }
 
 /// Quick-and-dirty PDB title scrape. Only walks the first ~16 KB of
@@ -134,12 +343,27 @@ func prepare3DmolHTML(htmlPath: String,
     // Try common text encodings explicitly — `String(contentsOfFile:)` without an
     // encoding hint will reject any file that isn't valid UTF-8, which routinely fails
     // for CIFs containing Latin-1 author names or older PDB files written on Windows.
-    let raw: String
+    let rawOriginal: String
     do {
-        raw = try readMolecularTextFile(pdbPath)
+        rawOriginal = try readMolecularTextFile(pdbPath)
     } catch {
         return errorHTML(title: "Could not read file",
                          detail: error.localizedDescription)
+    }
+
+    // Computational-chem output pre-parse (1.7.30+): if the file
+    // looks like a Gaussian / ORCA / QChem output (or .gjf / .com
+    // input), extract the last coordinate block, rewrite it as XYZ,
+    // and dispatch 3Dmol to its native XYZ parser. Falls through if
+    // not a recognised compchem format.
+    let raw: String
+    let resolvedFormat: String
+    if let conv = parseComputationalChem(rawOriginal, extension: pdbPath.lowercased().components(separatedBy: ".").last ?? "") {
+        raw = conv.xyz
+        resolvedFormat = "xyz"
+    } else {
+        raw = rawOriginal
+        resolvedFormat = dataFormat
     }
 
     let safeData = sanitizeForScriptBlock(raw)
@@ -153,7 +377,7 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{BG_COLOR}",          with: bg.rgbHex)
     html = html.replacingOccurrences(of: "{BG_ALPHA}",          with: bg.alpha)
     html = html.replacingOccurrences(of: "{ROTATION_SPEED}",    with: String(options.rotationSpeed.rotationSpeedNumber()))
-    html = html.replacingOccurrences(of: "{DATA_FORMAT}",       with: dataFormat)
+    html = html.replacingOccurrences(of: "{DATA_FORMAT}",       with: resolvedFormat)
     html = html.replacingOccurrences(of: "{AUTO_STYLE_HETERO}", with: options.autoStyleHetero ? "true" : "false")
     html = html.replacingOccurrences(of: "{SHOW_SURFACE}",      with: options.showSurface      ? "true" : "false")
     html = html.replacingOccurrences(of: "{HIDE_H}",            with: options.hideHydrogens    ? "true" : "false")
@@ -181,6 +405,8 @@ func prepare3DmolHTML(htmlPath: String,
     html = html.replacingOccurrences(of: "{CTL_SHOW_LABELCA}",  with: options.ctlShowLabelCA  ? "true" : "false")
     html = html.replacingOccurrences(of: "{CTL_SHOW_RECENTER}", with: options.ctlShowRecenter ? "true" : "false")
     html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",   with: options.outlineShading  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{AUTO_ORIENT}",       with: options.autoOrient      ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CUBE_ISOSURFACE}",   with: options.cubeIsosurface  ? "true" : "false")
     // PDB TITLE record contents, if any. Always passed but only shown
     // when {INFO_PDB_TITLE} is true. Safe-escape so weird titles can't
     // break out of the JS string literal.
@@ -356,6 +582,8 @@ func prepare3DmolHTMLMulti(htmlPath: String,
     html = html.replacingOccurrences(of: "{CTL_SHOW_LABELCA}",       with: options.ctlShowLabelCA  ? "true" : "false")
     html = html.replacingOccurrences(of: "{CTL_SHOW_RECENTER}",      with: options.ctlShowRecenter ? "true" : "false")
     html = html.replacingOccurrences(of: "{OUTLINE_SHADING}",        with: options.outlineShading  ? "true" : "false")
+    html = html.replacingOccurrences(of: "{AUTO_ORIENT}",            with: options.autoOrient      ? "true" : "false")
+    html = html.replacingOccurrences(of: "{CUBE_ISOSURFACE}",        with: options.cubeIsosurface  ? "true" : "false")
     let pdbTitle = extractPDBTitle(from: primary.data) ?? ""
     html = html.replacingOccurrences(of: "{PDB_TITLE}", with: escapeForJSStringLiteral(pdbTitle))
     html = html.replacingOccurrences(of: "{ZOOM_FACTOR}",       with: String(options.defaultZoom.factor))

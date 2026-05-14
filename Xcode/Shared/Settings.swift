@@ -114,6 +114,20 @@ class SettingsStorage: ObservableObject {
     // pop on light backgrounds. Default OFF.
     @Published var outlineShading:  Bool { didSet { Self.preferencesStore.set(outlineShading,  forKey: "outlineShading") } }
 
+    // Auto-orient (1.7.30+): rotate the molecule so its longest
+    // principal axis is horizontal. Computed from the atom-coord
+    // covariance matrix via a small 3x3 power-iteration eigendecomp
+    // in viewer.html. Default OFF (3Dmol's zoomTo() picks an OK
+    // default orientation; this is for users who want a deterministic
+    // canonical pose, e.g. for screenshots).
+    @Published var autoOrient:      Bool { didSet { Self.preferencesStore.set(autoOrient,      forKey: "autoOrient") } }
+
+    // Cube isosurface (1.7.30+): render .cube files as a real
+    // volumetric isosurface instead of just the atom skeleton.
+    // Pretty when on; expensive at the iso-level if the cube is
+    // dense. Default OFF.
+    @Published var cubeIsosurface:  Bool { didSet { Self.preferencesStore.set(cubeIsosurface,  forKey: "cubeIsosurface") } }
+
     // MARK: - Multi-file Quick Look behaviour
     //
     // Persisted preference for what to do when the user spacebars
@@ -180,6 +194,8 @@ class SettingsStorage: ObservableObject {
         self.ctlShowLabelCA   = store.object(forKey: "ctlShowLabelCA")   as? Bool ?? true
         self.ctlShowRecenter  = store.object(forKey: "ctlShowRecenter")  as? Bool ?? true
         self.outlineShading   = store.object(forKey: "outlineShading")   as? Bool ?? false
+        self.autoOrient       = store.object(forKey: "autoOrient")       as? Bool ?? false
+        self.cubeIsosurface   = store.object(forKey: "cubeIsosurface")   as? Bool ?? false
 
         self.multiFilePreviewMode = Self.read(forKey: "multiFilePreviewMode", default: .separate)
 

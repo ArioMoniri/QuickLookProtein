@@ -4,6 +4,43 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.30] — 2026-05-14
+
+### 🆕 Added — auto-orient + cube isosurface + comp-chem parsers
+
+- **Auto-orient by principal axes.** When the new `autoOrient`
+  setting is on (default OFF), the viewer rotates so the molecule's
+  longest principal axis is horizontal. Computed in JS via a 3×3
+  covariance matrix + 10-round power iteration on the dominant
+  eigenvector, then `viewer.rotate` yaw/pitch to align with the X
+  axis. Deterministic canonical pose per file — nice for
+  screenshots and batch consistency.
+- **Cube isosurface rendering.** New `cubeIsosurface` setting
+  (default OFF). When on AND the file is a Gaussian Cube, the viewer
+  builds a `$3Dmol.VolumeData(text, 'cube')` and calls
+  `viewer.addIsosurface` twice — once at `+0.02` in blue and once at
+  `-0.02` in red, the canonical orbital-density paired-lobe look.
+- **Gaussian / ORCA / QChem output parsing.** SharedFunctions.swift
+  gains a new `parseComputationalChem` family that sniffs ORCA's
+  *"CARTESIAN COORDINATES (ANGSTROEM)"* / Gaussian's *"Standard
+  orientation"* / QChem's *"Standard Nuclear Orientation"* blocks
+  out of the output text, picks the LAST block (= final optimization
+  step), rewrites it as XYZ, and dispatches 3Dmol to its native XYZ
+  parser. Also handles `.gjf` / `.com` Gaussian *input* files. The
+  format dispatch in `prepare3DmolHTML` is reused so atom-style
+  defaults and bond perception apply unchanged.
+- **Periodic-table lookup** (`atomicNumberToElement`) covering the
+  first 86 elements, used by Gaussian's atomic-number-based output
+  format.
+
+### 🪟 Windows
+
+- `Windows/Shared/SettingsStore.cs` mirrors `AutoOrient` and
+  `CubeIsosurface` toggles (default OFF) under the same HKCU hive
+  the main plugin reads.
+- `MoleculePanel.FillTemplate` forwards both placeholders.
+- Settings WPF gains two new checkboxes in *Rendering options*.
+
 ## [1.7.29] — 2026-05-14
 
 ### 🆕 Added

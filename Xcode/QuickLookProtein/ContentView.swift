@@ -135,6 +135,10 @@ struct ContentView: View {
                                 .help("Adds a small bottom-right toolbar in every Quick Look preview with one-click buttons for Stick / Line / Sphere / Cartoon style, Surface, Color SS, Label αC, and Recenter.")
                             Toggle("Outline shading",                 isOn: $userSettings.outlineShading)
                                 .help("Adds a thin dark border around every atom/bond. Makes the preview pop on light backgrounds.")
+                            Toggle("Auto-orient (longest axis horizontal)", isOn: $userSettings.autoOrient)
+                                .help("Rotate the molecule so its longest principal axis is horizontal. Useful for screenshots; gives every preview a deterministic canonical pose.")
+                            Toggle("Cube isosurface",                 isOn: $userSettings.cubeIsosurface)
+                                .help("Render Gaussian Cube files as ±isovalue isosurfaces (blue/red) instead of bare atoms. Useful for orbital / electron-density plots.")
                         }
 
                         // Per-button toolbar visibility - gated on the master
