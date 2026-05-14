@@ -7,6 +7,19 @@
     <language>en</language>
     <item>
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+      <title>QuickLookProtein 1.7.34</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.34</link>
+      <pubDate>Thu, 14 May 2026 08:14:14 +0000</pubDate>
+      <sparkle:version>1.7.34</sparkle:version>
+      <sparkle:shortVersionString>1.7.34</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;p&gt;See &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.34"&gt;the GitHub release&lt;/a&gt; for full notes and the binary download.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.34/QuickLookProtein-1.7.34.zip" sparkle:edSignature="K78hqrePtgwp8fPG+WHG3tEJsPWgEFIj/k0+FXCcECtxP3LX94VK2I+Ap92dIbe+1yrRBOaNBX6gz4CaEEVEAQ==" length="4077309" type="application/octet-stream" />
+    </item>
+    <item>
+>>>>>>> Stashed changes
       <title>QuickLookProtein 1.7.32</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.32</link>
       <pubDate>Thu, 14 May 2026 07:56:37 +0000</pubDate>
