@@ -853,10 +853,10 @@ func prepare3DmolHTML(htmlPath: String,
             return errorHTML(
                 title: "Trajectory format not previewable",
                 detail: "\(lowerExt.uppercased()) trajectory could not be parsed. " +
-                        "DCD (CHARMM/NAMD) and TRR (GROMACS uncompressed) are supported. " +
-                        "XTC requires libxdrfile-style decompression and is not yet readable " +
-                        "in this build. Add a sibling .pdb / .psf / .gro topology file to get " +
-                        "element-aware atom labels.")
+                        "DCD (CHARMM/NAMD), TRR (GROMACS uncompressed) and XTC " +
+                        "(GROMACS compressed) are supported. Add a sibling " +
+                        ".pdb / .psf / .gro topology file to get element-aware " +
+                        "atom labels.")
         }
     } else {
         do {
@@ -1309,7 +1309,7 @@ internal func readTrajectoryFirstFrame(path: String, ext: String) -> String? {
     case "trr":
         return parseTRRFirstFrame(data: data, trrURL: URL(fileURLWithPath: path))
     case "xtc":
-        return nil  // explicit unsupported — caller shows an info panel
+        return parseXTCFirstFrame(data: data, xtcURL: URL(fileURLWithPath: path))
     default:
         return nil
     }
@@ -1639,4 +1639,395 @@ private func readTRRFloat(_ data: Data, offset: inout Int, bytesPerFloat: Int) -
         offset += 8
         return Float(Double(bitPattern: u64))
     }
+}
+
+// MARK: - XTC (GROMACS compressed trajectory, 1.7.43+)
+//
+// XTC packs coordinates with a custom bit-stream so each frame fits in a
+// few KB instead of natoms*12 bytes. Port of libxdrfile2's
+// xdr_xtc_get_coordinates / xdr3dfcoord decompressor.
+//
+// Frame layout (all XDR big-endian, 4-byte aligned):
+//   int32 magic         = 1995
+//   int32 natoms
+//   int32 step
+//   float32 time
+//   float32 box[9]      row-major unit cell
+//   int32 natoms2       echo of natoms
+//
+// If natoms ≤ 9: raw natoms*3 float32 (XDR pads up to multiple of 4
+// bytes, which is automatic here).
+//
+// Otherwise the 3DF compressed block follows:
+//   float32 precision
+//   int32 minint[3]
+//   int32 maxint[3]
+//   int32 smallidx
+//   int32 nbytes
+//   <nbytes bytes>      bit-packed stream, then XDR-padded
+//
+// The stream emits N atoms as a mix of "large" (full-range) triples
+// and "small" (anchor + offset) triples; a run-length signal lets the
+// encoder repeat the previous small triple. Convert each emitted
+// integer back to Ångström with:
+//   x_Å = (intX + minint[0]) * 10 / precision
+
+// magicints[]: fixed table from libxdrfile2. Each entry is the number
+// of distinct integer values a "small" triple's component can take in
+// that bucket. magicbits[i] = ceil(log2(magicints[i] + 1)) but the
+// table is canonical so we use the values directly. Indices 0..8 are
+// padding (small mode unused for those buckets); useful range is 9..73.
+private let xtcMagicints: [Int] = [
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 8, 10, 12, 16, 20, 25, 32, 40, 50, 64,
+    80, 101, 128, 161, 203, 256, 322, 406, 512, 645,
+    812, 1024, 1290, 1625, 2048, 2580, 3250, 4096, 5060, 6501,
+    8192, 10321, 13003, 16384, 20642, 26007, 32768, 41285, 52015, 65536,
+    82570, 104031, 131072, 165140, 208063, 262144, 330280, 416127, 524287, 660561,
+    832255, 1048576, 1321122, 1664510, 2097152, 2642245, 3329021, 4194304, 5284491, 6658042,
+    8388607, 10568983, 13316085, 16777216
+]
+
+/// Bit-level reader for the XTC compressed coordinate stream.
+/// libxdrfile2's `receivebits` reads bits MSB-first across bytes,
+/// keeping a small int "lastbits" buffer that holds unconsumed bits
+/// at the LSB end with `cnt` tracking how many are valid. We mirror
+/// that exactly so the decompressor walks the stream the same way
+/// the encoder packed it.
+private struct XTCBitReader {
+    let data: Data
+    let baseOffset: Int
+    var byteIdx: Int = 0
+    /// Buffer of unconsumed bits, MSB-first within the field.
+    var lastBits: UInt32 = 0
+    var lastBitsCount: Int = 0
+
+    init(data: Data, offset: Int) {
+        self.data = data
+        self.baseOffset = offset
+    }
+
+    /// Read `nbits` (1..32) bits MSB-first across the byte stream and
+    /// return as UInt32. Direct port of `receivebits` from
+    /// xdrfile.c — pump bytes into the lastBits buffer until we have
+    /// enough, then peel off the top `nbits`.
+    mutating func readBits(_ nbits: Int) -> UInt32 {
+        var cnt = lastBitsCount
+        var lastBitsLocal = lastBits
+        while cnt < nbits {
+            lastBitsLocal = (lastBitsLocal << 8) |
+                UInt32(data[data.startIndex + baseOffset + byteIdx])
+            byteIdx += 1
+            cnt += 8
+        }
+        cnt -= nbits
+        let mask: UInt32 = nbits == 32 ? 0xFFFF_FFFF : ((UInt32(1) << UInt32(nbits)) &- 1)
+        let result = (lastBitsLocal >> UInt32(cnt)) & mask
+        // Trim consumed bits off the top.
+        let keepMask: UInt32 = cnt == 0 ? 0 : ((UInt32(1) << UInt32(cnt)) &- 1)
+        lastBits = lastBitsLocal & keepMask
+        lastBitsCount = cnt
+        return result
+    }
+
+    mutating func readInt(_ nbits: Int) -> Int {
+        return Int(readBits(nbits))
+    }
+
+    /// Port of libxdrfile2 `receiveints`. Reads a packed N-integer
+    /// representation in `nbits` bits and unwraps it into base-`sizes[i]`
+    /// digits. We special-case num=3 (the only case the XTC decoder uses).
+    mutating func receiveInts(numInts: Int, nbits: Int, sizes: [Int],
+                              outInts: inout [Int]) {
+        // Buffer holds up to 32 bytes worth of bits. The packed integer
+        // is read in 8-bit chunks MSB-first, then unwrapped LSB-first
+        // by repeated long-division by sizes[].
+        var bytes = [Int](repeating: 0, count: 32)
+        var nb = 0
+        var nbitsLeft = nbits
+        while nbitsLeft >= 8 {
+            bytes[nb] = Int(readBits(8))
+            nb += 1
+            nbitsLeft -= 8
+        }
+        if nbitsLeft > 0 {
+            bytes[nb] = Int(readBits(nbitsLeft))
+            nb += 1
+        }
+        // libxdrfile's bytes[] layout is MSB-at-index-0 after the read
+        // loop. We unwrap from the highest index towards 0, dividing by
+        // sizes[i] starting from i = numInts-1 down to i = 1; the final
+        // i = 0 result is whatever's left in bytes[0].
+        for i in stride(from: numInts - 1, through: 1, by: -1) {
+            let s = sizes[i]
+            var num = 0
+            for j in stride(from: nb - 1, through: 0, by: -1) {
+                num = (num << 8) | bytes[j]
+                let p = num / s
+                bytes[j] = p
+                num -= p * s
+            }
+            outInts[i] = num
+        }
+        outInts[0] = bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24)
+    }
+}
+
+/// Decompress an XTC frame to first-frame XYZ text.
+internal func parseXTCFirstFrame(data: Data, xtcURL: URL) -> String? {
+    guard data.count >= 60 else { return nil }
+    var offset = 0
+
+    // Magic (BE int32).
+    let magic = readInt32BE(data, offset: offset); offset += 4
+    guard magic == 1995 else { return nil }
+
+    // natoms / step / time / box / natoms2 header.
+    let natoms = Int(readInt32BE(data, offset: offset)); offset += 4
+    guard natoms > 0 && natoms < 10_000_000 else { return nil }
+    _ = readInt32BE(data, offset: offset); offset += 4  // step
+    offset += 4                                          // time (f32)
+    offset += 9 * 4                                      // box[9] (f32)
+    let natoms2 = Int(readInt32BE(data, offset: offset)); offset += 4
+    guard natoms2 == natoms else { return nil }
+
+    var coordsX = [Float](repeating: 0, count: natoms)
+    var coordsY = [Float](repeating: 0, count: natoms)
+    var coordsZ = [Float](repeating: 0, count: natoms)
+
+    if natoms <= 9 {
+        // Uncompressed path: natoms*3 float32 (BE).
+        guard offset + natoms * 12 <= data.count else { return nil }
+        for i in 0..<natoms {
+            coordsX[i] = readFloatBE(data, offset: &offset)
+            coordsY[i] = readFloatBE(data, offset: &offset)
+            coordsZ[i] = readFloatBE(data, offset: &offset)
+        }
+    } else {
+        // Compressed 3DF block.
+        guard offset + 36 <= data.count else { return nil }
+        let precisionU = readUInt32BE(data, offset: offset); offset += 4
+        let precision = Float(bitPattern: precisionU)
+        guard precision > 0 && precision.isFinite else { return nil }
+
+        var minint = [Int](repeating: 0, count: 3)
+        var maxint = [Int](repeating: 0, count: 3)
+        for i in 0..<3 {
+            minint[i] = Int(Int32(bitPattern: readUInt32BE(data, offset: offset)))
+            offset += 4
+        }
+        for i in 0..<3 {
+            maxint[i] = Int(Int32(bitPattern: readUInt32BE(data, offset: offset)))
+            offset += 4
+        }
+        var smallidx = Int(Int32(bitPattern: readUInt32BE(data, offset: offset)))
+        offset += 4
+        let nbytes = Int(Int32(bitPattern: readUInt32BE(data, offset: offset)))
+        offset += 4
+        guard nbytes >= 0, offset + nbytes <= data.count else { return nil }
+        guard smallidx >= 0 && smallidx < xtcMagicints.count else { return nil }
+
+        // sizeint[i] = number of bits needed to encode range (maxint-minint+1)
+        // when all three triples are encoded together via sizeofints.
+        var sizeint = [Int](repeating: 0, count: 3)
+        var bitsizeint = [Int](repeating: 0, count: 3)
+        var bitsize: Int = 0
+        for i in 0..<3 {
+            sizeint[i] = maxint[i] - minint[i] + 1
+            if sizeint[i] <= 0 { return nil }
+        }
+        // libxdrfile: if any sizeint > 2^24, encode separately via
+        // sizeofint each; otherwise combine via sizeofints across 3.
+        let HUGE_THRESHOLD = 1 << 24
+        if sizeint[0] > HUGE_THRESHOLD || sizeint[1] > HUGE_THRESHOLD || sizeint[2] > HUGE_THRESHOLD {
+            bitsizeint[0] = sizeOfInt(sizeint[0])
+            bitsizeint[1] = sizeOfInt(sizeint[1])
+            bitsizeint[2] = sizeOfInt(sizeint[2])
+            bitsize = 0
+        } else {
+            bitsize = sizeOfInts(sizes: sizeint)
+        }
+
+        // Small-int parameters from the magic table.
+        let FIRSTIDX = 9
+        var smallnum = xtcMagicints[smallidx] / 2
+        var smaller = smallidx > FIRSTIDX ? xtcMagicints[smallidx - 1] / 2 : 0
+        var sizesmall = [Int](repeating: xtcMagicints[smallidx], count: 3)
+
+        var reader = XTCBitReader(data: data, offset: offset)
+
+        // Decompression state. Allocate as fixed-size triples reused
+        // across loop iterations to match libxdrfile's pointer-swap idiom.
+        var thiscoord = [Int](repeating: 0, count: 3)
+        var prevcoord = [Int](repeating: 0, count: 3)
+        let invPrecision = 1.0 / Double(precision)
+        // libxdrfile applies `intcoord / precision` → nm. The viewer
+        // wants Å so we multiply by 10 in the emit step.
+
+        // Emitted-coord buffer in Å, atom-major; matches `lfp` in C.
+        var emittedCount = 0
+
+        // Bit width to use for the next small-mode receiveInts read.
+        var smallidxBitsize = sizeOfInts(sizes: sizesmall)
+
+        while emittedCount < natoms {
+            // --- Large mode: read one full-range triple. ------------
+            if bitsize == 0 {
+                thiscoord[0] = reader.readInt(bitsizeint[0])
+                thiscoord[1] = reader.readInt(bitsizeint[1])
+                thiscoord[2] = reader.readInt(bitsizeint[2])
+            } else {
+                reader.receiveInts(numInts: 3, nbits: bitsize,
+                                   sizes: sizeint, outInts: &thiscoord)
+            }
+            thiscoord[0] += minint[0]
+            thiscoord[1] += minint[1]
+            thiscoord[2] += minint[2]
+            prevcoord[0] = thiscoord[0]
+            prevcoord[1] = thiscoord[1]
+            prevcoord[2] = thiscoord[2]
+
+            // --- Run-length flag. -----------------------------------
+            let flag = reader.readBits(1)
+            var isSmaller = 0
+            var run = 0
+            if flag == 1 {
+                run = Int(reader.readBits(5))
+                isSmaller = run % 3
+                run -= isSmaller
+                isSmaller -= 1
+            }
+
+            if run > 0 {
+                // libxdrfile pattern: the first decoded small triple
+                // becomes the *current* `thiscoord` and we swap with
+                // prevcoord so that *prevcoord* is what gets emitted
+                // first. Then thiscoord (the newly-decoded one) emits
+                // second. Subsequent iterations just append.
+                for k in stride(from: 0, to: run, by: 3) {
+                    reader.receiveInts(numInts: 3, nbits: smallidxBitsize,
+                                       sizes: sizesmall, outInts: &thiscoord)
+                    thiscoord[0] += prevcoord[0] - smallnum
+                    thiscoord[1] += prevcoord[1] - smallnum
+                    thiscoord[2] += prevcoord[2] - smallnum
+                    if k == 0 {
+                        // Swap thiscoord/prevcoord so the "old" prevcoord
+                        // (large-mode result) emits first.
+                        let t0 = thiscoord[0]; thiscoord[0] = prevcoord[0]; prevcoord[0] = t0
+                        let t1 = thiscoord[1]; thiscoord[1] = prevcoord[1]; prevcoord[1] = t1
+                        let t2 = thiscoord[2]; thiscoord[2] = prevcoord[2]; prevcoord[2] = t2
+                        if emittedCount < natoms {
+                            coordsX[emittedCount] = Float(Double(prevcoord[0]) * invPrecision * 10)
+                            coordsY[emittedCount] = Float(Double(prevcoord[1]) * invPrecision * 10)
+                            coordsZ[emittedCount] = Float(Double(prevcoord[2]) * invPrecision * 10)
+                            emittedCount += 1
+                        }
+                    } else {
+                        prevcoord[0] = thiscoord[0]
+                        prevcoord[1] = thiscoord[1]
+                        prevcoord[2] = thiscoord[2]
+                    }
+                    if emittedCount < natoms {
+                        coordsX[emittedCount] = Float(Double(thiscoord[0]) * invPrecision * 10)
+                        coordsY[emittedCount] = Float(Double(thiscoord[1]) * invPrecision * 10)
+                        coordsZ[emittedCount] = Float(Double(thiscoord[2]) * invPrecision * 10)
+                        emittedCount += 1
+                    }
+                }
+            } else {
+                if emittedCount < natoms {
+                    coordsX[emittedCount] = Float(Double(thiscoord[0]) * invPrecision * 10)
+                    coordsY[emittedCount] = Float(Double(thiscoord[1]) * invPrecision * 10)
+                    coordsZ[emittedCount] = Float(Double(thiscoord[2]) * invPrecision * 10)
+                    emittedCount += 1
+                }
+            }
+
+            // --- Adjust the small bucket for the next iteration. ----
+            smallidx += isSmaller
+            if smallidx < 0 || smallidx >= xtcMagicints.count { return nil }
+            if isSmaller < 0 {
+                smallnum = smaller
+                smaller = smallidx > FIRSTIDX ? xtcMagicints[smallidx - 1] / 2 : 0
+            } else if isSmaller > 0 {
+                smaller = smallnum
+                smallnum = xtcMagicints[smallidx] / 2
+            }
+            sizesmall = [Int](repeating: xtcMagicints[smallidx], count: 3)
+            smallidxBitsize = sizeOfInts(sizes: sizesmall)
+        }
+        offset += nbytes
+        // XDR pads `nbytes` up to a 4-byte multiple, but we don't read
+        // anything past the bitstream so the padding is irrelevant.
+    }
+
+    // Element labels: prefer sibling topology, otherwise default to "C".
+    let elements = readSiblingElements(dcdURL: xtcURL, count: natoms)
+        ?? Array(repeating: "C", count: natoms)
+    var xyz = "\(natoms)\nFirst frame from \(xtcURL.lastPathComponent) (XTC, nm→Å)\n"
+    for i in 0..<natoms {
+        xyz += "\(elements[i]) \(coordsX[i]) \(coordsY[i]) \(coordsZ[i])\n"
+    }
+    return xyz
+}
+
+// MARK: - XTC bit-size helpers (port of libxdrfile2 sizeofint / sizeofints)
+
+/// Number of bits required to represent `value` ≥ 0 as unsigned.
+/// libxdrfile2's sizeofint: `(int)ceil(log2(size))` with a small loop.
+private func sizeOfInt(_ value: Int) -> Int {
+    var num = 1
+    var nbits = 0
+    while value >= num && nbits < 32 {
+        nbits += 1
+        num <<= 1
+    }
+    return nbits
+}
+
+/// Number of bits required to pack `sizes.count` ints with the given
+/// per-component upper bounds. Port of libxdrfile2 `sizeofints`: builds
+/// the product `prod = sizes[0] * sizes[1] * ... * sizes[n-1]` as a
+/// little-endian byte array (because the product can overflow 32 bits
+/// for large structures), then returns the bit-length of that product.
+private func sizeOfInts(sizes: [Int]) -> Int {
+    var bytes = [Int](repeating: 0, count: 32)
+    var nbytes = 1
+    bytes[0] = 1
+    for i in 0..<sizes.count {
+        let s = sizes[i]
+        var tmp = 0
+        for j in 0..<nbytes {
+            tmp = bytes[j] * s + tmp
+            bytes[j] = tmp & 0xFF
+            tmp >>= 8
+        }
+        while tmp != 0 {
+            bytes[nbytes] = tmp & 0xFF
+            nbytes += 1
+            tmp >>= 8
+        }
+    }
+    // Bit length of the top byte plus 8 per lower byte.
+    var nbits = 0
+    var num = 1
+    let top = bytes[nbytes - 1]
+    while top >= num {
+        nbits += 1
+        num <<= 1
+    }
+    return nbits + (nbytes - 1) * 8
+}
+
+private func readUInt32BE(_ data: Data, offset: Int) -> UInt32 {
+    return UInt32(data[data.startIndex + offset]) << 24 |
+           UInt32(data[data.startIndex + offset + 1]) << 16 |
+           UInt32(data[data.startIndex + offset + 2]) << 8 |
+           UInt32(data[data.startIndex + offset + 3])
+}
+
+private func readFloatBE(_ data: Data, offset: inout Int) -> Float {
+    let u = readUInt32BE(data, offset: offset)
+    offset += 4
+    return Float(bitPattern: u)
 }

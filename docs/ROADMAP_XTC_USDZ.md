@@ -9,6 +9,11 @@ future contributor a concrete plan.
 
 ## 1. XTC trajectory previews
 
+✅ Shipped in v1.7.43 — `parseXTCFirstFrame` in
+`Xcode/Shared/SharedFunctions.swift` is a faithful port of libxdrfile2's
+xdr3dfcoord decompressor. Implementation notes below are kept for
+future maintenance.
+
 **Goal.** When the user spacebars a `.xtc` file in Finder, render the first
 frame as XYZ in 3Dmol — same UX as the existing DCD and TRR readers.
 
@@ -134,6 +139,11 @@ requires libxdrfile-style decompression" line.
 ---
 
 ## 2. USDZ export from the Share button
+
+✅ Shipped in v1.7.42 — `Xcode/Shared/USDZExporter.swift` builds an
+MDLAsset of CPK-coloured spheres from `Xcode/Shared/MoleculeModel.swift`
+and writes a `.usdz` alongside the PNG when the share button is
+pressed. Implementation notes below are kept for future maintenance.
 
 **Goal.** The in-preview Share button currently captures the WebGL canvas as
 PNG and hands it to `NSSharingServicePicker`. Add a parallel USDZ export so
