@@ -520,6 +520,13 @@ private func cifAtomsAsPdb(_ raw: String) -> String? {
     // lossy (we drop alt-conf, anisou, etc.) but coords + chain +
     // residue identity round-trip correctly, which is all we need
     // for the assembly expansion.
+    //
+    // (1.7.45+) Extract _cell.length_* / _cell.angle_* / space group
+    // and emit a leading CRYST1 record so 3Dmol's addUnitCell() draws
+    // the right box. Without this the bio-assembly rewrite drops cell
+    // info, and "Show unit cell" rendered a misaligned default cube.
+    let cryst1Line = extractCRYST1FromCIF(raw)
+
     guard let loopStart = raw.range(of: "_atom_site.") else { return nil }
     let preamble = raw[..<loopStart.lowerBound]
     guard let loopHeader = preamble.range(of: "loop_", options: .backwards) else { return nil }
@@ -548,6 +555,7 @@ private func cifAtomsAsPdb(_ raw: String) -> String? {
     let iResSeq   = idx("auth_seq_id") ?? idx("label_seq_id") ?? -1
     let iElement  = idx("type_symbol") ?? -1
     var out = ""
+    if let cryst = cryst1Line { out += cryst + "\n" }
     for r in rows {
         let serial = iSerial   >= 0 ? Int(r[iSerial])  ?? 0 : 0
         let atomNm = iAtomName >= 0 ? r[iAtomName].replacingOccurrences(of: "\"", with: "") : "C"
@@ -578,6 +586,59 @@ private func cifAtomsAsPdb(_ raw: String) -> String? {
     }
     return out.isEmpty ? nil : out
 }
+
+/// Scan a CIF for `_cell.length_a/b/c`, `_cell.angle_*`, and the space
+/// group, and emit a PDB-compliant CRYST1 record. Returns nil if any of
+/// the six required cell numbers is missing. mmCIF dot-style keys
+/// (`_cell.length_a`) and legacy underscore style (`_cell_length_a`)
+/// are both accepted.
+private func extractCRYST1FromCIF(_ raw: String) -> String? {
+    func scan(_ keys: [String]) -> String? {
+        for line in raw.split(separator: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            for k in keys where t.hasPrefix(k) {
+                // Strip the key, take the first non-whitespace token.
+                let rest = String(t.dropFirst(k.count)).trimmingCharacters(in: .whitespaces)
+                guard !rest.isEmpty else { continue }
+                let tok = rest.split(whereSeparator: { $0.isWhitespace }).first.map(String.init) ?? rest
+                // Strip CIF uncertainty parentheses, e.g. "45.123(2)"
+                let bare = tok.split(separator: "(").first.map(String.init) ?? tok
+                return bare.replacingOccurrences(of: "'", with: "")
+                           .replacingOccurrences(of: "\"", with: "")
+            }
+        }
+        return nil
+    }
+    func scanDouble(_ keys: [String]) -> Double? { scan(keys).flatMap(Double.init) }
+    guard
+        let a     = scanDouble(["_cell.length_a",     "_cell_length_a"]),
+        let b     = scanDouble(["_cell.length_b",     "_cell_length_b"]),
+        let c     = scanDouble(["_cell.length_c",     "_cell_length_c"]),
+        let alpha = scanDouble(["_cell.angle_alpha",  "_cell_angle_alpha"]),
+        let beta  = scanDouble(["_cell.angle_beta",   "_cell_angle_beta"]),
+        let gamma = scanDouble(["_cell.angle_gamma",  "_cell_angle_gamma"])
+    else { return nil }
+    let spaceGroup = scan([
+        "_symmetry.space_group_name_H-M",
+        "_symmetry_space_group_name_H-M",
+        "_space_group.name_H-M_alt",
+        "_space_group_name_H-M_alt"
+    ]) ?? "P 1"
+    // PDB CRYST1 fixed-column format:
+    //   1- 6  "CRYST1"
+    //   7-15  a (9.3f)
+    //  16-24  b (9.3f)
+    //  25-33  c (9.3f)
+    //  34-40  alpha (7.2f)
+    //  41-47  beta  (7.2f)
+    //  48-54  gamma (7.2f)
+    //  56-66  space group (left-padded to 11 chars)
+    //  67-70  Z value (integer; default 1)
+    let sg = String(spaceGroup.prefix(11)).padding(toLength: 11, withPad: " ", startingAt: 0)
+    return String(format: "CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f %@%4d",
+                  a, b, c, alpha, beta, gamma, sg, 1)
+}
+
 //
 // Gaussian (.gjf input / .log + .out output), ORCA (.out), and
 // QChem (.out) produce well-defined Cartesian coordinate blocks

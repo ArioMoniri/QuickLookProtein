@@ -65,6 +65,8 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling {
 
         let items = (context.inputItems as? [NSExtensionItem]) ?? []
         var rendered = 0
+        var selectedURLs: [URL] = []
+        let urlsLock = NSLock()
         let group = DispatchGroup()
 
         for item in items {
@@ -84,6 +86,9 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling {
                     else if let d = item as? Data, let parsed = URL(dataRepresentation: d, relativeTo: nil) { url = parsed }
                     else { url = nil }
                     guard let fileURL = url else { return }
+                    urlsLock.lock()
+                    selectedURLs.append(fileURL)
+                    urlsLock.unlock()
                     if Self.renderSideCarPNG(for: fileURL) {
                         rendered += 1
                     }
@@ -95,9 +100,78 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling {
         // the extension request. macOS spins our process down the
         // instant we complete, so any in-flight loads would be lost.
         group.wait()
+
+        // (1.7.45+) Multi-file merge for spacebar's sandbox limit: when
+        // the user selects 2+ compatible molecule files and runs the
+        // Quick Action, also emit a `merged.pdb` next to the first file
+        // that concatenates each as its own MODEL. Spacebar-previewing
+        // the merged file shows them stacked in one scene — which is
+        // what Quick Look's "Merge all in same folder" mode tries to
+        // do but can't because of the per-file sandbox grant.
+        if selectedURLs.count >= 2 {
+            if Self.writeMergedPDB(from: selectedURLs) {
+                os_log("Wrote merged.pdb from %d files",
+                       log: actionLog, type: .info, selectedURLs.count)
+            }
+        }
+
         os_log("Quick Action rendered %d/%d files",
                log: actionLog, type: .info, rendered, items.count)
         context.completeRequest(returningItems: context.inputItems, completionHandler: nil)
+    }
+
+    /// Concatenate the selected files as a multi-MODEL PDB written next
+    /// to the first file as `<firstBase>-merged.pdb`. Skips files we
+    /// can't parse into atoms; writes nothing if fewer than 2 produce
+    /// usable atoms.
+    private static func writeMergedPDB(from urls: [URL]) -> Bool {
+        var models: [(name: String, atoms: [Atom])] = []
+        for u in urls {
+            let ext = u.pathExtension.lowercased()
+            guard acceptedExtensions.contains(ext),
+                  let atoms = parseAtoms(at: u, ext: ext),
+                  !atoms.isEmpty
+            else { continue }
+            models.append((u.deletingPathExtension().lastPathComponent, atoms))
+        }
+        guard models.count >= 2, let first = urls.first else { return false }
+
+        var text = "REMARK   QuickLookProtein merged Quick Action — \(models.count) models\n"
+        var modelIdx = 1
+        for m in models {
+            text += "MODEL     \(modelIdx)\n"
+            text += "REMARK   model name: \(m.name)\n"
+            var serial = 1
+            for atom in m.atoms {
+                // PDB ATOM line: 30-37 / 38-45 / 46-53 = 8.3f x,y,z
+                let elemPad = String(atom.element.prefix(2)).padding(toLength: 2, withPad: " ", startingAt: 0)
+                let line = String(format:
+                    "ATOM  %5d  %-3s %-3s A%4d    %8.3f%8.3f%8.3f  1.00  0.00          %@",
+                    serial,
+                    (atom.name.isEmpty ? atom.element : String(atom.name.prefix(3))) as CVarArg,
+                    "MOL" as CVarArg,
+                    modelIdx,
+                    atom.x, atom.y, atom.z,
+                    elemPad)
+                text += line + "\n"
+                serial += 1
+            }
+            text += "ENDMDL\n"
+            modelIdx += 1
+        }
+        text += "END\n"
+
+        let outURL = first.deletingPathExtension()
+            .deletingLastPathComponent()
+            .appendingPathComponent("\(first.deletingPathExtension().lastPathComponent)-merged.pdb")
+        do {
+            try text.write(to: outURL, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            os_log("merged.pdb write failed: %{public}@",
+                   log: actionLog, type: .error, error.localizedDescription)
+            return false
+        }
     }
 
     /// Render a single source file to `<source>-render.png` next to

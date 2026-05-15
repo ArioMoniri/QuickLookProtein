@@ -219,6 +219,13 @@ struct ContentView: View {
                                     Text($0.rawValue).tag($0)
                                 }
                             }
+                            .help("""
+                            Quick Look's sandbox hands the preview extension one file at a time, so spacebar-multi-select rarely triggers a merge. For a guaranteed merge:
+
+                            1. Select two or more compatible files in Finder.
+                            2. Right-click → Quick Actions → Render molecule to PNG.
+                            3. Open <name>-merged.pdb next to them via spacebar.
+                            """)
                         }
                         .frame(maxWidth: 340)
                     }

@@ -67,16 +67,37 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
         super.init()
         // Only spin up Sparkle when we have a real public key to verify
         // signatures against. Otherwise Sparkle errors on every launch.
-        if self.sparkleIsConfigured {
-            // `startingUpdater: true` means Sparkle starts its scheduled-
-            // check timer immediately; the SUEnableAutomaticChecks /
-            // SUScheduledCheckInterval Info.plist keys control its
-            // cadence.
-            self.controller = SPUStandardUpdaterController(
-                startingUpdater: true,
-                updaterDelegate: self,
-                userDriverDelegate: nil
-            )
+        guard self.sparkleIsConfigured else { return }
+
+        // CRITICAL: pass startingUpdater:false. The `true` variant calls
+        // SPUUpdater.startUpdater() synchronously inside init and routes
+        // any thrown error to SPUStandardUserDriver, which presents the
+        // stock "Updater failed to start. Please verify you have the
+        // latest version…" modal BEFORE our app's UI is even on screen
+        // (1.7.45+ fix for the persistent user complaint where the alert
+        // appeared on every launch of correctly-installed builds with
+        // valid Sparkle configuration).
+        //
+        // Instead we construct the controller without auto-starting,
+        // then call startUpdater(_:) ourselves below, capturing any
+        // error into lastCheckStatus so the About panel shows what
+        // failed without blocking the user with a modal.
+        let ctl = SPUStandardUpdaterController(
+            startingUpdater: false,
+            updaterDelegate: self,
+            userDriverDelegate: nil
+        )
+        do {
+            try ctl.updater.start()
+            self.controller = ctl
+            self.lastCheckStatus = "Auto-updates enabled."
+        } catch {
+            // Sparkle's start() throws for malformed SUPublicEDKey, bad
+            // feed URL, XPC handshake failure, etc. Don't show a modal —
+            // log to the About panel, and fall back to the manual-update
+            // path (which opens the GitHub Releases page in the browser).
+            self.controller = nil
+            self.lastCheckStatus = "Sparkle: \(error.localizedDescription) (manual updates only)"
         }
     }
 
@@ -97,6 +118,16 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
               !key.isEmpty,
               !key.hasPrefix("REPLACE_WITH_"),
               key != Self.zeroEdDSAPlaceholder else {
+            return false
+        }
+        // A valid Ed25519 public key in base64 is exactly 44 chars: 32 raw
+        // bytes → 43 base64 chars + 1 padding "=". Anything else gets
+        // rejected here rather than during SPUUpdater.start() (which would
+        // throw a less-helpful error). Common cause of the wrong length:
+        // a copy-paste that drops the trailing "=", or accidentally
+        // includes the surrounding `<string>...</string>` tag from the
+        // generate-sparkle-keys.sh output.
+        guard key.count == 44, key.hasSuffix("=") else {
             return false
         }
         return true
