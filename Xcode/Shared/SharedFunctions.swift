@@ -187,11 +187,13 @@ internal func convertCCP4ToCube(_ data: Data) -> String? {
     guard data.count >= needed else { return nil }
     var values = [Float](repeating: 0, count: totalVoxels)
     // withUnsafeMutableBufferPointer is generic over the closure's return
-    // type — we don't need the (Void) result, so explicitly discard it to
-    // silence "Result of call to '…' is unused".
-    _ = values.withUnsafeMutableBufferPointer { buf in
-        data.copyBytes(to: UnsafeMutableRawBufferPointer(buf),
-                       from: payloadOffset..<needed)
+    // type; Data.copyBytes(to:from:) returns Int (the bytes-copied count).
+    // Make the closure explicitly return Void so the outer call also returns
+    // Void and there's no "Result of call to '…' is unused" diagnostic
+    // regardless of Xcode's analyzer cache.
+    values.withUnsafeMutableBufferPointer { (buf: inout UnsafeMutableBufferPointer<Float>) -> Void in
+        let raw = UnsafeMutableRawBufferPointer(buf)
+        _ = data.copyBytes(to: raw, from: payloadOffset..<needed)
     }
     if endian == .big {
         for i in 0..<totalVoxels {
