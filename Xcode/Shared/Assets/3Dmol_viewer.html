@@ -226,7 +226,25 @@
                         addOpts.assignBonds = true;
                     }
                     try {
-                        viewer.addModel(data, format, addOpts);
+                        if (format === 'mmtf') {
+                            // MMTF binary bridge (1.7.57+). The Swift side
+                            // base64-encodes the raw MessagePack bytes into
+                            // #mol-data instead of pasting the byte string
+                            // directly (which gets mangled by UTF-8). Decode
+                            // back to Uint8Array, then hand to 3Dmol's MMTF
+                            // parser as a binary array.
+                            var raw = data;
+                            // tolerate accidental whitespace in the base64
+                            raw = raw.replace(/\s+/g, '');
+                            var bin = atob(raw);
+                            var arr = new Uint8Array(bin.length);
+                            for (var i = 0; i < bin.length; i++) {
+                                arr[i] = bin.charCodeAt(i);
+                            }
+                            viewer.addModel(arr, 'mmtf', addOpts);
+                        } else {
+                            viewer.addModel(data, format, addOpts);
+                        }
                     } catch (parseErr) {
                         return showError('Could not parse ' + format.toUpperCase(),
                                          parseErr && parseErr.message ? parseErr.message : String(parseErr));

@@ -907,9 +907,23 @@ func prepare3DmolHTML(htmlPath: String,
     let isCryoEM = (lowerExt == "ccp4" || lowerExt == "mrc" || lowerExt == "map")
                    && options.cryoEMRender
     let isTrajectory = (lowerExt == "dcd" || lowerExt == "xtc" || lowerExt == "trr")
+    let isMMTF = (lowerExt == "mmtf")
 
     let rawOriginal: String
-    if isCryoEM, let binary = try? Data(contentsOf: URL(fileURLWithPath: pdbPath)),
+    if isMMTF {
+        // MMTF is binary MessagePack — can't survive String(contentsOf:)
+        // text loading. Read the raw bytes and base64-encode them so the
+        // payload fits cleanly into the existing <script type="text/plain">
+        // injection point. base64 contains no '<' so sanitizeForScriptBlock
+        // and the comp-chem / bio-assembly pre-passes all no-op on it. The
+        // JS side detects format==='mmtf' and runs atob → Uint8Array →
+        // addModel, see Xcode/Shared/Assets/3Dmol_viewer.html.
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: pdbPath)) else {
+            return errorHTML(title: "Could not read MMTF file",
+                             detail: "The file is missing or unreadable.")
+        }
+        rawOriginal = data.base64EncodedString()
+    } else if isCryoEM, let binary = try? Data(contentsOf: URL(fileURLWithPath: pdbPath)),
        let cube = convertCCP4ToCube(binary) {
         rawOriginal = cube
     } else if isTrajectory {

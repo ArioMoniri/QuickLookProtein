@@ -384,21 +384,33 @@ struct ContentView: View {
             VisualEffectView(material: .underWindowBackground,
                              blending: .behindWindow)
                 .edgesIgnoringSafeArea(.all)
+            // Stronger radial bleeds in the AppIcon's gradient palette.
+            // These layers sit BENEATH every panel and the sidebar; the
+            // sidebar drops its own visual-effect view so these gradients
+            // show through directly, giving the requested liquid-glass
+            // feel where the wallpaper colour is the wash.
             ZStack {
                 RadialGradient(
                     gradient: Gradient(colors: [
-                        Color(red: 0.76, green: 0.10, blue: 0.36).opacity(0.22),
+                        Color(red: 0.76, green: 0.10, blue: 0.36).opacity(0.42),
                         Color.clear
                     ]),
-                    center: UnitPoint(x: 0.15, y: 0.05),
-                    startRadius: 50, endRadius: 520)
+                    center: UnitPoint(x: 0.10, y: 0.0),
+                    startRadius: 30, endRadius: 620)
                 RadialGradient(
                     gradient: Gradient(colors: [
-                        Color(red: 0.40, green: 0.55, blue: 0.95).opacity(0.18),
+                        Color(red: 0.48, green: 0.12, blue: 0.64).opacity(0.30),
                         Color.clear
                     ]),
-                    center: UnitPoint(x: 0.85, y: 1.0),
-                    startRadius: 50, endRadius: 480)
+                    center: UnitPoint(x: 0.05, y: 0.55),
+                    startRadius: 20, endRadius: 420)
+                RadialGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 0.40, green: 0.55, blue: 0.95).opacity(0.34),
+                        Color.clear
+                    ]),
+                    center: UnitPoint(x: 0.92, y: 1.0),
+                    startRadius: 30, endRadius: 560)
             }
             .edgesIgnoringSafeArea(.all)
             .allowsHitTesting(false)
@@ -428,21 +440,21 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebar: some View {
+        // The previous .hudWindow + .withinWindow visual-effect view
+        // still clamped saturation hard and rendered gray on Sequoia.
+        // Drop the NSVisualEffectView entirely and let the sidebar be
+        // a transparent SwiftUI layer — the magenta+blue radial
+        // gradients painted on the window backdrop now show through
+        // directly. A faint white wash on top keeps the section labels
+        // legible without re-introducing the grey opaque tile.
         ZStack {
-            // True liquid-glass sidebar. Two blending tricks:
-            //
-            //   1. `.withinWindow` blending makes the visual-effect view
-            //      sample the views BEHIND it in the same window — i.e.
-            //      the magenta+blue radial gradients painted on the
-            //      window's backdrop. `.behindWindow` would sample the
-            //      desktop instead and render flat gray, which is what
-            //      the v1.7.55 user feedback called out.
-            //
-            //   2. `.hudWindow` material has a noticeable saturation
-            //      curve that amplifies the colored gradient bleeding
-            //      through, where `.sidebar` clamps everything toward
-            //      neutral and never shows the magenta hue.
-            VisualEffectView(material: .hudWindow, blending: .withinWindow)
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.white.opacity(0.32),
+                    Color.white.opacity(0.18)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing)
                 .edgesIgnoringSafeArea(.vertical)
             sidebarContent
         }
@@ -1965,14 +1977,10 @@ struct ContentView: View {
         case "pqr":    resource = ("methane",  "pqr")
         case "vasp":   resource = ("diamond",  "vasp")
         case "cdjson": resource = ("methane",  "cdjson")
-        // MMTF is a binary MessagePack format. prepare3DmolHTML reads the
-        // file as UTF-8 text and injects it into a <script type="text/plain">
-        // block, which mangles the bytes — 3Dmol then errors with "Could
-        // not parse MMTF / The string contains invalid characters". Until
-        // we wire a base64+atob bridge for binary formats, the format-card
-        // preview falls back to the schematic placeholder for MMTF (the
-        // QL extension proper has the same limitation for now).
-        case "mmtf":   resource = nil
+        // MMTF goes through prepare3DmolHTML's binary-base64 branch
+        // (added in v1.7.57) — bytes are read as Data, base64-encoded,
+        // and the viewer's JS layer does atob → Uint8Array → addModel.
+        case "mmtf":   resource = ("methane",  "mmtf")
         default:       resource = nil
         }
         guard let r = resource,
