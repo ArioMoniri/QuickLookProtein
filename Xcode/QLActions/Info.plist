@@ -38,18 +38,50 @@
 					<key>NSMenuItem</key>
 					<dict>
 						<key>default</key>
-						<string>Render Molecule to PNG</string>
+						<string>Render Molecule to PNG (and merge if multi-selected)</string>
 					</dict>
 					<key>NSMessage</key>
 					<string>renderToPNG</string>
 					<key>NSPortName</key>
 					<string>com.ariomoniri.QuickLookProtein.QLActions</string>
+					<!--
+					  NSServiceCategory = "QuickAction" promotes the
+					  service into Finder's "Quick Actions" submenu in
+					  addition to (or instead of) the deeply-nested
+					  "Services" submenu. Vastly more discoverable.
+					-->
+					<key>NSServiceCategory</key>
+					<string>QuickAction</string>
 					<key>NSRequiredContext</key>
 					<dict/>
 					<key>NSSendTypes</key>
 					<array>
 						<string>NSFilenamesPboardType</string>
 						<string>public.file-url</string>
+					</array>
+					<!--
+					  NSSendFileTypes lists the UTIs we actually want to
+					  receive. Without this filter macOS shows the action
+					  for *every* selected file (jpegs, plain text, …)
+					  which is noisy. Listing molecule UTIs makes the
+					  action only appear when the user has at least one
+					  molecule file selected.
+					-->
+					<key>NSSendFileTypes</key>
+					<array>
+						<string>com.ariomoniri.QuickLookProtein.pdb</string>
+						<string>com.ariomoniri.QuickLookProtein.cif</string>
+						<string>com.ariomoniri.QuickLookProtein.mmcif</string>
+						<string>com.ariomoniri.QuickLookProtein.sdf</string>
+						<string>com.ariomoniri.QuickLookProtein.mol</string>
+						<string>com.ariomoniri.QuickLookProtein.mol2</string>
+						<string>com.ariomoniri.QuickLookProtein.xyz</string>
+						<string>com.ariomoniri.QuickLookProtein.gro</string>
+						<string>com.ariomoniri.QuickLookProtein.cube</string>
+						<string>com.ariomoniri.QuickLookProtein.pqr</string>
+						<string>com.ariomoniri.QuickLookProtein.vasp</string>
+						<string>com.ariomoniri.QuickLookProtein.cdjson</string>
+						<string>com.ariomoniri.QuickLookProtein.mmtf</string>
 					</array>
 				</dict>
 			</array>
