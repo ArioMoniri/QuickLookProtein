@@ -175,8 +175,15 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
     /// still light up the fallback path. When a real key is present we let
     /// Sparkle take over.
     private var sparkleIsConfigured: Bool {
-        guard let key = Bundle.main.infoDictionary?["SUPublicEDKey"] as? String,
-              !key.isEmpty,
+        guard let rawKey = Bundle.main.infoDictionary?["SUPublicEDKey"] as? String else {
+            return false
+        }
+        // Trim accidental whitespace/newlines that CI secret-injection
+        // sometimes leaves on the value (we've seen trailing \n on a
+        // few configurations). Without trimming, key.count == 44 fails
+        // even though the actual bytes are correct.
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty,
               !key.hasPrefix("REPLACE_WITH_"),
               key != Self.zeroEdDSAPlaceholder else {
             return false
@@ -184,10 +191,7 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
         // A valid Ed25519 public key in base64 is exactly 44 chars: 32 raw
         // bytes → 43 base64 chars + 1 padding "=". Anything else gets
         // rejected here rather than during SPUUpdater.start() (which would
-        // throw a less-helpful error). Common cause of the wrong length:
-        // a copy-paste that drops the trailing "=", or accidentally
-        // includes the surrounding `<string>...</string>` tag from the
-        // generate-sparkle-keys.sh output.
+        // throw a less-helpful error).
         guard key.count == 44, key.hasSuffix("=") else {
             return false
         }

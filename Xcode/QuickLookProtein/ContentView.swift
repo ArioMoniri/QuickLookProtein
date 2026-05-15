@@ -414,26 +414,37 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebarContent: some View {
+        // Built with ScrollView + VStack instead of List so its background
+        // takes on the same windowBackgroundColor as the detail pane
+        // (List's sidebar style paints a slightly darker grey panel that
+        // can't be overridden at macOS 11 without scrollContentBackground,
+        // which is 13+).
         VStack(spacing: 0) {
-            List {
-                // Ungrouped row at the top (General).
-                ForEach(SettingsSection.allCases.filter { $0.category == nil }) { section in
-                    sidebarRow(section)
-                }
-                // Grouped rows under category headers — matches the
-                // DockDoor design: Features / Customization / System.
-                ForEach(["Features", "Customization", "System"], id: \.self) { cat in
-                    Section(header: Text(cat)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.secondary)
-                                .padding(.top, 4)) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Ungrouped rows at the top (General).
+                    ForEach(SettingsSection.allCases.filter { $0.category == nil }) { section in
+                        sidebarRow(section)
+                    }
+                    // Grouped rows under category headers — matches the
+                    // DockDoor design: Features / Customization / System.
+                    ForEach(["Features", "Customization", "System"], id: \.self) { cat in
+                        Text(cat)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.top, 12)
+                            .padding(.bottom, 4)
                         ForEach(SettingsSection.allCases.filter { $0.category == cat }) { section in
                             sidebarRow(section)
                         }
                     }
                 }
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .listStyle(SidebarListStyle())
 
             Divider()
             HStack(spacing: 8) {
@@ -450,6 +461,9 @@ struct ContentView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
         }
+        // Match the right panel's background exactly so the sidebar
+        // doesn't read as a separate grey tile.
+        .background(Color(NSColor.windowBackgroundColor))
     }
 
     /// One sidebar row — plain SF Symbol + label. Selected row gets the
