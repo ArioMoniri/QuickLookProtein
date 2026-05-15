@@ -21,10 +21,60 @@ private let supportedExtensions: Set<String> = [
 /// long enough to feel like a hang.
 private let maxDropBytes: Int = 25 * 1024 * 1024
 
+/// Sidebar sections — matches the macOS System Settings layout introduced
+/// in v1.7.47. Order is the same as the design's chat-iterated sidebar:
+/// General → Formats → Appearance → Rendering → Toolbar → Info → Multi
+/// → Updates → About.
+enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
+    case general    = "General"
+    case formats    = "File Formats"
+    case appearance = "Appearance"
+    case rendering  = "Rendering"
+    case toolbar    = "Toolbar"
+    case info       = "Info Overlay"
+    case multi      = "Multi-file"
+    case updates    = "Software Update"
+    case about      = "About"
+
+    var id: String { rawValue }
+
+    /// SF Symbol used in the sidebar — picked to be reasonably faithful to
+    /// the design's filled-glyph icons while staying within the system set.
+    var symbol: String {
+        switch self {
+        case .general:    return "gearshape.fill"
+        case .formats:    return "doc.on.doc.fill"
+        case .appearance: return "paintbrush.fill"
+        case .rendering:  return "cube.transparent.fill"
+        case .toolbar:    return "square.grid.2x2.fill"
+        case .info:       return "info.bubble.fill"
+        case .multi:      return "square.grid.3x2.fill"
+        case .updates:    return "arrow.triangle.2.circlepath"
+        case .about:      return "atom"
+        }
+    }
+
+    /// Tint per section — used on the icon tile and the panel header.
+    var tint: Color {
+        switch self {
+        case .general:    return Color(red: 0.36, green: 0.43, blue: 0.54)
+        case .formats:    return Color(red: 0.85, green: 0.47, blue: 0.34)
+        case .appearance: return Color(red: 0.64, green: 0.35, blue: 0.85)
+        case .rendering:  return Color(red: 0.16, green: 0.55, blue: 0.33)
+        case .toolbar:    return Color(red: 0.23, green: 0.51, blue: 0.90)
+        case .info:       return Color(red: 0.04, green: 0.52, blue: 1.00)
+        case .multi:      return Color(red: 0.48, green: 0.36, blue: 0.90)
+        case .updates:    return Color(red: 0.04, green: 0.52, blue: 1.00)
+        case .about:      return Color(red: 0.43, green: 0.47, blue: 0.52)
+        }
+    }
+}
+
 struct ContentView: View {
 
     @StateObject private var userSettings = SettingsStorage()
     @ObservedObject private var updater = Updater.shared
+    @State private var selection: SettingsSection = .general
     /// File the user has dragged into the "Custom" tile.
     @State private var droppedFile: URL? = nil
     @State private var droppedFileError: String? = nil
@@ -35,273 +85,410 @@ struct ContentView: View {
     @State private var troubleshootingExpanded: Bool = false
 
     var body: some View {
-        let htmlPath = Bundle.main.path(forResource: "3Dmol_viewer", ofType: "html")!
-        let pdbPath  = Bundle.main.path(forResource: "6oc6",          ofType: "pdb")!
-        let cifPath  = Bundle.main.path(forResource: "1565673",       ofType: "cif")!
-        let sdfPath  = Bundle.main.path(forResource: "PQQ",           ofType: "sdf")!
-        let molPath  = Bundle.main.path(forResource: "methane",       ofType: "mol")!
-        let mol2Path = Bundle.main.path(forResource: "caffeine",      ofType: "mol2")!
-        let xyzPath  = Bundle.main.path(forResource: "benzene",       ofType: "xyz")!
-        let groPath  = Bundle.main.path(forResource: "water",         ofType: "gro")!
-        let cubePath = Bundle.main.path(forResource: "water",         ofType: "cube")!
-        let pqrPath    = Bundle.main.path(forResource: "methane",     ofType: "pqr")!
-        let vaspPath   = Bundle.main.path(forResource: "diamond",     ofType: "vasp")!
-        // CDJSON intentionally has no demo tile: 3Dmol's bundled cdjson
-        // parser produces atoms but no usable bond data even on textbook
-        // ChemDoodle JSON input, so the tile would always render blank.
-        // The format is still registered (UTI, Settings Picker, file-drop
-        // support) so users with .cdjson files that DO render can use them.
-
-        let baseUrl = URL(fileURLWithPath: htmlPath)
-
-        let htmlPDB    = previewHTML(htmlPath: htmlPath, filePath: pdbPath,    ext: "pdb")
-        let htmlCIF    = previewHTML(htmlPath: htmlPath, filePath: cifPath,    ext: "cif")
-        let htmlSDF    = previewHTML(htmlPath: htmlPath, filePath: sdfPath,    ext: "sdf")
-        let htmlMOL    = previewHTML(htmlPath: htmlPath, filePath: molPath,    ext: "mol")
-        let htmlMOL2   = previewHTML(htmlPath: htmlPath, filePath: mol2Path,   ext: "mol2")
-        let htmlXYZ    = previewHTML(htmlPath: htmlPath, filePath: xyzPath,    ext: "xyz")
-        let htmlGRO    = previewHTML(htmlPath: htmlPath, filePath: groPath,    ext: "gro")
-        let htmlCUBE   = previewHTML(htmlPath: htmlPath, filePath: cubePath,   ext: "cube")
-        let htmlPQR    = previewHTML(htmlPath: htmlPath, filePath: pqrPath,    ext: "pqr")
-        let htmlVASP   = previewHTML(htmlPath: htmlPath, filePath: vaspPath,   ext: "vasp")
-
-        // Single scrollable page — settings + about at the top, previews below.
-        // No fixed split, no clamped scroll region. The whole thing scrolls if
-        // the window gets too short for everything; otherwise it just lays out
-        // naturally and the previews grow with the available width.
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(alignment: .leading, spacing: 16) {
-
-                HStack(alignment: .top, spacing: 24) {
-
-                    // MARK: Settings — every format in one list, every menu row
-                    //                 is fully clickable (label included).
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Settings").font(.title)
-
-                        Text("Atom display style").font(.headline)
-                        // Standard Form-wrapped Pickers: the entire row including
-                        // the "PDB:" label is the popup button's hit area on macOS,
-                        // so clicking the label opens the dropdown. The fancy
-                        // custom Menu styling we tried earlier collapsed to a
-                        // tiny chevron because .menuStyle stripped the default
-                        // popup-button frame — use the standard control instead.
-                        Form {
-                            Picker("PDB:",    selection: $userSettings.atomStylePDB)    { atomStyleOptions }
-                            Picker("CIF:",    selection: $userSettings.atomStyleCIF)    { atomStyleOptions }
-                            Picker("SDF:",    selection: $userSettings.atomStyleSDF)    { atomStyleOptions }
-                            Picker("MOL:",    selection: $userSettings.atomStyleMOL)    { atomStyleOptions }
-                            Picker("MOL2:",   selection: $userSettings.atomStyleMOL2)   { atomStyleOptions }
-                            Picker("XYZ:",    selection: $userSettings.atomStyleXYZ)    { atomStyleOptions }
-                            Picker("GRO:",    selection: $userSettings.atomStyleGRO)    { atomStyleOptions }
-                            Picker("CUBE:",   selection: $userSettings.atomStyleCUBE)   { atomStyleOptions }
-                            Picker("PQR:",    selection: $userSettings.atomStylePQR)    { atomStyleOptions }
-                            Picker("VASP:",   selection: $userSettings.atomStyleVASP)   { atomStyleOptions }
-                            Picker("CDJSON:", selection: $userSettings.atomStyleCDJSON) { atomStyleOptions }
-                            Picker("MMTF:",   selection: $userSettings.atomStyleMMTF)   { atomStyleOptions }
-                        }
-                        .frame(maxWidth: 340)
-
-                        Text("Appearance").font(.headline).padding(.top, 6)
-                        Form {
-                            Picker("Color scheme:", selection: $userSettings.colorScheme) {
-                                ForEach(Settings.ColorScheme.allCases) { Text($0.rawValue).tag($0) }
-                            }
-                            Picker("Rotation:", selection: $userSettings.rotationSpeed) {
-                                ForEach(Settings.RotationSpeed.allCases) { Text($0.rawValue).tag($0) }
-                            }
-                            Picker("Default zoom:", selection: $userSettings.defaultZoom) {
-                                ForEach(Settings.DefaultZoom.allCases) { Text($0.rawValue).tag($0) }
-                            }
-                            .help("Applied to every preview after 3Dmol's auto-fit. Also affects the Quick Look extension.")
-                            HStack {
-                                ColorPicker("Background:", selection: $userSettings.bgColor, supportsOpacity: true)
-                                    .help("#" + convertColorToRGB(color: userSettings.bgColor).rgbHex
-                                          + ", alpha: " + convertColorToRGB(color: userSettings.bgColor).alpha)
-                                Button("Transparent", action: resetColor)
-                            }
-                        }
-                        .frame(maxWidth: 340)
-
-                        Text("Rendering options").font(.headline).padding(.top, 6)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Toggle("Smart protein + ligand styling", isOn: $userSettings.autoStyleHetero)
-                                .help("When a file contains both a protein and a ligand, render the protein with the chosen style and ligands as sticks.")
-                            Toggle("Show molecular surface",          isOn: $userSettings.showSurface)
-                            Toggle("Hide hydrogens",                  isOn: $userSettings.hideHydrogens)
-                            Toggle("Show unit cell (CIF)",            isOn: $userSettings.showUnitCell)
-                            Toggle("Show info overlay",               isOn: $userSettings.showInfoOverlay)
-                            Toggle("Show interactive controls",       isOn: $userSettings.showControlsInPreview)
-                                .help("Adds a small bottom-right toolbar in every Quick Look preview with one-click buttons for Stick / Line / Sphere / Cartoon style, Surface, Color SS, Label αC, and Recenter.")
-                            Toggle("Outline shading",                 isOn: $userSettings.outlineShading)
-                                .help("Adds a thin dark border around every atom/bond. Makes the preview pop on light backgrounds.")
-                            Toggle("Ambient occlusion",               isOn: $userSettings.ambientOcclusion)
-                                .help("CSS vignette over the WebGL canvas that deepens edges, giving a low-cost pseudo-AO effect. Auto-disabled for stick/line previews of small molecules so atoms don't get washed out.")
-                            Toggle("Auto-orient (longest axis horizontal)", isOn: $userSettings.autoOrient)
-                                .help("Rotate the molecule so its longest principal axis is horizontal. Useful for screenshots; gives every preview a deterministic canonical pose.")
-                            Toggle("Cube isosurface",                 isOn: $userSettings.cubeIsosurface)
-                                .help("Render Gaussian Cube files as ±isovalue isosurfaces (blue/red) instead of bare atoms. Useful for orbital / electron-density plots.")
-                            Toggle("Biological assembly",             isOn: $userSettings.bioAssembly)
-                                .help("Expand PDB / CIF files into their full biological assembly using REMARK 350 (PDB) or _pdbx_struct_oper_list (CIF) transformations. Off: show only the asymmetric unit.")
-                            Toggle("Cryo-EM density isosurface",      isOn: $userSettings.cryoEMRender)
-                                .help("Render .ccp4 / .mrc / .map files as a volumetric isosurface. Off: those files fall back to the host's text viewer.")
-                            Toggle("Share button in preview",         isOn: $userSettings.showShareButton)
-                                .help("Adds a Share button to the in-preview toolbar that captures the current rendering as PNG and presents the system Sharing picker.")
-                            Toggle("Include USDZ in share (AR Quick Look)", isOn: $userSettings.includeUSDZInShare)
-                                .help("When sharing, also write a .usdz of the molecule so AirDropping to an iPhone/iPad opens it in AR Quick Look. Skipped automatically for structures larger than 20,000 atoms.")
-                            Toggle("Animated thumbnails (experimental)", isOn: $userSettings.animatedThumbnails)
-                                .help("Encode Finder thumbnails as 12-frame spinning APNGs (≥128 px only). Renders ~12x slower per thumbnail. macOS Finder displays the first frame statically — visible animation requires third-party viewers that honour APNG.")
-                            Picker("Thumbnail style", selection: $userSettings.thumbnailStyle) {
-                                ForEach(Settings.ThumbnailStyle.allCases) { style in
-                                    Text(style.rawValue).tag(style)
-                                }
-                            }
-                            .help("Pin the Finder thumbnail render style. Auto picks ribbon for proteins (≥25 Cα) and CPK spheres for everything else.")
-                        }
-
-                        // Per-button toolbar visibility - gated on the master
-                        // "Show interactive controls" toggle above. When that
-                        // toggle is off, the whole bar is hidden so flipping
-                        // these has no immediate effect; we still keep the UI
-                        // alive so users can pre-configure their selection.
-                        Text("Toolbar buttons").font(.headline).padding(.top, 8)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Toggle("Stick",     isOn: $userSettings.ctlShowStick)
-                            Toggle("Line",      isOn: $userSettings.ctlShowLine)
-                            Toggle("Sphere",    isOn: $userSettings.ctlShowSphere)
-                            Toggle("Cartoon",   isOn: $userSettings.ctlShowCartoon)
-                            Toggle("Surface",   isOn: $userSettings.ctlShowSurface)
-                            Toggle("Color SS",  isOn: $userSettings.ctlShowColorSS)
-                            Toggle("Label αC",  isOn: $userSettings.ctlShowLabelCA)
-                            Toggle("Recenter",  isOn: $userSettings.ctlShowRecenter)
-                            Toggle("Spin (auto-rotation toggle)", isOn: $userSettings.ctlShowRotation)
-                                .help("Adds a Spin button to the in-preview toolbar that toggles auto-rotation on/off, using the global Rotation setting as the rate.")
-                        }
-                        .disabled(!userSettings.showControlsInPreview)
-                        .opacity(userSettings.showControlsInPreview ? 1 : 0.4)
-
-                        // MARK: Info-overlay fields - which bits of info appear
-                        //       in the info pill at the top-left of every
-                        //       preview. Gated on the master "Show info
-                        //       overlay" toggle above so users can hide the
-                        //       whole strip without re-checking each field.
-                        Text("Info overlay fields").font(.headline).padding(.top, 8)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Toggle("File name",          isOn: $userSettings.infoShowFileName)
-                            Toggle("Atom count",         isOn: $userSettings.infoShowAtomCount)
-                            Toggle("Chain count",        isOn: $userSettings.infoShowChainCount)
-                            Toggle("Residue count",      isOn: $userSettings.infoShowResidueCount)
-                            Toggle("Element breakdown",  isOn: $userSettings.infoShowElementBreakdown)
-                                .help("Top four most abundant elements with counts, e.g. \"C:120 N:36 O:30 H:24\".")
-                            Toggle("Molecular weight",   isOn: $userSettings.infoShowMolWeight)
-                                .help("Sum of standard atomic masses (Daltons / kDa above 1000).")
-                            Toggle("Bond count",         isOn: $userSettings.infoShowBondCount)
-                            Toggle("PDB title",          isOn: $userSettings.infoShowPDBTitle)
-                                .help("First TITLE record from the PDB header. Only meaningful for .pdb / .ent files.")
-                            Toggle("File format",        isOn: $userSettings.infoShowFormat)
-                        }
-                        .disabled(!userSettings.showInfoOverlay)
-                        .opacity(userSettings.showInfoOverlay ? 1 : 0.4)
-
-                        // MARK: Multi-file Quick Look behaviour.
-                        //       Quick Look's `<` `>` navigation between
-                        //       selected files is built into macOS and
-                        //       can't be disabled from a Quick Look
-                        //       extension. The "Merge in same folder"
-                        //       option is honoured by the preview
-                        //       extension - it reads sibling structures
-                        //       and stacks them in one 3Dmol scene.
-                        Text("Multiple-file preview").font(.headline).padding(.top, 8)
-                        Form {
-                            Picker("When previewing many files:",
-                                   selection: $userSettings.multiFilePreviewMode) {
-                                ForEach(Settings.MultiFilePreviewMode.allCases) {
-                                    Text($0.rawValue).tag($0)
-                                }
-                            }
-                            .help("""
-                            Quick Look's sandbox hands the preview extension one file at a time, so spacebar-multi-select rarely triggers a merge. For a guaranteed merge:
-
-                            1. Select two or more compatible files in Finder.
-                            2. Right-click → Quick Actions → Render molecule to PNG.
-                            3. Open <name>-merged.pdb next to them via spacebar.
-                            """)
-                        }
-                        .frame(maxWidth: 340)
-                    }
-                    .padding()
-
-                    // MARK: About — three card-style sections (Updates, Credits,
-                    //               Troubleshooting). The big shift from the old layout
-                    //               is that "Check for updates" is now the primary CTA
-                    //               in its own card, with a colored icon + version line
-                    //               + prominent button, rather than a tiny right-aligned
-                    //               control next to "Installed version:".
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("About").font(.title).padding(.bottom, 2)
-
-                        updatesCard
-                        creditsCard
-                        troubleshootingCard
-                        footerCredit
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-                .padding(.horizontal, 8)
-
-                Divider()
-                    .padding(.horizontal, 8)
-
-                // MARK: Live previews — one tile per supported format, plus the
-                //       custom drag/click-to-upload tile. 3-column LazyVGrid so
-                //       all nine fit in a reasonably-sized window without
-                //       shrinking individual tiles below readability.
-                let previewColumns: [GridItem] = [
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10)
-                ]
-                LazyVGrid(columns: previewColumns, spacing: 12) {
-                    previewTile(html: htmlPDB,  base: baseUrl,
-                                title: "PDB",
-                                caption: { (Text("XoxF from ") + Text("M. extorquens").italic() + Text(" (6OC6)")) })
-                    previewTile(html: htmlCIF,  base: baseUrl,
-                                title: "CIF",
-                                caption: { Text("Bioinspired Fe complex (1565673)") })
-                    previewTile(html: htmlSDF,  base: baseUrl,
-                                title: "SDF",
-                                caption: { Text("Pyrroloquinoline quinone (CID 1024)") })
-
-                    previewTile(html: htmlMOL,  base: baseUrl,
-                                title: "MOL",
-                                caption: { Text("Methane (V2000)") })
-                    previewTile(html: htmlMOL2, base: baseUrl,
-                                title: "MOL2",
-                                caption: { Text("Caffeine") })
-                    previewTile(html: htmlXYZ,  base: baseUrl,
-                                title: "XYZ",
-                                caption: { Text("Benzene (XMol XYZ)") })
-
-                    previewTile(html: htmlGRO,  base: baseUrl,
-                                title: "GRO",
-                                caption: { Text("Water (GROMACS)") })
-                    previewTile(html: htmlCUBE, base: baseUrl,
-                                title: "CUBE",
-                                caption: { Text("Water (Gaussian Cube)") })
-                    previewTile(html: htmlPQR,  base: baseUrl,
-                                title: "PQR",
-                                caption: { Text("Methane (PDB + charge/radius)") })
-
-                    previewTile(html: htmlVASP, base: baseUrl,
-                                title: "VASP",
-                                caption: { Text("Diamond cubic carbon (POSCAR)") })
-
-                    customDropTile(htmlPath: htmlPath, baseUrl: baseUrl)
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 16)
+        HStack(spacing: 0) {
+            sidebar
+                .frame(width: 218)
+            Divider()
+            ScrollView {
+                panelContent
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 18)
+                    .frame(maxWidth: 720, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .top)
             }
+        }
+        .frame(minWidth: 920, minHeight: 640)
+    }
+
+    // MARK: - Sidebar
+
+    @ViewBuilder
+    private var sidebar: some View {
+        VStack(spacing: 0) {
+            List {
+                ForEach(SettingsSection.allCases) { section in
+                    HStack(spacing: 8) {
+                        sectionIcon(section)
+                        Text(section.rawValue).font(.system(size: 13))
+                            .foregroundColor(selection == section ? .white : .primary)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(selection == section ? Color.accentColor : Color.clear)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture { selection = section }
+                    .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 1, trailing: 6))
+                }
+            }
+            .listStyle(SidebarListStyle())
+
+            Divider()
+            HStack(spacing: 8) {
+                Image(systemName: "atom")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 22, height: 22)
+                    .background(LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 0.76, green: 0.10, blue: 0.36),
+                            Color(red: 0.48, green: 0.12, blue: 0.64)
+                        ]),
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("QuickLookProtein").font(.system(size: 11.5, weight: .semibold))
+                    Text(appVersionString).font(.system(size: 10)).foregroundColor(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+    }
+
+    private func sectionIcon(_ section: SettingsSection) -> some View {
+        Image(systemName: section.symbol)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(.white)
+            .frame(width: 20, height: 20)
+            .background(section.tint)
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+
+    private var appVersionString: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+        return "v\(v)"
+    }
+
+    // MARK: - Routing
+
+    @ViewBuilder
+    private var panelContent: some View {
+        switch selection {
+        case .general:    generalPanel
+        case .formats:    formatsPanel
+        case .appearance: appearancePanel
+        case .rendering:  renderingPanel
+        case .toolbar:    toolbarPanel
+        case .info:       infoOverlayPanel
+        case .multi:      multiFilePanel
+        case .updates:    updatesPanel
+        case .about:      aboutPanel
+        }
+    }
+
+    @ViewBuilder
+    private func panelHeader(_ section: SettingsSection, subtitle: String) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: section.symbol)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 40, height: 40)
+                .background(section.tint)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(section.rawValue).font(.system(size: 22, weight: .bold))
+                Text(subtitle).font(.system(size: 12.5)).foregroundColor(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.bottom, 10)
+    }
+
+    // MARK: - Panels
+
+    @ViewBuilder
+    private var generalPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            panelHeader(.general, subtitle: "Quick Look behavior and viewer defaults")
+
+            GroupBox(label: Text("Defaults").font(.headline)) {
+                Form {
+                    Picker("Color scheme:", selection: $userSettings.colorScheme) {
+                        ForEach(Settings.ColorScheme.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
+            GroupBox(label: Text("Performance").font(.headline)) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("QuickLookProtein renders via 3Dmol.js in a WKWebView with hardware-accelerated WebGL — there is no per-app GPU toggle. Performance is governed by the structure size and your global Default zoom.")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var formatsPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            panelHeader(.formats, subtitle: "Each format gets its own renderer. Change the style to preview live.")
+
+            let cols = [GridItem(.adaptive(minimum: 280), spacing: 14)]
+            LazyVGrid(columns: cols, spacing: 14) {
+                formatCard("PDB",    style: $userSettings.atomStylePDB,    tint: Color(red: 0.90, green: 0.27, blue: 0.27), description: "Protein Data Bank")
+                formatCard("CIF",    style: $userSettings.atomStyleCIF,    tint: Color(red: 0.94, green: 0.54, blue: 0.12), description: "Crystallographic IF")
+                formatCard("SDF",    style: $userSettings.atomStyleSDF,    tint: Color(red: 0.90, green: 0.72, blue: 0.17), description: "Structure Data File")
+                formatCard("MOL",    style: $userSettings.atomStyleMOL,    tint: Color(red: 0.36, green: 0.69, blue: 0.29), description: "MDL Molfile")
+                formatCard("MOL2",   style: $userSettings.atomStyleMOL2,   tint: Color(red: 0.15, green: 0.65, blue: 0.58), description: "Tripos Mol2")
+                formatCard("XYZ",    style: $userSettings.atomStyleXYZ,    tint: Color(red: 0.22, green: 0.68, blue: 0.86), description: "XYZ Coordinates")
+                formatCard("GRO",    style: $userSettings.atomStyleGRO,    tint: Color(red: 0.23, green: 0.51, blue: 0.90), description: "GROMACS")
+                formatCard("CUBE",   style: $userSettings.atomStyleCUBE,   tint: Color(red: 0.48, green: 0.36, blue: 0.90), description: "Gaussian Cube")
+                formatCard("PQR",    style: $userSettings.atomStylePQR,    tint: Color(red: 0.76, green: 0.31, blue: 0.72), description: "PDB + Charge/Radius")
+                formatCard("VASP",   style: $userSettings.atomStyleVASP,   tint: Color(red: 0.43, green: 0.47, blue: 0.52), description: "VASP POSCAR")
+                formatCard("CDJSON", style: $userSettings.atomStyleCDJSON, tint: Color(red: 0.60, green: 0.42, blue: 0.25), description: "ChemDraw JSON")
+                formatCard("MMTF",   style: $userSettings.atomStyleMMTF,   tint: Color(red: 0.31, green: 0.42, blue: 0.76), description: "MacroMol Transmission")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func formatCard(_ ext: String,
+                            style: Binding<Settings.AtomStyle>,
+                            tint: Color,
+                            description: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Rectangle().fill(tint).frame(height: 3)
+                .clipShape(RoundedRectangle(cornerRadius: 1.5))
+                .padding(.top, 1)
+
+            HStack(spacing: 10) {
+                Text(ext)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(tint)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(description).font(.system(size: 13, weight: .semibold))
+                    Text(".\(ext.lowercased())")
+                        .font(.system(size: 10.5, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+
+            Picker("", selection: style) {
+                ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .labelsHidden()
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+            .padding(.top, 2)
+        }
+        .background(Color(NSColor.windowBackgroundColor).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
+    }
+
+    @ViewBuilder
+    private var appearancePanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            panelHeader(.appearance, subtitle: "Color, motion, and background of the preview")
+
+            GroupBox(label: Text("Color").font(.headline)) {
+                Form {
+                    Picker("Color scheme:", selection: $userSettings.colorScheme) {
+                        ForEach(Settings.ColorScheme.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    Toggle("Highlight ligands (smart styling)", isOn: $userSettings.autoStyleHetero)
+                }
+            }
+
+            GroupBox(label: Text("Motion").font(.headline)) {
+                Form {
+                    Picker("Rotation:", selection: $userSettings.rotationSpeed) {
+                        ForEach(Settings.RotationSpeed.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    Picker("Default zoom:", selection: $userSettings.defaultZoom) {
+                        ForEach(Settings.DefaultZoom.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                }
+            }
+
+            GroupBox(label: Text("Background").font(.headline)) {
+                HStack {
+                    ColorPicker("Background:", selection: $userSettings.bgColor, supportsOpacity: true)
+                        .help("#" + convertColorToRGB(color: userSettings.bgColor).rgbHex
+                              + ", alpha: " + convertColorToRGB(color: userSettings.bgColor).alpha)
+                    Button("Transparent", action: resetColor)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var renderingPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            panelHeader(.rendering, subtitle: "What to draw and how to draw it")
+
+            GroupBox(label: Text("Geometry").font(.headline)) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Smart protein + ligand styling", isOn: $userSettings.autoStyleHetero)
+                    Toggle("Show molecular surface", isOn: $userSettings.showSurface)
+                    Toggle("Hide hydrogens", isOn: $userSettings.hideHydrogens)
+                    Toggle("Show unit cell (PDB CRYST1 / CIF _cell)", isOn: $userSettings.showUnitCell)
+                }
+            }
+
+            GroupBox(label: Text("Overlays & Shading").font(.headline)) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Show info overlay", isOn: $userSettings.showInfoOverlay)
+                    Toggle("Show interactive controls", isOn: $userSettings.showControlsInPreview)
+                    Toggle("Outline shading", isOn: $userSettings.outlineShading)
+                    Toggle("Ambient occlusion (vignette)", isOn: $userSettings.ambientOcclusion)
+                    Toggle("Auto-orient (longest axis horizontal)", isOn: $userSettings.autoOrient)
+                }
+            }
+
+            GroupBox(label: Text("Advanced").font(.headline)) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Cube isosurface (.cube)", isOn: $userSettings.cubeIsosurface)
+                    Toggle("Biological assembly (PDB REMARK 350 / CIF oper_list)", isOn: $userSettings.bioAssembly)
+                    Toggle("Cryo-EM density isosurface (.ccp4/.mrc/.map)", isOn: $userSettings.cryoEMRender)
+                    Toggle("Share button in preview", isOn: $userSettings.showShareButton)
+                    Toggle("Include USDZ in Share (AR Quick Look)", isOn: $userSettings.includeUSDZInShare)
+                    Toggle("Animated thumbnails (experimental APNG)", isOn: $userSettings.animatedThumbnails)
+                    Picker("Thumbnail style:", selection: $userSettings.thumbnailStyle) {
+                        ForEach(Settings.ThumbnailStyle.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .padding(.top, 4)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var toolbarPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            panelHeader(.toolbar, subtitle: "Buttons shown on the in-preview toolbar")
+
+            GroupBox(label: Text("Master").font(.headline)) {
+                Toggle("Show interactive controls", isOn: $userSettings.showControlsInPreview)
+                    .padding(.vertical, 2)
+            }
+
+            GroupBox(label: Text("Buttons").font(.headline)) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                          alignment: .leading, spacing: 6) {
+                    Toggle("Stick",     isOn: $userSettings.ctlShowStick)
+                    Toggle("Line",      isOn: $userSettings.ctlShowLine)
+                    Toggle("Sphere",    isOn: $userSettings.ctlShowSphere)
+                    Toggle("Cartoon",   isOn: $userSettings.ctlShowCartoon)
+                    Toggle("Surface",   isOn: $userSettings.ctlShowSurface)
+                    Toggle("Color SS",  isOn: $userSettings.ctlShowColorSS)
+                    Toggle("Label αC",  isOn: $userSettings.ctlShowLabelCA)
+                    Toggle("Recenter",  isOn: $userSettings.ctlShowRecenter)
+                    Toggle("Spin",      isOn: $userSettings.ctlShowRotation)
+                }
+                .disabled(!userSettings.showControlsInPreview)
+                .opacity(userSettings.showControlsInPreview ? 1 : 0.45)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var infoOverlayPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            panelHeader(.info, subtitle: "Metadata to display on top of the preview")
+
+            GroupBox(label: Text("Master").font(.headline)) {
+                Toggle("Show info overlay", isOn: $userSettings.showInfoOverlay)
+                    .padding(.vertical, 2)
+            }
+
+            GroupBox(label: Text("Fields").font(.headline)) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("File name",          isOn: $userSettings.infoShowFileName)
+                    Toggle("File format",        isOn: $userSettings.infoShowFormat)
+                    Toggle("Atom count",         isOn: $userSettings.infoShowAtomCount)
+                    Toggle("Chain count",        isOn: $userSettings.infoShowChainCount)
+                    Toggle("Residue count",      isOn: $userSettings.infoShowResidueCount)
+                    Toggle("Element breakdown",  isOn: $userSettings.infoShowElementBreakdown)
+                    Toggle("Molecular weight",   isOn: $userSettings.infoShowMolWeight)
+                    Toggle("Bond count",         isOn: $userSettings.infoShowBondCount)
+                    Toggle("PDB title (HEADER)", isOn: $userSettings.infoShowPDBTitle)
+                }
+                .disabled(!userSettings.showInfoOverlay)
+                .opacity(userSettings.showInfoOverlay ? 1 : 0.45)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var multiFilePanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            panelHeader(.multi, subtitle: "Behavior when previewing more than one structure")
+
+            GroupBox(label: Text("Layout").font(.headline)) {
+                Form {
+                    Picker("When previewing many files:",
+                           selection: $userSettings.multiFilePreviewMode) {
+                        ForEach(Settings.MultiFilePreviewMode.allCases) {
+                            Text($0.rawValue).tag($0)
+                        }
+                    }
+                    .help("""
+                    Quick Look's sandbox hands the preview extension one file at a time, so spacebar-multi-select rarely triggers a merge.
+
+                    For a guaranteed merge:
+                    1. Select two or more compatible files in Finder.
+                    2. Right-click → Quick Actions → Render Molecule to PNG.
+                    3. Open <first>-merged.pdb that appears next to them.
+                    """)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var updatesPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            panelHeader(.updates, subtitle: "Stay current with signed, notarised releases")
+            updatesCard
+            troubleshootingCard
+        }
+    }
+
+    @ViewBuilder
+    private var aboutPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .center, spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(LinearGradient(
+                            colors: [Color(red: 0.76, green: 0.10, blue: 0.36),
+                                     Color(red: 0.48, green: 0.12, blue: 0.64)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 96, height: 96)
+                        .shadow(color: Color(red: 0.48, green: 0.12, blue: 0.64).opacity(0.3),
+                                radius: 12, x: 0, y: 8)
+                    Image(systemName: "atom")
+                        .font(.system(size: 50, weight: .regular))
+                        .foregroundColor(.white)
+                }
+                Text("QuickLookProtein").font(.system(size: 22, weight: .bold))
+                Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+                    .font(.system(size: 12)).foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 12)
+
+            creditsCard
+            footerCredit
         }
     }
 
@@ -701,7 +888,7 @@ struct ContentView_Previews: PreviewProvider {
 // Single-source styling for the three About-panel cards so they share
 // padding, corner radius, and background treatment. Kept simple
 // (Color.secondary.opacity → cornerRadius → overlay) because
-// `.regularMaterial` / `.background(.thinMaterial)` would require macOS 12
+// `.regularMaterial` / `.background(Color.gray.opacity(0.06))` would require macOS 12
 // and the project's deployment target is 11.
 
 struct AboutCard<Content: View>: View {
