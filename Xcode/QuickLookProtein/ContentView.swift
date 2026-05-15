@@ -1940,7 +1940,7 @@ struct ContentView: View {
         case "cube":   resource = ("water",    "cube")
         case "pqr":    resource = ("methane",  "pqr")
         case "vasp":   resource = ("diamond",  "vasp")
-        case "cdjson": resource = ("benzene",  "cdjson")
+        case "cdjson": resource = ("methane",  "cdjson")
         case "mmtf":   resource = ("methane",  "mmtf")
         default:       resource = nil
         }
