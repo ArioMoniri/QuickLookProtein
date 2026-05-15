@@ -196,45 +196,45 @@ jobs:
       # identity used by the main binary, then run a final --deep sign
       # on the .app so the embedded XPC services are part of the
       # parent's signed contents.
-      - name: Embed Sparkle XPC services
+      - name: Re-sign Sparkle XPC services in place (in the framework)
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           APP=build/export/QuickLookProtein.app
-          SRC="$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices"
-          DST="$APP/Contents/XPCServices"
-          if [ ! -d "$SRC" ]; then
-            echo "::warning::Sparkle.framework XPCServices/ not found — Sparkle dep may not be wired into the target. Skipping."
+          # Sparkle 2.7+ EXPLICITLY refuses to start when the XPC services
+          # are placed at $APP/Contents/XPCServices/. The new docs
+          # (https://sparkle-project.org/documentation/sandboxing/) say
+          # the services must stay inside the framework's own
+          # XPCServices directory; the runtime check catches and surfaces
+          # "XPC Service (Installer.xpc) must be in the Sparkle framework"
+          # otherwise. Drop the old "copy to app/Contents/XPCServices/"
+          # step and re-sign them where they live.
+          STALE="$APP/Contents/XPCServices"
+          if [ -d "$STALE" ]; then
+            echo "Removing stale $STALE (Sparkle 2.7+ wants XPCs in the framework)"
+            rm -rf "$STALE"
+          fi
+
+          FW="$APP/Contents/Frameworks/Sparkle.framework"
+          FW_XPC="$FW/Versions/B/XPCServices"
+          if [ ! -d "$FW_XPC" ]; then
+            echo "::warning::$FW_XPC not found — Sparkle dep may not be wired. Skipping."
             exit 0
           fi
-          mkdir -p "$DST"
-          for svc in Installer.xpc Downloader.xpc; do
-            if [ -d "$SRC/$svc" ]; then
-              /usr/bin/ditto "$SRC/$svc" "$DST/$svc"
-            else
-              echo "::warning::$SRC/$svc missing; skipping."
-            fi
-          done
-          # Resolve the actual identity name from the keychain — manual
-          # signing in the export step writes "Developer ID Application"
-          # as the cert *type*, but the per-binary codesign call here
-          # needs the SHA1 or full common name.
+
           IDENTITY=$(security find-identity -v -p codesigning \
                      | awk '/Developer ID Application/ {print $2; exit}')
           if [ -z "$IDENTITY" ]; then
             echo "::error::Could not find Developer ID Application identity in keychain."
             exit 1
           fi
-          # Re-sign each XPC service with its OWN entitlements file.
-          # Without --entitlements the re-sign strips whatever Sparkle
-          # baked in, and a sandboxed host can no longer talk to the
-          # services - the user sees "An error occurred while
-          # launching the installer." when clicking Install Update.
-          # Per https://sparkle-project.org/documentation/sandboxing/
-          # each .xpc needs distinct entitlements:
-          #   Installer.xpc   -> sandbox + group + read/write /Applications
-          #   Downloader.xpc  -> sandbox + group + network.client
-          for svc in "$DST"/*.xpc; do
+
+          # Re-sign each XPC service in place with its own entitlements.
+          # Installer.xpc needs read/write to /Applications/ (it installs
+          # the update); Downloader.xpc needs network.client (it pulls
+          # the .zip). Both need app-sandbox + the App Group so they
+          # can talk to the host. See Xcode/Sparkle/*.entitlements.
+          for svc in "$FW_XPC"/*.xpc; do
             [ -d "$svc" ] || continue
             base=$(basename "$svc" .xpc)
             ents_file="Xcode/Sparkle/${base}.entitlements"
@@ -242,25 +242,29 @@ jobs:
               echo "::error::Missing entitlements file for $base: $ents_file"
               exit 1
             fi
-            echo "Re-signing $svc with $ents_file"
+            echo "Re-signing $svc with $ents_file (in place)"
             codesign --force --options runtime --timestamp \
                      --entitlements "$ents_file" \
                      --sign "$IDENTITY" "$svc"
           done
-          # Re-sign the whole app so the parent's signature covers
-          # the XPC services we just added.
-          #
-          # CRITICAL: use --preserve-metadata=entitlements, NOT
-          # --entitlements <file>. The xcodebuild archive step
-          # already signed the .app with entitlements where
-          # $(TeamIdentifierPrefix) was expanded to the team ID
-          # (e.g. FF68N39FU5.group...). Passing the raw .entitlements
-          # file to codesign here would re-write those with the
-          # literal unexpanded $(TeamIdentifierPrefix)group... string,
-          # breaking App Group membership (Sparkle's updater fails to
-          # start, the QL extension stops seeing main-app settings,
-          # multi-file merge mode never fires - all symptoms of the
-          # app + extension no longer sharing their UserDefaults).
+
+          # Re-sign the framework so its outer signature covers the
+          # freshly-signed XPC services. Preserve-metadata to avoid
+          # clobbering whatever Sparkle's xcframework baked in.
+          echo "Re-signing Sparkle.framework"
+          codesign --force --options runtime --timestamp \
+                   --preserve-metadata=identifier,entitlements,flags \
+                   --sign "$IDENTITY" "$FW/Versions/B"
+          codesign --force --options runtime --timestamp \
+                   --preserve-metadata=identifier,entitlements,flags \
+                   --sign "$IDENTITY" "$FW"
+
+          # Finally re-sign the host .app so its signature covers the
+          # re-signed framework. Preserve-metadata=entitlements is
+          # CRITICAL — passing the raw .entitlements file here would
+          # write the literal unexpanded $(TeamIdentifierPrefix)group...
+          # string and break the App Group across QL + Thumbnail +
+          # MDImporter + the new XPCs.
           codesign --force --options runtime --timestamp \
                    --preserve-metadata=entitlements,requirements \
                    --sign "$IDENTITY" "$APP"
@@ -271,7 +275,8 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign -dvv "$APP" | head -20
           # Confirm the XPC services landed where Sparkle expects them.
-          ls -la "$APP/Contents/XPCServices/" || true
+          # Sparkle 2.7+ keeps XPCs inside the framework, not at the app level.
+          ls -la "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/" || true
 
       # ----------------------------------------------------------------
       - name: Package zip
