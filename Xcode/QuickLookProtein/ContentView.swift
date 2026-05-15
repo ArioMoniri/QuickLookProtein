@@ -1349,37 +1349,59 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 18) {
             panelHeader(.updates, subtitle: "Stay current with signed, notarised releases")
 
-            // Hero status card — version, last-check status, EdDSA badge,
-            // and the two primary actions.
+            // Hero status card — branches on whether Sparkle actually
+            // started. When it didn't, the card switches to a yellow
+            // "auto-updates unavailable" state with the specific reason
+            // and a "Download from GitHub" CTA (instead of pretending
+            // the software is up to date).
             Card {
                 HStack(spacing: 14) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
+                    Image(systemName: updater.sparkleAvailable
+                          ? "arrow.triangle.2.circlepath"
+                          : "exclamationmark.triangle.fill")
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 48, height: 48)
-                        .background(LinearGradient(
-                            gradient: Gradient(colors: [Color(red: 0.04, green: 0.52, blue: 1.00),
-                                                        Color(red: 0.37, green: 0.61, blue: 1.00)]),
-                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .background(updater.sparkleAvailable
+                                    ? LinearGradient(
+                                        gradient: Gradient(colors: [Color(red: 0.04, green: 0.52, blue: 1.00),
+                                                                    Color(red: 0.37, green: 0.61, blue: 1.00)]),
+                                        startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    : LinearGradient(
+                                        gradient: Gradient(colors: [Color(red: 0.95, green: 0.62, blue: 0.18),
+                                                                    Color(red: 0.92, green: 0.40, blue: 0.10)]),
+                                        startPoint: .topLeading, endPoint: .bottomTrailing))
                         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(heroUpdateTitle).font(.system(size: 15, weight: .semibold))
                         Text(heroUpdateSubtitle)
                             .font(.system(size: 12)).foregroundColor(.secondary)
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.seal.fill")
+                        if updater.sparkleAvailable {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Color(red: 0.20, green: 0.78, blue: 0.35))
+                                Text("Verified with Sparkle EdDSA signature")
+                                    .font(.system(size: 11)).foregroundColor(.secondary)
+                            }
+                        } else {
+                            Text(updater.sparkleUnavailableReason)
                                 .font(.system(size: 11))
-                                .foregroundColor(Color(red: 0.20, green: 0.78, blue: 0.35))
-                            Text("Verified with Sparkle EdDSA signature")
-                                .font(.system(size: 11)).foregroundColor(.secondary)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Spacer(minLength: 0)
                     VStack(spacing: 6) {
-                        Button("Check for Updates") { updater.checkForUpdates() }
-                            .buttonStyle(PrimaryPillButtonStyle())
-                        Button("Download from GitHub") { updater.openReleasesPage() }
-                            .buttonStyle(SecondaryPillButtonStyle())
+                        if updater.sparkleAvailable {
+                            Button("Check for Updates") { updater.checkForUpdates() }
+                                .buttonStyle(PrimaryPillButtonStyle())
+                            Button("Download from GitHub") { updater.openReleasesPage() }
+                                .buttonStyle(SecondaryPillButtonStyle())
+                        } else {
+                            Button("Download from GitHub") { updater.openReleasesPage() }
+                                .buttonStyle(PrimaryPillButtonStyle())
+                        }
                     }
                 }
                 .padding(16)
@@ -1423,6 +1445,9 @@ struct ContentView: View {
     }
 
     private var heroUpdateTitle: String {
+        if !updater.sparkleAvailable {
+            return "Auto-updates are unavailable"
+        }
         if updater.lastCheckStatus.lowercased().contains("checking") {
             return "Checking for updates…"
         }

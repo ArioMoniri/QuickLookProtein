@@ -22,6 +22,33 @@
 
 **macOS:** open the disk image, drag **QuickLookProtein.app** into **Applications**, then hit <kbd>Space</kbd> on any `.pdb` / `.cif` / `.mol2` / etc. file in Finder.
 
+<details>
+<summary>🎨 UI versions — Settings-app facelift in v1.7.47</summary>
+
+The host **Settings app** went through a redesign in **v1.7.47**:
+
+| Version range | Settings layout |
+|---|---|
+| **v1.7.47 and later** | macOS-System-Settings-style **sidebar** (General · File Formats · Appearance · Rendering · Toolbar · Info Overlay · Multi-file · Software Update · About) with live 3Dmol previews per format and a liquid-glass backdrop |
+| **v1.7.46 and earlier** | Flat single-page layout — settings on top, preview tiles below |
+
+The Quick Look extension itself (what spacebar in Finder shows) is **the same** in both — only the Settings window changed. If you specifically prefer the older flat layout, [v1.7.46](https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.46) is the last build with it; note you'll miss every fix and feature since (CIF unit cell CRYST1, Sparkle no-modal, format-disable gating, Multi-file Quick Action merge, magenta accent, real cdjson/mmtf samples, etc.).
+
+</details>
+
+<details>
+<summary>🔄 Software Update — if "auto-updates unavailable" persists</summary>
+
+The Software Update panel will say **"Auto-updates are unavailable"** with a reason if Sparkle couldn't start. Common causes:
+
+1. **Installed version is older than v1.7.45.** Earlier builds called Sparkle with `startingUpdater: true`, which presented a modal and broke the auto-update loop. The fix is in v1.7.45+, but it can't update *itself* — you need one manual DMG download from [Releases](https://github.com/ArioMoniri/QuickLookProtein/releases/latest) to break the cycle.
+2. **Unsigned dev build.** If you compiled locally, the SUPublicEDKey is the placeholder — auto-updates are off by design. Use "Download from GitHub" for the signed release.
+3. **App Group container not provisioned.** Console shows `Using kCFPreferencesAnyUser with a container is only allowed for System Containers` — same dev-build symptom; signed releases ship with the entitlement intact.
+
+In all three cases the panel falls back to a prominent **"Download from GitHub"** button instead of trying to update through a broken Sparkle. After installing the new DMG manually once, auto-updates resume normally.
+
+</details>
+
 ### 🪟 Windows
 
 **Install.** Download [`QuickLookProtein-Setup.exe`](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein-Setup.exe), double-click it, click **More info → Run anyway** on SmartScreen, click **Install**. Done.

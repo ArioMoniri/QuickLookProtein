@@ -44,6 +44,16 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
 
     @Published var canCheck: Bool = true
     @Published var lastCheckStatus: String = ""
+    /// Honest signal of whether Sparkle actually came up. UI uses this to
+    /// avoid showing the "Your software is up to date" hero when in fact
+    /// the controller never started (placeholder key, signing mismatch,
+    /// stale install, etc.).
+    @Published var sparkleAvailable: Bool = false
+    /// Set when `sparkleAvailable == false`, this is the human-readable
+    /// reason — surfaced inline in the About / Software Update panel so
+    /// the user can fix it (or do a manual download) without spelunking
+    /// Console.app.
+    @Published var sparkleUnavailableReason: String = ""
 
     /// Two real Sparkle knobs surfaced as @Published proxies so the
     /// Settings UI's Software Update panel can bind directly. Setting
@@ -102,7 +112,12 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
         super.init()
         // Only spin up Sparkle when we have a real public key to verify
         // signatures against. Otherwise Sparkle errors on every launch.
-        guard self.sparkleIsConfigured else { return }
+        guard self.sparkleIsConfigured else {
+            self.sparkleAvailable = false
+            self.sparkleUnavailableReason =
+                "Sparkle public key isn't set in this build — auto-updates are disabled. Use Download from GitHub to grab the latest signed DMG."
+            return
+        }
 
         // CRITICAL: pass startingUpdater:false. The `true` variant calls
         // SPUUpdater.startUpdater() synchronously inside init and routes
@@ -133,13 +148,17 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
             self.automaticallyChecksForUpdates = ctl.updater.automaticallyChecksForUpdates
             self.updateCheckCadence = UpdateCheckCadence.from(seconds: ctl.updater.updateCheckInterval)
             self.lastCheckStatus = "Auto-updates enabled."
+            self.sparkleAvailable = true
         } catch {
             // Sparkle's start() throws for malformed SUPublicEDKey, bad
             // feed URL, XPC handshake failure, etc. Don't show a modal —
             // log to the About panel, and fall back to the manual-update
             // path (which opens the GitHub Releases page in the browser).
             self.controller = nil
-            self.lastCheckStatus = "Sparkle: \(error.localizedDescription) (manual updates only)"
+            self.sparkleAvailable = false
+            self.sparkleUnavailableReason =
+                "Sparkle couldn't start: \(error.localizedDescription). This usually means the installed app is too old to auto-update through the v1.7.45+ fix. One manual DMG download from GitHub will fix it permanently."
+            self.lastCheckStatus = "Auto-updates unavailable — see Software Update for details."
         }
     }
 
