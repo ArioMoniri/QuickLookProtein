@@ -590,7 +590,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.52;
+				MARKETING_VERSION = 1.7.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLThumbnail;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -629,7 +629,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.52;
+				MARKETING_VERSION = 1.7.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLThumbnail;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -667,7 +667,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.52;
+				MARKETING_VERSION = 1.7.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLActions;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -706,7 +706,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.52;
+				MARKETING_VERSION = 1.7.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLActions;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -858,7 +858,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.52;
+				MARKETING_VERSION = 1.7.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -886,7 +886,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.52;
+				MARKETING_VERSION = 1.7.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -909,7 +909,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.52;
+				MARKETING_VERSION = 1.7.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -933,7 +933,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.52;
+				MARKETING_VERSION = 1.7.53;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

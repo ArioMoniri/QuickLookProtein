@@ -106,20 +106,26 @@ private struct SectionLabel: View {
     }
 }
 
-/// Rounded card with subtle background — the container for grouped rows
-/// inside a settings panel. Uses the macOS-11-safe windowBackground color
-/// instead of `.regularMaterial` so it works at the existing deployment
-/// target.
+/// Rounded card with subtle translucent background — the container for
+/// grouped rows inside a settings panel. Uses VisualEffectView under a
+/// thin tint so the magenta+blue radial backdrop bleeds through and the
+/// card reads as proper liquid glass (not opaque grey).
 private struct Card<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
         VStack(spacing: 0) { content }
             .padding(.vertical, 4)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(
+                ZStack {
+                    VisualEffectView(material: .contentBackground,
+                                     blending: .withinWindow)
+                    Color(NSColor.controlBackgroundColor).opacity(0.55)
+                }
+            )
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
             )
     }
 }
@@ -423,15 +429,22 @@ struct ContentView: View {
     @ViewBuilder
     private var sidebar: some View {
         ZStack {
-            // Layered glass: vibrancy material for the "see the desktop
-            // through it" effect + a semi-opaque tint on top so the
-            // sidebar contents stay legible at any wallpaper. Without
-            // the tint the .sidebar material renders too transparent and
-            // the magenta backdrop bleeds onto the section labels.
+            // True liquid-glass sidebar: vibrancy material does most of
+            // the work, with only a faint accent-tinted overlay on top
+            // so the magenta wallpaper reads through as a soft tint
+            // rather than blocking it. The previous 55%-opaque tile
+            // was hiding the gradient entirely (user feedback: "glass
+            // design have not been applied").
             VisualEffectView(material: .sidebar, blending: .behindWindow)
                 .edgesIgnoringSafeArea(.vertical)
-            Color(NSColor.windowBackgroundColor).opacity(0.55)
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.76, green: 0.10, blue: 0.36).opacity(0.08),
+                    Color(red: 0.48, green: 0.12, blue: 0.64).opacity(0.05)
+                ]),
+                startPoint: .top, endPoint: .bottom)
                 .edgesIgnoringSafeArea(.vertical)
+                .allowsHitTesting(false)
             sidebarContent
         }
     }
@@ -1927,7 +1940,9 @@ struct ContentView: View {
         case "cube":   resource = ("water",    "cube")
         case "pqr":    resource = ("methane",  "pqr")
         case "vasp":   resource = ("diamond",  "vasp")
-        default:       resource = nil   // CDJSON, MMTF — no sample bundled
+        case "cdjson": resource = ("benzene",  "cdjson")
+        case "mmtf":   resource = ("methane",  "mmtf")
+        default:       resource = nil
         }
         guard let r = resource,
               let p = Bundle.main.path(forResource: r.name, ofType: r.type)
