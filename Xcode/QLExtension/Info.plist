@@ -19,7 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSExtension</key>
@@ -28,46 +28,36 @@
 		<dict>
 			<key>QLSupportedContentTypes</key>
 			<array>
-				<!-- PDB -->
 				<string>org.libreoffice.pdb-document</string>
 				<string>dyn.ah62d4rv4ge80g4pg</string>
 				<string>net.sourceforge.openbabel.pdb</string>
 				<string>com.ariomoniri.QuickLookProtein.pdb</string>
-				<!-- SDF / MDL Molfile -->
 				<string>net.sourceforge.openbabel.mdl</string>
 				<string>dyn.ah62d4rv4ge81a3dc</string>
 				<string>com.ariomoniri.QuickLookProtein.sdf</string>
 				<string>com.ariomoniri.QuickLookProtein.mol</string>
-				<!-- CIF / mmCIF -->
 				<string>com.cif</string>
 				<string>com.crystalmaker.crystalmaker.cif</string>
 				<string>com.revvity.external.cif</string>
 				<string>dyn.ah62d4rv4ge81g3dg</string>
 				<string>com.ariomoniri.QuickLookProtein.cif</string>
 				<string>com.ariomoniri.QuickLookProtein.mmcif</string>
-				<!-- Tripos MOL2 -->
 				<string>com.tripos.mol2</string>
 				<string>com.ariomoniri.QuickLookProtein.mol2</string>
-				<!-- XYZ -->
 				<string>com.ariomoniri.QuickLookProtein.xyz</string>
-				<!-- GROMACS -->
 				<string>com.ariomoniri.QuickLookProtein.gro</string>
-				<!-- Gaussian CUBE -->
 				<string>com.ariomoniri.QuickLookProtein.cube</string>
 				<string>com.ariomoniri.QuickLookProtein.pqr</string>
 				<string>com.ariomoniri.QuickLookProtein.prmtop</string>
 				<string>com.ariomoniri.QuickLookProtein.vasp</string>
 				<string>com.ariomoniri.QuickLookProtein.cdjson</string>
 				<string>com.ariomoniri.QuickLookProtein.mmtf</string>
-				<!-- Gaussian/ORCA/QChem output text (1.7.30+) -->
 				<string>com.ariomoniri.QuickLookProtein.gjf</string>
 				<string>com.ariomoniri.QuickLookProtein.com</string>
 				<string>com.ariomoniri.QuickLookProtein.compchemlog</string>
-				<!-- Cryo-EM density volumes (1.7.32+) -->
 				<string>com.ariomoniri.QuickLookProtein.ccp4</string>
 				<string>com.ariomoniri.QuickLookProtein.mrc</string>
 				<string>com.ariomoniri.QuickLookProtein.map</string>
-				<!-- MD trajectories (1.7.36+); first-frame preview only -->
 				<string>com.ariomoniri.QuickLookProtein.dcd</string>
 				<string>com.ariomoniri.QuickLookProtein.xtc</string>
 				<string>com.ariomoniri.QuickLookProtein.trr</string>
@@ -77,10 +67,6 @@
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.quicklook.preview</string>
-		<!-- Matches the @objc(QLPreviewPreviewViewController) attribute on the
-		     Swift class. Without the explicit Obj-C class name, PluginKit's
-		     NSClassFromString fails on Swift's mangled name and Quick Look
-		     silently shows the generic doc-icon preview. -->
 		<key>NSExtensionPrincipalClass</key>
 		<string>QLPreviewPreviewViewController</string>
 	</dict>

@@ -19,7 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSExtension</key>
@@ -55,10 +55,6 @@
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.quicklook.thumbnail</string>
-		<!-- Matches the @objc(QLThumbnailThumbnailProvider) attribute on
-		     the Swift class. Using an explicit Obj-C class name avoids
-		     Swift's auto-mangling, which has been observed to silently
-		     fail to register the extension on some macOS / Swift combos. -->
 		<key>NSExtensionPrincipalClass</key>
 		<string>QLThumbnailThumbnailProvider</string>
 	</dict>

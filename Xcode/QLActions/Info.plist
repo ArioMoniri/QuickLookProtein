@@ -19,7 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSExtension</key>
@@ -44,34 +44,17 @@
 					<string>renderToPNG</string>
 					<key>NSPortName</key>
 					<string>com.ariomoniri.QuickLookProtein.QLActions</string>
-					<!--
-					  NSServiceCategory = "QuickAction" promotes the
-					  service into Finder's "Quick Actions" submenu in
-					  addition to (or instead of) the deeply-nested
-					  "Services" submenu. Vastly more discoverable.
-					-->
-					<key>NSServiceCategory</key>
-					<string>QuickAction</string>
 					<key>NSRequiredContext</key>
 					<dict/>
+					<key>NSRequiredFileTypes</key>
+					<array/>
 					<key>NSSendTypes</key>
 					<array>
 						<string>NSFilenamesPboardType</string>
 						<string>public.file-url</string>
 					</array>
-					<!--
-					  We previously listed molecule UTIs in NSSendFileTypes
-					  to filter the action to molecule selections only.
-					  That broke discovery: macOS hides the entry whenever
-					  *any* selected file doesn't match (including
-					  unfamiliar extensions where the custom UTI hasn't
-					  been indexed yet by Launch Services). v1.7.62
-					  drops the filter — the action accepts every file
-					  selection, and the handler skips non-molecule
-					  extensions internally via acceptedExtensions.contains.
-					-->
-					<key>NSRequiredFileTypes</key>
-					<array/>
+					<key>NSServiceCategory</key>
+					<string>QuickAction</string>
 				</dict>
 			</array>
 		</dict>

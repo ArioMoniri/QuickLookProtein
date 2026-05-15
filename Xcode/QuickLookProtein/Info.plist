@@ -16,8 +16,20 @@
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<!--
+	  Tracks the marketing version so Sparkle's comparator can match the
+	  installed app against <sparkle:version> in the appcast. The previous
+	  hard-coded "1" made every release look older than every appcast entry
+	  (1.7.64 > 1 to Sparkle's numeric-string comparator), which triggered
+	  "An update is available" → install attempt → install handshake
+	  failure modal on every Check for Updates click, regardless of
+	  whether the user was already on the latest version. With this
+	  keyed to MARKETING_VERSION, the installed CFBundleVersion equals
+	  the appcast's sparkle:version for matching releases and Sparkle
+	  correctly reports "up to date".
+	-->
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>

@@ -19,13 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
-	<!--
-	  CSImportExtension is macOS 12+. We hard-code 12.0 here so the system
-	  refuses to load the bundle on macOS 11 rather than crashing at
-	  principal-class instantiation. The MDImporter target's
-	  MACOSX_DEPLOYMENT_TARGET must also be set to 12.0 in Xcode.
-	-->
+	<string>$(MARKETING_VERSION)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>NSExtension</key>
