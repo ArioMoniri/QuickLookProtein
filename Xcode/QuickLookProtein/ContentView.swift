@@ -301,6 +301,29 @@ private struct FormatViewerPlaceholder: View {
     }
 }
 
+/// NSVisualEffectView wrapper — for the System-Settings-style sidebar
+/// vibrancy that SwiftUI's `.thinMaterial` can't provide at the macOS 11
+/// deployment target. Material is configurable per-instance so the same
+/// type can power both the sidebar (`.sidebar`) and the window backdrop
+/// (`.underWindowBackground`) variants.
+struct VisualEffectView: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .sidebar
+    var blending: NSVisualEffectView.BlendingMode = .behindWindow
+    var state:    NSVisualEffectView.State = .followsWindowActiveState
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.material = material
+        v.blendingMode = blending
+        v.state = state
+        return v
+    }
+    func updateNSView(_ v: NSVisualEffectView, context: Context) {
+        v.material = material
+        v.blendingMode = blending
+        v.state = state
+    }
+}
+
 /// Background preset for the previewer. Persists as a string preference
 /// because the @Published bgColorRed/Green/Blue/Opacity stay as the source
 /// of truth — the preset just writes those four values when chosen.
@@ -333,16 +356,45 @@ struct ContentView: View {
     @State private var troubleshootingExpanded: Bool = false
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-                .frame(width: 218)
-            Divider()
-            ScrollView {
-                panelContent
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 18)
-                    .frame(maxWidth: 720, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .top)
+        ZStack {
+            // Window-wide liquid-glass backdrop tinted with the app icon's
+            // magenta + purple gradient. A subtle radial bleed in the top-
+            // left corner and a cool blue bleed in the bottom-right echo
+            // the design template's "wallpaper" look while staying out of
+            // the way of the cards' content.
+            VisualEffectView(material: .underWindowBackground,
+                             blending: .behindWindow)
+                .edgesIgnoringSafeArea(.all)
+            ZStack {
+                RadialGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 0.76, green: 0.10, blue: 0.36).opacity(0.22),
+                        Color.clear
+                    ]),
+                    center: UnitPoint(x: 0.15, y: 0.05),
+                    startRadius: 50, endRadius: 520)
+                RadialGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 0.40, green: 0.55, blue: 0.95).opacity(0.18),
+                        Color.clear
+                    ]),
+                    center: UnitPoint(x: 0.85, y: 1.0),
+                    startRadius: 50, endRadius: 480)
+            }
+            .edgesIgnoringSafeArea(.all)
+            .allowsHitTesting(false)
+
+            HStack(spacing: 0) {
+                sidebar
+                    .frame(width: 218)
+                Divider()
+                ScrollView {
+                    panelContent
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 18)
+                        .frame(maxWidth: 720, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                }
             }
         }
         .frame(minWidth: 920, minHeight: 640)
@@ -357,6 +409,15 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebar: some View {
+        ZStack {
+            VisualEffectView(material: .sidebar, blending: .behindWindow)
+                .edgesIgnoringSafeArea(.vertical)
+            sidebarContent
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarContent: some View {
         VStack(spacing: 0) {
             List {
                 ForEach(SettingsSection.allCases) { section in
@@ -479,19 +540,11 @@ struct ContentView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 SectionLabel(text: "Defaults")
-                Card {
-                    FormRow(label: "Color scheme") {
-                        Picker("", selection: $userSettings.colorScheme) {
-                            ForEach(Settings.ColorScheme.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .labelsHidden()
-                        .frame(width: 220)
-                    }
-                }
-                Text("Per-format display style is set in File Formats. Color scheme applies everywhere.")
-                    .font(.system(size: 11))
+                Text("Per-format display style is set in File Formats. Color scheme + Rotation + Default zoom + Background live in Appearance.")
+                    .font(.system(size: 11.5))
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 16)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -583,16 +636,29 @@ struct ContentView: View {
             // Colored accent rail along the top
             Rectangle().fill(tint).frame(height: 3)
 
-            // Viewer placeholder — a stylised preview of the structure-in-style
+            // Real WKWebView preview of this format's bundled sample
+            // structure rendered at the current per-format atom-style.
+            // The preview reloads when `style.wrappedValue` changes (the
+            // .id() modifier forces SwiftUI to rebuild the WebView).
             ZStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.94, green: 0.95, blue: 0.96),
-                        Color(red: 0.83, green: 0.85, blue: 0.88)
-                    ]),
-                    startPoint: .top, endPoint: .bottom)
-                FormatViewerPlaceholder(ext: ext, style: style.wrappedValue, tint: tint)
-                    .padding(8)
+                if let html = sampleHTML(forExt: ext, style: style.wrappedValue),
+                   let baseUrl = sampleBaseURL {
+                    WebView(html: html, baseUrl: baseUrl)
+                        .id("\(ext)-\(style.wrappedValue.rawValue)")
+                        .frame(height: 140)
+                } else {
+                    // No bundled sample for this format (CDJSON, MMTF) —
+                    // fall back to the schematic SwiftUI render.
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 0.94, green: 0.95, blue: 0.96),
+                            Color(red: 0.83, green: 0.85, blue: 0.88)
+                        ]),
+                        startPoint: .top, endPoint: .bottom)
+                        .frame(height: 140)
+                    FormatViewerPlaceholder(ext: ext, style: style.wrappedValue, tint: tint)
+                        .padding(8)
+                }
                 VStack {
                     Spacer()
                     HStack {
@@ -606,8 +672,10 @@ struct ContentView: View {
                     }
                 }
                 .padding(8)
+                .allowsHitTesting(false)
             }
             .frame(height: 140)
+            .clipped()
 
             // Header row: badge + name + ext + enable toggle
             HStack(spacing: 10) {
@@ -948,55 +1016,35 @@ struct ContentView: View {
     }
 
     private var toolbarPreviewPane: some View {
-        let activeLabels: [String] = [
-            (userSettings.ctlShowStick,    "Stick"),
-            (userSettings.ctlShowLine,     "Line"),
-            (userSettings.ctlShowSphere,   "Sphere"),
-            (userSettings.ctlShowCartoon,  "Cartoon"),
-            (userSettings.ctlShowSurface,  "Surface"),
-            (userSettings.ctlShowColorSS,  "Color SS"),
-            (userSettings.ctlShowLabelCA,  "Label αC"),
-            (userSettings.ctlShowRecenter, "Recenter"),
-            (userSettings.ctlShowRotation, "Spin"),
-        ].filter { $0.0 }.map { $0.1 }
-
-        return ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.91, green: 0.92, blue: 0.93),
-                        Color(red: 0.78, green: 0.79, blue: 0.82)
-                    ]),
-                    center: .center, startRadius: 30, endRadius: 220))
-                .frame(height: 180)
-            VStack {
-                HStack {
-                    Text("caffeine.mol2 · 24 atoms · C₈H₁₀N₄O₂")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(Color.primary.opacity(0.65))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.white.opacity(0.75)))
-                    Spacer()
-                }
-                Spacer()
-                if !activeLabels.isEmpty && userSettings.showControlsInPreview {
-                    HStack(spacing: 2) {
-                        ForEach(activeLabels, id: \.self) { l in
-                            Text(l).font(.system(size: 10.5, weight: .medium))
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                        }
-                    }
-                    .padding(3)
-                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.white.opacity(0.78))
-                        .shadow(color: Color.black.opacity(0.1), radius: 6, y: 2))
-                }
+        // Real 3Dmol preview of caffeine.mol2 — same molecule the design
+        // mocks up, but rendered live with the user's current toolbar
+        // settings so toggling Stick/Cartoon/etc actually shows the
+        // resulting in-preview toolbar.
+        ZStack {
+            if let html = sampleHTML(forExt: "mol2", style: userSettings.atomStyleMOL2),
+               let baseUrl = sampleBaseURL {
+                WebView(html: html, baseUrl: baseUrl)
+                    .frame(height: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .id("toolbar-preview-\(userSettings.atomStyleMOL2.rawValue)-\(toolbarSignature)")
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.secondary.opacity(0.1))
+                    .frame(height: 200)
             }
-            .padding(10)
-            .frame(height: 180)
         }
+    }
+
+    /// Cache-busting signature for the toolbar preview WebView so it
+    /// reloads when any of the toolbar button toggles changes.
+    private var toolbarSignature: String {
+        [userSettings.showControlsInPreview,
+         userSettings.ctlShowStick, userSettings.ctlShowLine,
+         userSettings.ctlShowSphere, userSettings.ctlShowCartoon,
+         userSettings.ctlShowSurface, userSettings.ctlShowColorSS,
+         userSettings.ctlShowLabelCA, userSettings.ctlShowRecenter,
+         userSettings.ctlShowRotation, userSettings.showShareButton]
+            .map { $0 ? "1" : "0" }.joined()
     }
 
     @ViewBuilder
@@ -1034,6 +1082,58 @@ struct ContentView: View {
                     CheckRow(label: "PDB title (HEADER)", isOn: $userSettings.infoShowPDBTitle)
                 }
                 .disabled(!userSettings.showInfoOverlay)
+                .opacity(userSettings.showInfoOverlay ? 1 : 0.45)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "Live preview")
+                Card {
+                    VStack(alignment: .leading, spacing: 6) {
+                        let rows: [(String, String, Bool)] = [
+                            ("File name",         "6oc6.pdb",                userSettings.infoShowFileName),
+                            ("File format",       "PDB",                     userSettings.infoShowFormat),
+                            ("Atom count",        "12,488 atoms",            userSettings.infoShowAtomCount),
+                            ("Chain count",       "4 chains",                userSettings.infoShowChainCount),
+                            ("Residue count",     "1,560 residues",          userSettings.infoShowResidueCount),
+                            ("Element breakdown", "C·6.2k H·5.1k N·1.0k O·1.1k", userSettings.infoShowElementBreakdown),
+                            ("Molecular weight",  "156.8 kDa",               userSettings.infoShowMolWeight),
+                            ("Bond count",        "12,820 bonds",            userSettings.infoShowBondCount),
+                            ("PDB title",         "XoxF from M. extorquens", userSettings.infoShowPDBTitle),
+                        ]
+                        let visible = rows.filter { $0.2 }
+                        if visible.isEmpty {
+                            Text("No fields selected.")
+                                .font(.system(size: 11.5, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(visible, id: \.0) { row in
+                                HStack(alignment: .top, spacing: 12) {
+                                    Text(row.0)
+                                        .font(.system(size: 10.5, design: .monospaced))
+                                        .foregroundColor(Color.primary.opacity(0.45))
+                                        .frame(width: 130, alignment: .leading)
+                                    Text(row.1)
+                                        .font(.system(size: 11.5, design: .monospaced))
+                                        .foregroundColor(Color.primary.opacity(0.78))
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(red: 0.96, green: 0.96, blue: 0.97),
+                                    Color(red: 0.85, green: 0.85, blue: 0.87)
+                                ]),
+                                startPoint: .topLeading, endPoint: .bottomTrailing))
+                    )
+                    .padding(10)
+                }
                 .opacity(userSettings.showInfoOverlay ? 1 : 0.45)
             }
         }
@@ -1663,6 +1763,52 @@ struct ContentView: View {
             }
         }
         return true
+    }
+
+    /// baseURL passed to every WKWebView preview — required so the
+    /// viewer template can resolve its bundled `<script src="3Dmol.js">`.
+    private var sampleBaseURL: URL? {
+        Bundle.main.path(forResource: "3Dmol_viewer", ofType: "html")
+            .map { URL(fileURLWithPath: $0) }
+    }
+
+    /// Resolve `ext` to a bundled sample structure and build the HTML
+    /// that renders it at the requested atom-style. Returns nil when
+    /// no sample exists for this format (CDJSON / MMTF) — the caller
+    /// falls back to a schematic SwiftUI placeholder.
+    private func sampleHTML(forExt ext: String, style: Settings.AtomStyle) -> String? {
+        guard let htmlPath = Bundle.main.path(forResource: "3Dmol_viewer", ofType: "html") else {
+            return nil
+        }
+        let lower = ext.lowercased()
+        let resource: (name: String, type: String)?
+        switch lower {
+        case "pdb":    resource = ("6oc6",     "pdb")
+        case "cif":    resource = ("1565673",  "cif")
+        case "sdf":    resource = ("PQQ",      "sdf")
+        case "mol":    resource = ("methane",  "mol")
+        case "mol2":   resource = ("caffeine", "mol2")
+        case "xyz":    resource = ("benzene",  "xyz")
+        case "gro":    resource = ("water",    "gro")
+        case "cube":   resource = ("water",    "cube")
+        case "pqr":    resource = ("methane",  "pqr")
+        case "vasp":   resource = ("diamond",  "vasp")
+        default:       resource = nil   // CDJSON, MMTF — no sample bundled
+        }
+        guard let r = resource,
+              let p = Bundle.main.path(forResource: r.name, ofType: r.type)
+        else { return nil }
+        // Build a ViewerOptions that mirrors the user's settings but pins
+        // the atom-style to the one this card displays, so all 12 cards
+        // can preview different styles simultaneously.
+        var opts = ViewerOptions.from(userSettings,
+                                      fileExtension: r.type,
+                                      fileName: "\(r.name).\(r.type)")
+        opts.atomStyle = style
+        return prepare3DmolHTML(htmlPath: htmlPath,
+                                pdbPath: p,
+                                dataFormat: Settings.dataFormat(forExtension: r.type) ?? "pdb",
+                                options: opts)
     }
 
     private func previewHTML(htmlPath: String, filePath: String, ext: String) -> String {
