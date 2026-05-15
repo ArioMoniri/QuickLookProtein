@@ -186,7 +186,10 @@ internal func convertCCP4ToCube(_ data: Data) -> String? {
     let needed = payloadOffset + 4 * totalVoxels
     guard data.count >= needed else { return nil }
     var values = [Float](repeating: 0, count: totalVoxels)
-    values.withUnsafeMutableBufferPointer { buf in
+    // withUnsafeMutableBufferPointer is generic over the closure's return
+    // type — we don't need the (Void) result, so explicitly discard it to
+    // silence "Result of call to '…' is unused".
+    _ = values.withUnsafeMutableBufferPointer { buf in
         data.copyBytes(to: UnsafeMutableRawBufferPointer(buf),
                        from: payloadOffset..<needed)
     }
