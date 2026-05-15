@@ -98,6 +98,11 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 920, minHeight: 640)
+        // App-wide magenta accent — matches the project's icon gradient and
+        // the Claude Design template's magenta switches. SwiftUI cascades
+        // this through every selection background, switch tint, and
+        // Picker chevron beneath.
+        .accentColor(Color(red: 0.76, green: 0.10, blue: 0.36))
     }
 
     // MARK: - Sidebar
@@ -206,6 +211,16 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 16) {
             panelHeader(.general, subtitle: "Quick Look behavior and viewer defaults")
 
+            GroupBox(label: Text("Quick Look").font(.headline)) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Enable QuickLookProtein", isOn: $userSettings.masterEnabled)
+                        .help("Master switch. When OFF, the QL extension shows a 'paused' placeholder instead of rendering molecules — useful for troubleshooting without uninstalling the extension.")
+                    Toggle("Run on first preview", isOn: $userSettings.runOnFirstPreview)
+                        .help("When ON (default), the WebView renders immediately on the first spacebar-press for a file. When OFF, large files show a tap-to-render placeholder first to avoid stalling Finder on slow disks.")
+                }
+                .padding(.vertical, 2)
+            }
+
             GroupBox(label: Text("Defaults").font(.headline)) {
                 Form {
                     Picker("Color scheme:", selection: $userSettings.colorScheme) {
@@ -234,18 +249,18 @@ struct ContentView: View {
 
             let cols = [GridItem(.adaptive(minimum: 280), spacing: 14)]
             LazyVGrid(columns: cols, spacing: 14) {
-                formatCard("PDB",    style: $userSettings.atomStylePDB,    tint: Color(red: 0.90, green: 0.27, blue: 0.27), description: "Protein Data Bank")
-                formatCard("CIF",    style: $userSettings.atomStyleCIF,    tint: Color(red: 0.94, green: 0.54, blue: 0.12), description: "Crystallographic IF")
-                formatCard("SDF",    style: $userSettings.atomStyleSDF,    tint: Color(red: 0.90, green: 0.72, blue: 0.17), description: "Structure Data File")
-                formatCard("MOL",    style: $userSettings.atomStyleMOL,    tint: Color(red: 0.36, green: 0.69, blue: 0.29), description: "MDL Molfile")
-                formatCard("MOL2",   style: $userSettings.atomStyleMOL2,   tint: Color(red: 0.15, green: 0.65, blue: 0.58), description: "Tripos Mol2")
-                formatCard("XYZ",    style: $userSettings.atomStyleXYZ,    tint: Color(red: 0.22, green: 0.68, blue: 0.86), description: "XYZ Coordinates")
-                formatCard("GRO",    style: $userSettings.atomStyleGRO,    tint: Color(red: 0.23, green: 0.51, blue: 0.90), description: "GROMACS")
-                formatCard("CUBE",   style: $userSettings.atomStyleCUBE,   tint: Color(red: 0.48, green: 0.36, blue: 0.90), description: "Gaussian Cube")
-                formatCard("PQR",    style: $userSettings.atomStylePQR,    tint: Color(red: 0.76, green: 0.31, blue: 0.72), description: "PDB + Charge/Radius")
-                formatCard("VASP",   style: $userSettings.atomStyleVASP,   tint: Color(red: 0.43, green: 0.47, blue: 0.52), description: "VASP POSCAR")
-                formatCard("CDJSON", style: $userSettings.atomStyleCDJSON, tint: Color(red: 0.60, green: 0.42, blue: 0.25), description: "ChemDraw JSON")
-                formatCard("MMTF",   style: $userSettings.atomStyleMMTF,   tint: Color(red: 0.31, green: 0.42, blue: 0.76), description: "MacroMol Transmission")
+                formatCard("PDB",    style: $userSettings.atomStylePDB,    enabled: $userSettings.formatEnabledPDB,    tint: Color(red: 0.90, green: 0.27, blue: 0.27), description: "Protein Data Bank")
+                formatCard("CIF",    style: $userSettings.atomStyleCIF,    enabled: $userSettings.formatEnabledCIF,    tint: Color(red: 0.94, green: 0.54, blue: 0.12), description: "Crystallographic IF")
+                formatCard("SDF",    style: $userSettings.atomStyleSDF,    enabled: $userSettings.formatEnabledSDF,    tint: Color(red: 0.90, green: 0.72, blue: 0.17), description: "Structure Data File")
+                formatCard("MOL",    style: $userSettings.atomStyleMOL,    enabled: $userSettings.formatEnabledMOL,    tint: Color(red: 0.36, green: 0.69, blue: 0.29), description: "MDL Molfile")
+                formatCard("MOL2",   style: $userSettings.atomStyleMOL2,   enabled: $userSettings.formatEnabledMOL2,   tint: Color(red: 0.15, green: 0.65, blue: 0.58), description: "Tripos Mol2")
+                formatCard("XYZ",    style: $userSettings.atomStyleXYZ,    enabled: $userSettings.formatEnabledXYZ,    tint: Color(red: 0.22, green: 0.68, blue: 0.86), description: "XYZ Coordinates")
+                formatCard("GRO",    style: $userSettings.atomStyleGRO,    enabled: $userSettings.formatEnabledGRO,    tint: Color(red: 0.23, green: 0.51, blue: 0.90), description: "GROMACS")
+                formatCard("CUBE",   style: $userSettings.atomStyleCUBE,   enabled: $userSettings.formatEnabledCUBE,   tint: Color(red: 0.48, green: 0.36, blue: 0.90), description: "Gaussian Cube")
+                formatCard("PQR",    style: $userSettings.atomStylePQR,    enabled: $userSettings.formatEnabledPQR,    tint: Color(red: 0.76, green: 0.31, blue: 0.72), description: "PDB + Charge/Radius")
+                formatCard("VASP",   style: $userSettings.atomStyleVASP,   enabled: $userSettings.formatEnabledVASP,   tint: Color(red: 0.43, green: 0.47, blue: 0.52), description: "VASP POSCAR")
+                formatCard("CDJSON", style: $userSettings.atomStyleCDJSON, enabled: $userSettings.formatEnabledCDJSON, tint: Color(red: 0.60, green: 0.42, blue: 0.25), description: "ChemDraw JSON")
+                formatCard("MMTF",   style: $userSettings.atomStyleMMTF,   enabled: $userSettings.formatEnabledMMTF,   tint: Color(red: 0.31, green: 0.42, blue: 0.76), description: "MacroMol Transmission")
             }
         }
     }
@@ -253,6 +268,7 @@ struct ContentView: View {
     @ViewBuilder
     private func formatCard(_ ext: String,
                             style: Binding<Settings.AtomStyle>,
+                            enabled: Binding<Bool>,
                             tint: Color,
                             description: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -274,6 +290,9 @@ struct ContentView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer(minLength: 0)
+                Toggle("", isOn: enabled)
+                    .labelsHidden()
+                    .help("Disable .\(ext.lowercased()) previews. The QL extension shows a 'paused' placeholder for this format until you re-enable it.")
             }
             .padding(.horizontal, 14)
 
@@ -281,6 +300,8 @@ struct ContentView: View {
                 ForEach(Settings.AtomStyle.allCases) { Text($0.rawValue).tag($0) }
             }
             .labelsHidden()
+            .disabled(!enabled.wrappedValue)
+            .opacity(enabled.wrappedValue ? 1.0 : 0.45)
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
             .padding(.top, 2)
@@ -359,6 +380,19 @@ struct ContentView: View {
                     Toggle("Cube isosurface (.cube)", isOn: $userSettings.cubeIsosurface)
                     Toggle("Biological assembly (PDB REMARK 350 / CIF oper_list)", isOn: $userSettings.bioAssembly)
                     Toggle("Cryo-EM density isosurface (.ccp4/.mrc/.map)", isOn: $userSettings.cryoEMRender)
+                    HStack(spacing: 8) {
+                        Text("Cryo-EM σ threshold:")
+                            .font(.system(size: 12))
+                        Slider(value: $userSettings.cryoEMSigma, in: 0.5...6.0, step: 0.1)
+                            .frame(maxWidth: 220)
+                        Text(String(format: "%.1f σ", userSettings.cryoEMSigma))
+                            .font(.system(size: 11.5, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                    .disabled(!userSettings.cryoEMRender)
+                    .opacity(userSettings.cryoEMRender ? 1 : 0.45)
+                    .help("Threshold for the cryo-EM isosurface contour — higher σ shows only the densest features (sharp helices, ligand binding sites); lower σ reveals the full envelope. Typical range 1.5–3.0σ.")
                     Toggle("Share button in preview", isOn: $userSettings.showShareButton)
                     Toggle("Include USDZ in Share (AR Quick Look)", isOn: $userSettings.includeUSDZInShare)
                     Toggle("Animated thumbnails (experimental APNG)", isOn: $userSettings.animatedThumbnails)

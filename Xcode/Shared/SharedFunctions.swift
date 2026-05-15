@@ -1275,6 +1275,43 @@ private func readMolecularTextFile(_ path: String) throws -> String {
                                 "File is not text in any common encoding"])
 }
 
+/// Render a styled "extension disabled in Settings" page. Used by the QL
+/// extension when the user's masterEnabled flag is OFF or the per-format
+/// formatEnabled flag for this file's extension is OFF.
+func disabledHTML(reason: String, fileName: String) -> String {
+    let safeName = fileName
+        .replacingOccurrences(of: "<", with: "&lt;")
+        .replacingOccurrences(of: ">", with: "&gt;")
+    let safeReason = reason
+        .replacingOccurrences(of: "<", with: "&lt;")
+        .replacingOccurrences(of: ">", with: "&gt;")
+    return """
+    <!doctype html><html><head><meta charset="utf-8"><style>
+    html,body{margin:0;padding:0;height:100%;
+      font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+      display:flex;align-items:center;justify-content:center;
+      background:transparent;color:#555;text-align:center;padding:24px;}
+    .icon{width:48px;height:48px;border-radius:11px;display:inline-flex;
+      align-items:center;justify-content:center;
+      background:linear-gradient(135deg,#c2185b,#7b1fa2);
+      color:#fff;font-size:24px;line-height:1;margin-bottom:14px;
+      box-shadow:0 4px 12px rgba(123,31,162,0.3);}
+    .t{font-weight:600;margin-bottom:8px;font-size:14px;color:#333;}
+    .n{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;
+      color:#888;margin-top:6px;}
+    .d{font-size:12px;color:#777;max-width:420px;line-height:1.5;}
+    @media (prefers-color-scheme: dark){
+      .t{color:#eee;} .d{color:#aaa;} .n{color:#888;} body{color:#ccc;}
+    }
+    </style></head><body><div>
+      <div class="icon">⏸</div>
+      <div class="t">QuickLookProtein is paused</div>
+      <div class="d">\(safeReason)</div>
+      <div class="n">\(safeName)</div>
+    </div></body></html>
+    """
+}
+
 /// Renders a styled in-page message when the file is too large to safely render inside
 /// a Quick Look extension's memory budget.
 func oversizedFileHTML(name: String, sizeMB: Double) -> String {

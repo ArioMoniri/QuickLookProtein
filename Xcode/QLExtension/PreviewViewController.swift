@@ -101,7 +101,31 @@ class PreviewViewController: NSViewController,
         let dataFormat = Settings.dataFormat(forExtension: fileExtension) ?? "pdb"
         os_log("ext=%{public}@ → format=%{public}@", log: qlLog, type: .info, fileExtension, dataFormat)
 
+        // Master + per-format disable gates (1.7.48+). Both default ON,
+        // so unchanged installs pass straight through. When either gate is
+        // OFF, render a friendly "paused" HTML so the user knows why their
+        // QL is dark instead of seeing a half-rendered molecule.
+        let gateSettings = SettingsStorage()
         let html: String
+        if !gateSettings.masterEnabled {
+            html = disabledHTML(
+                reason: "QuickLookProtein is disabled in the Settings app. Re-enable it under General → Quick Look to resume molecule previews.",
+                fileName: url.lastPathComponent)
+            let baseUrl = URL(fileURLWithPath: htmlPath)
+            self.pendingHandler = handler
+            self.webView?.loadHTMLString(html, baseURL: baseUrl)
+            return
+        }
+        if !gateSettings.formatEnabled(forExtension: fileExtension) {
+            html = disabledHTML(
+                reason: "Previews for .\(fileExtension) files are turned off in the Settings app. Re-enable .\(fileExtension) under File Formats to resume.",
+                fileName: url.lastPathComponent)
+            let baseUrl = URL(fileURLWithPath: htmlPath)
+            self.pendingHandler = handler
+            self.webView?.loadHTMLString(html, baseURL: baseUrl)
+            return
+        }
+
         let cap = (fileExtension == "ccp4" || fileExtension == "mrc" || fileExtension == "map")
                   ? maxPreviewBytesCryoEM : maxPreviewBytes
         if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int,

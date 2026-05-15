@@ -110,6 +110,56 @@ class SettingsStorage: ObservableObject {
     @Published var ctlShowRecenter: Bool { didSet { Self.preferencesStore.set(ctlShowRecenter, forKey: "ctlShowRecenter") } }
     @Published var ctlShowRotation: Bool { didSet { Self.preferencesStore.set(ctlShowRotation, forKey: "ctlShowRotation") } }
 
+    // Master enable (1.7.48+). When OFF, the QL extension renders an info
+    // panel instead of running the WebView preview pipeline. Useful while
+    // troubleshooting a misbehaving 3Dmol render without uninstalling.
+    @Published var masterEnabled: Bool { didSet { Self.preferencesStore.set(masterEnabled, forKey: "masterEnabled") } }
+    // "Run on first preview" — when OFF, skip the rendering pipeline for the
+    // very first Finder-spacebar of a new file path (show a tap-to-render
+    // placeholder instead). Most users want ON; OFF helps on slow disks /
+    // large files where the initial parse can stall the QL window.
+    @Published var runOnFirstPreview: Bool { didSet { Self.preferencesStore.set(runOnFirstPreview, forKey: "runOnFirstPreview") } }
+
+    // Per-format enable flags (1.7.48+). When a format's flag is OFF, the
+    // QL extension still claims the UTI (we can't unregister at runtime —
+    // UTIs are baked into Info.plist) but renders a "disabled in Settings"
+    // info panel instead of the molecule. Lets power users selectively
+    // disable formats that conflict with other tools.
+    @Published var formatEnabledPDB:    Bool { didSet { Self.preferencesStore.set(formatEnabledPDB,    forKey: "formatEnabledPDB") } }
+    @Published var formatEnabledCIF:    Bool { didSet { Self.preferencesStore.set(formatEnabledCIF,    forKey: "formatEnabledCIF") } }
+    @Published var formatEnabledSDF:    Bool { didSet { Self.preferencesStore.set(formatEnabledSDF,    forKey: "formatEnabledSDF") } }
+    @Published var formatEnabledMOL:    Bool { didSet { Self.preferencesStore.set(formatEnabledMOL,    forKey: "formatEnabledMOL") } }
+    @Published var formatEnabledMOL2:   Bool { didSet { Self.preferencesStore.set(formatEnabledMOL2,   forKey: "formatEnabledMOL2") } }
+    @Published var formatEnabledXYZ:    Bool { didSet { Self.preferencesStore.set(formatEnabledXYZ,    forKey: "formatEnabledXYZ") } }
+    @Published var formatEnabledGRO:    Bool { didSet { Self.preferencesStore.set(formatEnabledGRO,    forKey: "formatEnabledGRO") } }
+    @Published var formatEnabledCUBE:   Bool { didSet { Self.preferencesStore.set(formatEnabledCUBE,   forKey: "formatEnabledCUBE") } }
+    @Published var formatEnabledPQR:    Bool { didSet { Self.preferencesStore.set(formatEnabledPQR,    forKey: "formatEnabledPQR") } }
+    @Published var formatEnabledVASP:   Bool { didSet { Self.preferencesStore.set(formatEnabledVASP,   forKey: "formatEnabledVASP") } }
+    @Published var formatEnabledCDJSON: Bool { didSet { Self.preferencesStore.set(formatEnabledCDJSON, forKey: "formatEnabledCDJSON") } }
+    @Published var formatEnabledMMTF:   Bool { didSet { Self.preferencesStore.set(formatEnabledMMTF,   forKey: "formatEnabledMMTF") } }
+
+    /// Returns whether the given filename extension's format is enabled.
+    /// Used by the QL extension to gate rendering. Unknown extensions
+    /// default to enabled so the cryo-EM / trajectory / .gjf paths still
+    /// work without separate flags.
+    func formatEnabled(forExtension ext: String) -> Bool {
+        switch ext.lowercased() {
+        case "pdb", "ent", "pdbqt":      return formatEnabledPDB
+        case "cif", "mmcif":             return formatEnabledCIF
+        case "sdf":                      return formatEnabledSDF
+        case "mol":                      return formatEnabledMOL
+        case "mol2":                     return formatEnabledMOL2
+        case "xyz":                      return formatEnabledXYZ
+        case "gro":                      return formatEnabledGRO
+        case "cube", "cub":              return formatEnabledCUBE
+        case "pqr":                      return formatEnabledPQR
+        case "vasp", "poscar":           return formatEnabledVASP
+        case "cdjson":                   return formatEnabledCDJSON
+        case "mmtf":                     return formatEnabledMMTF
+        default:                         return true
+        }
+    }
+
     // Outline shading: 3Dmol's `style: { outline: true }` flag. Adds a
     // thin black border around each atom/bond, makes the preview
     // pop on light backgrounds. Default OFF.
@@ -249,6 +299,20 @@ class SettingsStorage: ObservableObject {
         self.ctlShowLabelCA   = store.object(forKey: "ctlShowLabelCA")   as? Bool ?? true
         self.ctlShowRecenter  = store.object(forKey: "ctlShowRecenter")  as? Bool ?? true
         self.ctlShowRotation  = store.object(forKey: "ctlShowRotation")  as? Bool ?? true
+        self.masterEnabled      = store.object(forKey: "masterEnabled")      as? Bool ?? true
+        self.runOnFirstPreview  = store.object(forKey: "runOnFirstPreview")  as? Bool ?? true
+        self.formatEnabledPDB    = store.object(forKey: "formatEnabledPDB")    as? Bool ?? true
+        self.formatEnabledCIF    = store.object(forKey: "formatEnabledCIF")    as? Bool ?? true
+        self.formatEnabledSDF    = store.object(forKey: "formatEnabledSDF")    as? Bool ?? true
+        self.formatEnabledMOL    = store.object(forKey: "formatEnabledMOL")    as? Bool ?? true
+        self.formatEnabledMOL2   = store.object(forKey: "formatEnabledMOL2")   as? Bool ?? true
+        self.formatEnabledXYZ    = store.object(forKey: "formatEnabledXYZ")    as? Bool ?? true
+        self.formatEnabledGRO    = store.object(forKey: "formatEnabledGRO")    as? Bool ?? true
+        self.formatEnabledCUBE   = store.object(forKey: "formatEnabledCUBE")   as? Bool ?? true
+        self.formatEnabledPQR    = store.object(forKey: "formatEnabledPQR")    as? Bool ?? true
+        self.formatEnabledVASP   = store.object(forKey: "formatEnabledVASP")   as? Bool ?? true
+        self.formatEnabledCDJSON = store.object(forKey: "formatEnabledCDJSON") as? Bool ?? true
+        self.formatEnabledMMTF   = store.object(forKey: "formatEnabledMMTF")   as? Bool ?? true
         self.outlineShading   = store.object(forKey: "outlineShading")   as? Bool ?? false
         self.ambientOcclusion = store.object(forKey: "ambientOcclusion") as? Bool ?? true
         self.autoOrient       = store.object(forKey: "autoOrient")       as? Bool ?? false
