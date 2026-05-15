@@ -45,6 +45,41 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
     @Published var canCheck: Bool = true
     @Published var lastCheckStatus: String = ""
 
+    /// Two real Sparkle knobs surfaced as @Published proxies so the
+    /// Settings UI's Software Update panel can bind directly. Setting
+    /// either property writes the change back to SPUUpdater immediately
+    /// and Sparkle persists the value via its own NSUserDefaults storage.
+    @Published var automaticallyChecksForUpdates: Bool = true {
+        didSet {
+            controller?.updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates
+        }
+    }
+    /// Cadence is stored in seconds; expose as a Picker-friendly enum.
+    @Published var updateCheckCadence: UpdateCheckCadence = .weekly {
+        didSet {
+            controller?.updater.updateCheckInterval = updateCheckCadence.seconds
+        }
+    }
+
+    enum UpdateCheckCadence: String, CaseIterable, Identifiable {
+        case daily   = "Daily"
+        case weekly  = "Weekly"
+        case monthly = "Monthly"
+        var id: String { rawValue }
+        var seconds: TimeInterval {
+            switch self {
+            case .daily:   return 60 * 60 * 24
+            case .weekly:  return 60 * 60 * 24 * 7
+            case .monthly: return 60 * 60 * 24 * 30
+            }
+        }
+        static func from(seconds: TimeInterval) -> UpdateCheckCadence {
+            if seconds <= 60 * 60 * 24 * 2          { return .daily }
+            if seconds <= 60 * 60 * 24 * 14         { return .weekly }
+            return .monthly
+        }
+    }
+
     /// Optional because we only construct Sparkle when `SUPublicEDKey`
     /// in Info.plist is a real key — not the `REPLACE_WITH_…` placeholder
     /// the source ships with. Constructing `SPUStandardUpdaterController`
@@ -90,6 +125,13 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
         do {
             try ctl.updater.start()
             self.controller = ctl
+            // Reflect Sparkle's persisted settings into our @Published
+            // proxies so the UI starts in sync. didSets are intentionally
+            // bypassed here — assigning the same value would re-write to
+            // Sparkle and noop, but doing it through `_` keeps the
+            // direction-of-truth one-way from Sparkle to UI on startup.
+            self.automaticallyChecksForUpdates = ctl.updater.automaticallyChecksForUpdates
+            self.updateCheckCadence = UpdateCheckCadence.from(seconds: ctl.updater.updateCheckInterval)
             self.lastCheckStatus = "Auto-updates enabled."
         } catch {
             // Sparkle's start() throws for malformed SUPublicEDKey, bad
@@ -148,6 +190,36 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
         }
         lastCheckStatus = "Checking…"
         controller.checkForUpdates(nil)
+    }
+
+    /// Open the GitHub Releases page in the user's default browser —
+    /// fallback when Sparkle isn't configured (no public key) or when
+    /// the user clicks "Download from GitHub" deliberately.
+    func openReleasesPage() {
+        NSWorkspace.shared.open(releasesURL)
+    }
+
+    /// Reset macOS's Quick Look generator cache. Run when the QL preview
+    /// stops refreshing after an update (the system caches the old
+    /// extension's bundle path until restarted).
+    func resetQuickLookCache() {
+        let p = Process()
+        p.launchPath = "/usr/bin/qlmanage"
+        p.arguments = ["-r", "cache"]
+        do {
+            try p.run()
+            p.waitUntilExit()
+            // Also reset the registered generator list so the new
+            // extension version gets picked up.
+            let q = Process()
+            q.launchPath = "/usr/bin/qlmanage"
+            q.arguments = ["-r"]
+            try q.run()
+            q.waitUntilExit()
+            lastCheckStatus = "Quick Look cache reset (\(Self.lastCheckFormatter.string(from: Date())))."
+        } catch {
+            lastCheckStatus = "qlmanage failed: \(error.localizedDescription)"
+        }
     }
 
     // MARK: SPUUpdaterDelegate (small lifecycle pings the About UI surfaces)

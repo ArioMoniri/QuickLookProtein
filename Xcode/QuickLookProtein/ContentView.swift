@@ -1041,66 +1041,278 @@ struct ContentView: View {
 
     @ViewBuilder
     private var multiFilePanel: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            panelHeader(.multi, subtitle: "Behavior when previewing more than one structure")
+        VStack(alignment: .leading, spacing: 18) {
+            panelHeader(.multi, subtitle: "Behavior when previewing more than one structure at once")
 
-            GroupBox(label: Text("Layout").font(.headline)) {
-                Form {
-                    Picker("When previewing many files:",
-                           selection: $userSettings.multiFilePreviewMode) {
-                        ForEach(Settings.MultiFilePreviewMode.allCases) {
-                            Text($0.rawValue).tag($0)
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "Layout")
+                Card {
+                    FormRow(label: "When previewing many files") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            multiModeRadio(
+                                .separate,
+                                title: "Separate windows (default)",
+                                sub: "Quick Look's standard ⌘‹/⌘› navigation — best for comparing one at a time")
+                            multiModeRadio(
+                                .mergeFolder,
+                                title: "Merge all in same folder",
+                                sub: "Overlay every readable sibling in one viewport — sandbox permitting (use Quick Actions for guaranteed merge)")
                         }
                     }
-                    .help("""
-                    Quick Look's sandbox hands the preview extension one file at a time, so spacebar-multi-select rarely triggers a merge.
-
-                    For a guaranteed merge:
-                    1. Select two or more compatible files in Finder.
-                    2. Right-click → Quick Actions → Render Molecule to PNG.
-                    3. Open <first>-merged.pdb that appears next to them.
-                    """)
                 }
+                Text("Quick Look's sandbox usually hands the preview extension one file at a time, so spacebar-multi-select doesn't always trigger a merge. For a guaranteed merge: right-click 2+ files → Quick Actions → Render Molecule to PNG, then open the `<first>-merged.pdb` that appears next to them.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 16)
             }
         }
     }
 
+    /// One radio row with a primary label + explanatory sub-line. Styled
+    /// to match the design's bullet+description pattern.
+    private func multiModeRadio(_ mode: Settings.MultiFilePreviewMode,
+                                title: String,
+                                sub: String) -> some View {
+        let selected = userSettings.multiFilePreviewMode == mode
+        return Button {
+            userSettings.multiFilePreviewMode = mode
+        } label: {
+            HStack(alignment: .top, spacing: 8) {
+                ZStack {
+                    Circle()
+                        .stroke(selected ? Color.accentColor : Color.primary.opacity(0.3),
+                                lineWidth: selected ? 5 : 1)
+                        .frame(width: 14, height: 14)
+                }
+                .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.system(size: 13))
+                    Text(sub).font(.system(size: 11)).foregroundColor(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     @ViewBuilder
     private var updatesPanel: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 18) {
             panelHeader(.updates, subtitle: "Stay current with signed, notarised releases")
-            updatesCard
+
+            // Hero status card — version, last-check status, EdDSA badge,
+            // and the two primary actions.
+            Card {
+                HStack(spacing: 14) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 48, height: 48)
+                        .background(LinearGradient(
+                            gradient: Gradient(colors: [Color(red: 0.04, green: 0.52, blue: 1.00),
+                                                        Color(red: 0.37, green: 0.61, blue: 1.00)]),
+                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(heroUpdateTitle).font(.system(size: 15, weight: .semibold))
+                        Text(heroUpdateSubtitle)
+                            .font(.system(size: 12)).foregroundColor(.secondary)
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(Color(red: 0.20, green: 0.78, blue: 0.35))
+                            Text("Verified with Sparkle EdDSA signature")
+                                .font(.system(size: 11)).foregroundColor(.secondary)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    VStack(spacing: 6) {
+                        Button("Check for Updates") { updater.checkForUpdates() }
+                            .buttonStyle(PrimaryPillButtonStyle())
+                        Button("Download from GitHub") { updater.openReleasesPage() }
+                            .buttonStyle(SecondaryPillButtonStyle())
+                    }
+                }
+                .padding(16)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "Updates")
+                Card {
+                    ToggleRow(label: "Check automatically",
+                              isOn: $updater.automaticallyChecksForUpdates,
+                              hint: "Sparkle polls the GitHub appcast at the cadence below.")
+                    RowDivider()
+                    FormRow(label: "Check frequency") {
+                        Picker("", selection: $updater.updateCheckCadence) {
+                            ForEach(Updater.UpdateCheckCadence.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .labelsHidden()
+                        .frame(width: 130)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "Maintenance")
+                Card {
+                    FormRow(label: "Quick Look cache",
+                            hint: "Run if previews stop refreshing after an update.") {
+                        Button("Reset Quick Look cache") { updater.resetQuickLookCache() }
+                    }
+                }
+                if !updater.lastCheckStatus.isEmpty {
+                    Text(updater.lastCheckStatus)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 16)
+                }
+            }
+
             troubleshootingCard
         }
     }
 
+    private var heroUpdateTitle: String {
+        if updater.lastCheckStatus.lowercased().contains("checking") {
+            return "Checking for updates…"
+        }
+        return "Your software is up to date."
+    }
+
+    private var heroUpdateSubtitle: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "QuickLookProtein \(v) (build \(b))"
+    }
+
     @ViewBuilder
     private var aboutPanel: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .center, spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(LinearGradient(
-                            colors: [Color(red: 0.76, green: 0.10, blue: 0.36),
-                                     Color(red: 0.48, green: 0.12, blue: 0.64)],
-                            startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 96, height: 96)
-                        .shadow(color: Color(red: 0.48, green: 0.12, blue: 0.64).opacity(0.3),
-                                radius: 12, x: 0, y: 8)
-                    Image(systemName: "atom")
-                        .font(.system(size: 50, weight: .regular))
-                        .foregroundColor(.white)
-                }
-                Text("QuickLookProtein").font(.system(size: 22, weight: .bold))
-                Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+        let v  = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+        let b  = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        let min = Bundle.main.infoDictionary?["LSMinimumSystemVersion"] as? String ?? ""
+
+        VStack(alignment: .leading, spacing: 18) {
+            // Hero: real AppIcon + name + version line
+            VStack(alignment: .center, spacing: 8) {
+                appIconImage
+                    .resizable()
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
+                Text("QuickLookProtein").font(.system(size: 24, weight: .bold))
+                Text("Version \(v) (build \(b))\(min.isEmpty ? "" : " · macOS \(min) +")")
                     .font(.system(size: 12)).foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 12)
 
-            creditsCard
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "Credits")
+                Card {
+                    VStack(alignment: .leading, spacing: 10) {
+                        (Text("Originally built by ") +
+                         Text("Jethro Hemmann").bold() +
+                         Text(" (2021–2022)."))
+                            .font(.system(size: 13))
+                        (Text("Extended by ") +
+                         Text("Ariorad Moniri").bold() +
+                         Text(" (2026) — multi-format support, smart protein+ligand styling, molecular surfaces, Finder thumbnails, Spotlight indexing, drag-and-drop preview, Quick Actions, AR-Quick-Look USDZ, DCD/TRR/XTC trajectories, and Sparkle auto-update."))
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    RowDivider()
+                    HStack(spacing: 10) {
+                        Image(systemName: "link")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        Button("github.com/ArioMoniri/QuickLookProtein") {
+                            if let u = URL(string: "https://github.com/ArioMoniri/QuickLookProtein") {
+                                NSWorkspace.shared.open(u)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.accentColor)
+                        .font(.system(size: 12.5))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "Supported formats")
+                Card {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)],
+                              alignment: .leading, spacing: 8) {
+                        formatBadgeRow("PDB",    "Protein Data Bank",     Color(red: 0.90, green: 0.27, blue: 0.27))
+                        formatBadgeRow("CIF",    "Crystallographic IF",   Color(red: 0.94, green: 0.54, blue: 0.12))
+                        formatBadgeRow("SDF",    "Structure Data File",   Color(red: 0.90, green: 0.72, blue: 0.17))
+                        formatBadgeRow("MOL",    "MDL Molfile",           Color(red: 0.36, green: 0.69, blue: 0.29))
+                        formatBadgeRow("MOL2",   "Tripos Mol2",           Color(red: 0.15, green: 0.65, blue: 0.58))
+                        formatBadgeRow("XYZ",    "XYZ Coordinates",       Color(red: 0.22, green: 0.68, blue: 0.86))
+                        formatBadgeRow("GRO",    "GROMACS",               Color(red: 0.23, green: 0.51, blue: 0.90))
+                        formatBadgeRow("CUBE",   "Gaussian Cube",         Color(red: 0.48, green: 0.36, blue: 0.90))
+                        formatBadgeRow("PQR",    "PDB + Charge/Radius",   Color(red: 0.76, green: 0.31, blue: 0.72))
+                        formatBadgeRow("VASP",   "VASP POSCAR",           Color(red: 0.43, green: 0.47, blue: 0.52))
+                        formatBadgeRow("CDJSON", "ChemDraw JSON",         Color(red: 0.60, green: 0.42, blue: 0.25))
+                        formatBadgeRow("MMTF",   "MacroMol Transmission", Color(red: 0.31, green: 0.42, blue: 0.76))
+                    }
+                    .padding(12)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "Rendering engine")
+                Card {
+                    VStack(alignment: .leading, spacing: 4) {
+                        (Text("Rendered by ") +
+                         Text("3Dmol.js").bold() +
+                         Text(" (Rego & Koes, 2015)"))
+                            .font(.system(size: 13))
+                        Button("3dmol.csb.pitt.edu →") {
+                            if let u = URL(string: "https://3dmol.csb.pitt.edu") {
+                                NSWorkspace.shared.open(u)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.accentColor)
+                        .font(.system(size: 12))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+            }
+
             footerCredit
         }
+    }
+
+    /// One row in the "Supported formats" grid: colored monospace badge +
+    /// truncated friendly name. Mirrors the design's FormatBadge layout.
+    private func formatBadgeRow(_ ext: String, _ name: String, _ tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Text(ext)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(tint)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            Text(name)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
     }
 
     /// Shared option list for every per-format atom-style Picker.
