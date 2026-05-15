@@ -429,22 +429,21 @@ struct ContentView: View {
     @ViewBuilder
     private var sidebar: some View {
         ZStack {
-            // True liquid-glass sidebar: vibrancy material does most of
-            // the work, with only a faint accent-tinted overlay on top
-            // so the magenta wallpaper reads through as a soft tint
-            // rather than blocking it. The previous 55%-opaque tile
-            // was hiding the gradient entirely (user feedback: "glass
-            // design have not been applied").
-            VisualEffectView(material: .sidebar, blending: .behindWindow)
+            // True liquid-glass sidebar. Two blending tricks:
+            //
+            //   1. `.withinWindow` blending makes the visual-effect view
+            //      sample the views BEHIND it in the same window — i.e.
+            //      the magenta+blue radial gradients painted on the
+            //      window's backdrop. `.behindWindow` would sample the
+            //      desktop instead and render flat gray, which is what
+            //      the v1.7.55 user feedback called out.
+            //
+            //   2. `.hudWindow` material has a noticeable saturation
+            //      curve that amplifies the colored gradient bleeding
+            //      through, where `.sidebar` clamps everything toward
+            //      neutral and never shows the magenta hue.
+            VisualEffectView(material: .hudWindow, blending: .withinWindow)
                 .edgesIgnoringSafeArea(.vertical)
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.76, green: 0.10, blue: 0.36).opacity(0.08),
-                    Color(red: 0.48, green: 0.12, blue: 0.64).opacity(0.05)
-                ]),
-                startPoint: .top, endPoint: .bottom)
-                .edgesIgnoringSafeArea(.vertical)
-                .allowsHitTesting(false)
             sidebarContent
         }
     }
@@ -1966,7 +1965,14 @@ struct ContentView: View {
         case "pqr":    resource = ("methane",  "pqr")
         case "vasp":   resource = ("diamond",  "vasp")
         case "cdjson": resource = ("methane",  "cdjson")
-        case "mmtf":   resource = ("methane",  "mmtf")
+        // MMTF is a binary MessagePack format. prepare3DmolHTML reads the
+        // file as UTF-8 text and injects it into a <script type="text/plain">
+        // block, which mangles the bytes — 3Dmol then errors with "Could
+        // not parse MMTF / The string contains invalid characters". Until
+        // we wire a base64+atob bridge for binary formats, the format-card
+        // preview falls back to the schematic placeholder for MMTF (the
+        // QL extension proper has the same limitation for now).
+        case "mmtf":   resource = nil
         default:       resource = nil
         }
         guard let r = resource,
