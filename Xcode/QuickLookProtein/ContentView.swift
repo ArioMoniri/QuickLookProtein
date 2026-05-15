@@ -44,44 +44,40 @@ enum FormatFilter: String, CaseIterable, Identifiable {
 enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     case general    = "General"
     case formats    = "File Formats"
+    case multi      = "Multi-file"
     case appearance = "Appearance"
     case rendering  = "Rendering"
     case toolbar    = "Toolbar"
     case info       = "Info Overlay"
-    case multi      = "Multi-file"
     case updates    = "Software Update"
     case about      = "About"
 
     var id: String { rawValue }
 
-    /// SF Symbol used in the sidebar — picked to be reasonably faithful to
-    /// the design's filled-glyph icons while staying within the system set.
+    /// SF Symbol used in the sidebar — plain monochrome glyphs, matching
+    /// the DockDoor-style design reference. No colored tile backgrounds.
     var symbol: String {
         switch self {
-        case .general:    return "gearshape.fill"
-        case .formats:    return "doc.on.doc.fill"
-        case .appearance: return "paintbrush.fill"
-        case .rendering:  return "cube.transparent.fill"
-        case .toolbar:    return "square.grid.2x2.fill"
-        case .info:       return "info.bubble.fill"
-        case .multi:      return "square.grid.3x2.fill"
+        case .general:    return "gearshape"
+        case .formats:    return "doc.on.doc"
+        case .multi:      return "rectangle.split.3x1"
+        case .appearance: return "paintpalette"
+        case .rendering:  return "cube.transparent"
+        case .toolbar:    return "slider.horizontal.below.rectangle"
+        case .info:       return "info.bubble"
         case .updates:    return "arrow.triangle.2.circlepath"
         case .about:      return "atom"
         }
     }
 
-    /// Tint per section — used on the icon tile and the panel header.
-    var tint: Color {
+    /// Grouping for the sidebar's Features/Customization/System headers.
+    /// `nil` means the row sits ungrouped at the top of the sidebar.
+    var category: String? {
         switch self {
-        case .general:    return Color(red: 0.36, green: 0.43, blue: 0.54)
-        case .formats:    return Color(red: 0.85, green: 0.47, blue: 0.34)
-        case .appearance: return Color(red: 0.64, green: 0.35, blue: 0.85)
-        case .rendering:  return Color(red: 0.16, green: 0.55, blue: 0.33)
-        case .toolbar:    return Color(red: 0.23, green: 0.51, blue: 0.90)
-        case .info:       return Color(red: 0.04, green: 0.52, blue: 1.00)
-        case .multi:      return Color(red: 0.48, green: 0.36, blue: 0.90)
-        case .updates:    return Color(red: 0.04, green: 0.52, blue: 1.00)
-        case .about:      return Color(red: 0.43, green: 0.47, blue: 0.52)
+        case .general:                                     return nil
+        case .formats, .multi:                             return "Features"
+        case .appearance, .rendering, .toolbar, .info:     return "Customization"
+        case .updates, .about:                             return "System"
         }
     }
 }
@@ -376,44 +372,14 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            // Window-wide liquid-glass backdrop tinted with the app icon's
-            // magenta + purple gradient. A subtle radial bleed in the top-
-            // left corner and a cool blue bleed in the bottom-right echo
-            // the design template's "wallpaper" look while staying out of
-            // the way of the cards' content.
-            VisualEffectView(material: .underWindowBackground,
-                             blending: .behindWindow)
+            // Clean native window backdrop — matches the DockDoor-style
+            // reference design the user supplied. The earlier magenta+blue
+            // radial gradients fought with the panel content and never
+            // delivered the glass effect we wanted; switching to a plain
+            // window-background material reads as proper native macOS
+            // Settings instead of a custom-tinted skin.
+            Color(NSColor.windowBackgroundColor)
                 .edgesIgnoringSafeArea(.all)
-            // Stronger radial bleeds in the AppIcon's gradient palette.
-            // These layers sit BENEATH every panel and the sidebar; the
-            // sidebar drops its own visual-effect view so these gradients
-            // show through directly, giving the requested liquid-glass
-            // feel where the wallpaper colour is the wash.
-            ZStack {
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.76, green: 0.10, blue: 0.36).opacity(0.42),
-                        Color.clear
-                    ]),
-                    center: UnitPoint(x: 0.10, y: 0.0),
-                    startRadius: 30, endRadius: 620)
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.48, green: 0.12, blue: 0.64).opacity(0.30),
-                        Color.clear
-                    ]),
-                    center: UnitPoint(x: 0.05, y: 0.55),
-                    startRadius: 20, endRadius: 420)
-                RadialGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.40, green: 0.55, blue: 0.95).opacity(0.34),
-                        Color.clear
-                    ]),
-                    center: UnitPoint(x: 0.92, y: 1.0),
-                    startRadius: 30, endRadius: 560)
-            }
-            .edgesIgnoringSafeArea(.all)
-            .allowsHitTesting(false)
 
             HStack(spacing: 0) {
                 sidebar
@@ -440,46 +406,31 @@ struct ContentView: View {
 
     @ViewBuilder
     private var sidebar: some View {
-        // The previous .hudWindow + .withinWindow visual-effect view
-        // still clamped saturation hard and rendered gray on Sequoia.
-        // Drop the NSVisualEffectView entirely and let the sidebar be
-        // a transparent SwiftUI layer — the magenta+blue radial
-        // gradients painted on the window backdrop now show through
-        // directly. A faint white wash on top keeps the section labels
-        // legible without re-introducing the grey opaque tile.
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.white.opacity(0.32),
-                    Color.white.opacity(0.18)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing)
-                .edgesIgnoringSafeArea(.vertical)
-            sidebarContent
-        }
+        // Native macOS Settings styling — a transparent SwiftUI layer over
+        // the window's stock background color. No tints, no gradients;
+        // matches the DockDoor reference design.
+        sidebarContent
     }
 
     @ViewBuilder
     private var sidebarContent: some View {
         VStack(spacing: 0) {
             List {
-                ForEach(SettingsSection.allCases) { section in
-                    HStack(spacing: 8) {
-                        sectionIcon(section)
-                        Text(section.rawValue).font(.system(size: 13))
-                            .foregroundColor(selection == section ? .white : .primary)
-                        Spacer(minLength: 0)
+                // Ungrouped row at the top (General).
+                ForEach(SettingsSection.allCases.filter { $0.category == nil }) { section in
+                    sidebarRow(section)
+                }
+                // Grouped rows under category headers — matches the
+                // DockDoor design: Features / Customization / System.
+                ForEach(["Features", "Customization", "System"], id: \.self) { cat in
+                    Section(header: Text(cat)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.secondary)
+                                .padding(.top, 4)) {
+                        ForEach(SettingsSection.allCases.filter { $0.category == cat }) { section in
+                            sidebarRow(section)
+                        }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(selection == section ? Color.accentColor : Color.clear)
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture { selection = section }
-                    .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 1, trailing: 6))
                 }
             }
             .listStyle(SidebarListStyle())
@@ -501,6 +452,31 @@ struct ContentView: View {
         }
     }
 
+    /// One sidebar row — plain SF Symbol + label. Selected row gets the
+    /// stock List selection background (light grey on macOS); we don't
+    /// repaint with a magenta accent the way the previous redesign did.
+    @ViewBuilder
+    private func sidebarRow(_ section: SettingsSection) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: section.symbol)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundColor(.primary)
+                .frame(width: 22, height: 22)
+            Text(section.rawValue).font(.system(size: 13))
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(selection == section
+                      ? Color.primary.opacity(0.10)
+                      : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { selection = section }
+    }
+
     /// Resolve the bundle's AppIcon — same image Finder shows for the .app.
     /// Falls back to a gradient SF Symbol if the asset catalog hasn't built
     /// the icon for some reason.
@@ -511,14 +487,9 @@ struct ContentView: View {
         return Image(systemName: "atom")
     }
 
-    private func sectionIcon(_ section: SettingsSection) -> some View {
-        Image(systemName: section.symbol)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(.white)
-            .frame(width: 20, height: 20)
-            .background(section.tint)
-            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-    }
+    // sectionIcon was the colored-tile icon used by the previous sidebar
+    // layout. Removed in v1.7.58 — the new sidebarRow uses plain
+    // monochrome SF Symbols inline with no tile background.
 
     private var appVersionString: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -544,20 +515,20 @@ struct ContentView: View {
 
     @ViewBuilder
     private func panelHeader(_ section: SettingsSection, subtitle: String) -> some View {
-        HStack(alignment: .center, spacing: 14) {
-            Image(systemName: section.symbol)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 40, height: 40)
-                .background(section.tint)
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(section.rawValue).font(.system(size: 22, weight: .bold))
-                Text(subtitle).font(.system(size: 12.5)).foregroundColor(.secondary)
+        // Native System-Settings-style header: monochrome icon, smaller
+        // title, no colored tile background. Matches the DockDoor design
+        // the user referenced.
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                Image(systemName: section.symbol)
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundColor(.secondary)
+                Text(section.rawValue).font(.system(size: 18, weight: .semibold))
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            Text(subtitle).font(.system(size: 12)).foregroundColor(.secondary)
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Panels
