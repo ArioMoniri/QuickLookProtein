@@ -234,6 +234,17 @@ jobs:
           # the update); Downloader.xpc needs network.client (it pulls
           # the .zip). Both need app-sandbox + the App Group so they
           # can talk to the host. See Xcode/Sparkle/*.entitlements.
+          #
+          # CRITICAL: pass --identifier explicitly. Without it, codesign
+          # rewrites the bundle's signing identifier to a path-derived
+          # value, and Sparkle's mach-lookup for
+          # "org.sparkle-project.InstallerLauncher" no longer matches the
+          # XPC's signature → "An error occurred while launching the
+          # installer". The identifier MUST equal the CFBundleIdentifier
+          # baked into the XPC's Info.plist by the upstream Sparkle build.
+          declare -A xpc_identifier
+          xpc_identifier[Installer]="org.sparkle-project.InstallerLauncher"
+          xpc_identifier[Downloader]="org.sparkle-project.DownloaderService"
           for svc in "$FW_XPC"/*.xpc; do
             [ -d "$svc" ] || continue
             base=$(basename "$svc" .xpc)
@@ -242,21 +253,26 @@ jobs:
               echo "::error::Missing entitlements file for $base: $ents_file"
               exit 1
             fi
-            echo "Re-signing $svc with $ents_file (in place)"
+            id="${xpc_identifier[$base]}"
+            if [ -z "$id" ]; then
+              echo "::error::No known signing identifier for $base"
+              exit 1
+            fi
+            echo "Re-signing $svc as $id (in place) with $ents_file"
             codesign --force --options runtime --timestamp \
+                     --identifier "$id" \
                      --entitlements "$ents_file" \
                      --sign "$IDENTITY" "$svc"
           done
 
-          # Re-sign the framework so its outer signature covers the
-          # freshly-signed XPC services. Preserve-metadata to avoid
-          # clobbering whatever Sparkle's xcframework baked in.
+          # Re-sign the framework once. Don't sign Versions/B separately
+          # — codesign handles the framework's internal versioning when
+          # given the .framework path. --identifier locks the framework's
+          # signing identifier to the original Sparkle CFBundleIdentifier
+          # so the host's framework reference still resolves.
           echo "Re-signing Sparkle.framework"
           codesign --force --options runtime --timestamp \
-                   --preserve-metadata=identifier,entitlements,flags \
-                   --sign "$IDENTITY" "$FW/Versions/B"
-          codesign --force --options runtime --timestamp \
-                   --preserve-metadata=identifier,entitlements,flags \
+                   --identifier "org.sparkle-project.Sparkle" \
                    --sign "$IDENTITY" "$FW"
 
           # Finally re-sign the host .app so its signature covers the
