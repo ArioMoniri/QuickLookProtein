@@ -120,6 +120,15 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling {
         context.completeRequest(returningItems: context.inputItems, completionHandler: nil)
     }
 
+    /// PDB ATOM-record atom-name field (columns 13-16, 4 chars). Element
+    /// symbols are written right-justified within a 3-char window so the
+    /// padded result matches the canonical `_CA_`/`_C__`/`_FE2` layout.
+    private static func atomNameField(_ element: String) -> String {
+        let e = element.uppercased()
+        if e.count == 1 { return " " + e + "  " }      // " C  "
+        return e.padding(toLength: 4, withPad: " ", startingAt: 0)  // "FE  "
+    }
+
     /// Concatenate the selected files as a multi-MODEL PDB written next
     /// to the first file as `<firstBase>-merged.pdb`. Skips files we
     /// can't parse into atoms; writes nothing if fewer than 2 produce
@@ -136,23 +145,32 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling {
         }
         guard models.count >= 2, let first = urls.first else { return false }
 
-        var text = "REMARK   QuickLookProtein merged Quick Action — \(models.count) models\n"
+        var text = "REMARK   QuickLookProtein merged Quick Action - \(models.count) models\n"
         var modelIdx = 1
         for m in models {
-            text += "MODEL     \(modelIdx)\n"
+            text += String(format: "MODEL     %4d\n", modelIdx)
             text += "REMARK   model name: \(m.name)\n"
             var serial = 1
             for atom in m.atoms {
-                // PDB ATOM line: 30-37 / 38-45 / 46-53 = 8.3f x,y,z
-                let elemPad = String(atom.element.prefix(2)).padding(toLength: 2, withPad: " ", startingAt: 0)
-                let line = String(format:
-                    "ATOM  %5d  %-3s %-3s A%4d    %8.3f%8.3f%8.3f  1.00  0.00          %@",
-                    serial,
-                    (atom.name.isEmpty ? atom.element : String(atom.name.prefix(3))) as CVarArg,
-                    "MOL" as CVarArg,
-                    modelIdx,
-                    atom.x, atom.y, atom.z,
-                    elemPad)
+                // Build the PDB ATOM record column-by-column. The fixed-
+                // column layout is fiddly enough that mixing %-3s C-string
+                // formatters with Swift String is a recipe for crashes —
+                // use String(format:) only for the numeric fields and
+                // padding(toLength:) for the text fields.
+                let elem3 = atomNameField(atom.element)
+                let resN3 = String(atom.resName.prefix(3))
+                                .padding(toLength: 3, withPad: " ", startingAt: 0)
+                let chain = atom.chain.isEmpty ? "A"
+                          : String(atom.chain.prefix(1))
+                let elem2 = String(atom.element.prefix(2))
+                                .padding(toLength: 2, withPad: " ", startingAt: 0)
+                let coords = String(format: "%8.3f%8.3f%8.3f",
+                                    Double(atom.x), Double(atom.y), Double(atom.z))
+                let line = "ATOM  " +
+                    String(format: "%5d", serial) +
+                    " " + elem3 + " " + resN3 + " " + chain +
+                    String(format: "%4d", modelIdx) + "    " +
+                    coords + "  1.00  0.00          " + elem2
                 text += line + "\n"
                 serial += 1
             }
@@ -377,7 +395,8 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling {
         }
         let extent = max(maxX - minX, max(maxY - minY, maxZ - minZ))
         guard extent > 0 else { return nil }
-        let cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2
+        let cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
+        _ = (minZ + maxZ) / 2  // depth centroid not used after the orthographic 2D paint
         let scale = (renderSide * 0.8) / extent
 
         // Map atom coords → canvas. Z is mapped to brightness so depth
