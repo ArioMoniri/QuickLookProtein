@@ -242,9 +242,9 @@ jobs:
           # XPC's signature → "An error occurred while launching the
           # installer". The identifier MUST equal the CFBundleIdentifier
           # baked into the XPC's Info.plist by the upstream Sparkle build.
-          declare -A xpc_identifier
-          xpc_identifier[Installer]="org.sparkle-project.InstallerLauncher"
-          xpc_identifier[Downloader]="org.sparkle-project.DownloaderService"
+          # macOS ships bash 3.2 (no associative arrays / declare -A), so
+          # map XPC service basenames to their canonical CFBundleIdentifier
+          # via a case statement instead.
           for svc in "$FW_XPC"/*.xpc; do
             [ -d "$svc" ] || continue
             base=$(basename "$svc" .xpc)
@@ -253,11 +253,14 @@ jobs:
               echo "::error::Missing entitlements file for $base: $ents_file"
               exit 1
             fi
-            id="${xpc_identifier[$base]}"
-            if [ -z "$id" ]; then
-              echo "::error::No known signing identifier for $base"
-              exit 1
-            fi
+            case "$base" in
+              Installer)  id="org.sparkle-project.InstallerLauncher" ;;
+              Downloader) id="org.sparkle-project.DownloaderService" ;;
+              *)
+                echo "::error::No known signing identifier for $base"
+                exit 1
+                ;;
+            esac
             echo "Re-signing $svc as $id (in place) with $ents_file"
             codesign --force --options runtime --timestamp \
                      --identifier "$id" \
