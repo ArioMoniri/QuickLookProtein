@@ -60,29 +60,18 @@
 						<string>public.file-url</string>
 					</array>
 					<!--
-					  NSSendFileTypes lists the UTIs we actually want to
-					  receive. Without this filter macOS shows the action
-					  for *every* selected file (jpegs, plain text, …)
-					  which is noisy. Listing molecule UTIs makes the
-					  action only appear when the user has at least one
-					  molecule file selected.
+					  We previously listed molecule UTIs in NSSendFileTypes
+					  to filter the action to molecule selections only.
+					  That broke discovery: macOS hides the entry whenever
+					  *any* selected file doesn't match (including
+					  unfamiliar extensions where the custom UTI hasn't
+					  been indexed yet by Launch Services). v1.7.62
+					  drops the filter — the action accepts every file
+					  selection, and the handler skips non-molecule
+					  extensions internally via acceptedExtensions.contains.
 					-->
-					<key>NSSendFileTypes</key>
-					<array>
-						<string>com.ariomoniri.QuickLookProtein.pdb</string>
-						<string>com.ariomoniri.QuickLookProtein.cif</string>
-						<string>com.ariomoniri.QuickLookProtein.mmcif</string>
-						<string>com.ariomoniri.QuickLookProtein.sdf</string>
-						<string>com.ariomoniri.QuickLookProtein.mol</string>
-						<string>com.ariomoniri.QuickLookProtein.mol2</string>
-						<string>com.ariomoniri.QuickLookProtein.xyz</string>
-						<string>com.ariomoniri.QuickLookProtein.gro</string>
-						<string>com.ariomoniri.QuickLookProtein.cube</string>
-						<string>com.ariomoniri.QuickLookProtein.pqr</string>
-						<string>com.ariomoniri.QuickLookProtein.vasp</string>
-						<string>com.ariomoniri.QuickLookProtein.cdjson</string>
-						<string>com.ariomoniri.QuickLookProtein.mmtf</string>
-					</array>
+					<key>NSRequiredFileTypes</key>
+					<array/>
 				</dict>
 			</array>
 		</dict>
