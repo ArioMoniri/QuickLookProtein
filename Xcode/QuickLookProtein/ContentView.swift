@@ -176,23 +176,36 @@ private struct ToggleRow: View {
 }
 
 /// Checkbox row with a primary label + optional sub-label underneath.
-/// Used in Rendering panel where each toggle has an explanatory sub-line.
+/// Used in Rendering / Info panels where each toggle has an explanatory
+/// sub-line. The checkbox is anchored at a fixed leading position so
+/// adjacent rows form a clean column regardless of label width.
 private struct CheckRow: View {
     let label: String
     @Binding var isOn: Bool
     var sub: String? = nil
     var body: some View {
-        Toggle(isOn: $isOn) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label).font(.system(size: 13))
-                if let sub = sub {
-                    Text(sub).font(.system(size: 11)).foregroundColor(.secondary)
+        Button {
+            isOn.toggle()
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                // Fixed-width checkbox area, left-anchored
+                Toggle("", isOn: $isOn)
+                    .labelsHidden()
+                    .toggleStyle(CheckboxToggleStyle())
+                    .frame(width: 18, alignment: .leading)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(label).font(.system(size: 13))
+                    if let sub = sub {
+                        Text(sub).font(.system(size: 11)).foregroundColor(.secondary)
+                    }
                 }
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
-        .toggleStyle(CheckboxToggleStyle())
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .buttonStyle(.plain)
     }
 }
 
@@ -410,7 +423,14 @@ struct ContentView: View {
     @ViewBuilder
     private var sidebar: some View {
         ZStack {
+            // Layered glass: vibrancy material for the "see the desktop
+            // through it" effect + a semi-opaque tint on top so the
+            // sidebar contents stay legible at any wallpaper. Without
+            // the tint the .sidebar material renders too transparent and
+            // the magenta backdrop bleeds onto the section labels.
             VisualEffectView(material: .sidebar, blending: .behindWindow)
+                .edgesIgnoringSafeArea(.vertical)
+            Color(NSColor.windowBackgroundColor).opacity(0.55)
                 .edgesIgnoringSafeArea(.vertical)
             sidebarContent
         }
@@ -536,15 +556,6 @@ struct ContentView: View {
                               isOn: $userSettings.runOnFirstPreview,
                               hint: "Render immediately on the first spacebar-press. Off shows a tap-to-render placeholder on slow disks.")
                 }
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                SectionLabel(text: "Defaults")
-                Text("Per-format display style is set in File Formats. Color scheme + Rotation + Default zoom + Background live in Appearance.")
-                    .font(.system(size: 11.5))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 16)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -743,11 +754,13 @@ struct ContentView: View {
                 Card {
                     FormRow(label: "Rotation") {
                         Picker("", selection: $userSettings.rotationSpeed) {
-                            ForEach(Settings.RotationSpeed.allCases) { Text($0.rawValue).tag($0) }
+                            ForEach(Settings.RotationSpeed.allCases) { speed in
+                                Text(shortRotationLabel(speed)).tag(speed)
+                            }
                         }
                         .labelsHidden()
                         .pickerStyle(SegmentedPickerStyle())
-                        .frame(width: 220)
+                        .frame(width: 240)
                     }
                     RowDivider()
                     FormRow(label: "Default zoom") {
@@ -766,54 +779,104 @@ struct ContentView: View {
                     FormRow(label: "Mode") {
                         HStack(spacing: 10) {
                             backgroundSwatch("Light",
-                                             gradient: Gradient(colors: [.white, Color(red: 0.91, green: 0.91, blue: 0.92)]),
-                                             rgb: (1.0, 1.0, 1.0))
+                                             style: .solid(Color.white),
+                                             rgba: (1.0, 1.0, 1.0, 1.0))
                             backgroundSwatch("Dark",
-                                             gradient: Gradient(colors: [Color(red: 0.22, green: 0.22, blue: 0.24), Color(red: 0.11, green: 0.11, blue: 0.13)]),
-                                             rgb: (0.07, 0.07, 0.08))
-                            backgroundSwatch("Gradient",
-                                             gradient: Gradient(colors: [Color(red: 0.75, green: 0.52, blue: 0.99), Color(red: 0.38, green: 0.65, blue: 0.98)]),
-                                             rgb: (0.55, 0.58, 0.95))
+                                             style: .solid(Color(red: 0.07, green: 0.07, blue: 0.08)),
+                                             rgba: (0.07, 0.07, 0.08, 1.0))
+                            backgroundSwatch("Transparent",
+                                             style: .checkerboard,
+                                             rgba: (1.0, 1.0, 1.0, 0.0))
                             backgroundSwatch("Custom",
-                                             gradient: nil,
-                                             rgb: nil)
+                                             style: .custom,
+                                             rgba: nil)
                         }
                     }
                     RowDivider()
                     FormRow(label: "Custom color",
-                            hint: "Used when Mode is Custom; otherwise the preset overrides this.") {
-                        HStack(spacing: 8) {
-                            ColorPicker("", selection: $userSettings.bgColor, supportsOpacity: true)
-                                .labelsHidden()
-                            Button("Transparent", action: resetColor)
-                        }
+                            hint: "Used when Mode is Custom; the Light / Dark / Transparent presets override this.") {
+                        ColorPicker("", selection: $userSettings.bgColor, supportsOpacity: true)
+                            .labelsHidden()
                     }
                 }
             }
         }
     }
 
-    /// Tile for the Background-Mode picker. Setting `rgb = nil` makes the
-    /// swatch render a transparent checkerboard (the "Custom" slot).
+    /// Short labels for the Rotation segmented control. The full
+    /// rawValues ("No rotation", "Medium", …) wrap awkwardly at 240 px;
+    /// we keep the rawValues for persistence and substitute shorter
+    /// display strings here.
+    private func shortRotationLabel(_ speed: Settings.RotationSpeed) -> String {
+        switch speed {
+        case .noRotation: return "Off"
+        case .slow:       return "Slow"
+        case .medium:     return "Medium"
+        case .fast:       return "Fast"
+        }
+    }
+
+    enum SwatchStyle {
+        case solid(Color)
+        case checkerboard   // for the "Transparent" preset
+        case custom         // user-chosen color
+    }
+
+    /// Tile for the Background-Mode picker. Light / Dark / Transparent
+    /// each write a specific (r,g,b,a) into the bgColor* settings. The
+    /// "Custom" tile is a passthrough that just selects whatever color
+    /// is already in the picker.
     private func backgroundSwatch(_ label: String,
-                                  gradient: Gradient?,
-                                  rgb: (Double, Double, Double)?) -> some View {
+                                  style: SwatchStyle,
+                                  rgba: (Double, Double, Double, Double)?) -> some View {
+        // Selection logic: match (r,g,b,a) to within 2% on each channel.
+        // Custom is selected only when no preset matches.
+        let r = userSettings.bgColorRed
+        let g = userSettings.bgColorGreen
+        let b = userSettings.bgColorBlue
+        let a = userSettings.bgColorOpacity
         let isSelected: Bool = {
-            guard let rgb = rgb else { return false }
-            return abs(userSettings.bgColorRed   - rgb.0) < 0.02 &&
-                   abs(userSettings.bgColorGreen - rgb.1) < 0.02 &&
-                   abs(userSettings.bgColorBlue  - rgb.2) < 0.02
+            if let rgba = rgba {
+                return abs(r - rgba.0) < 0.02 && abs(g - rgba.1) < 0.02
+                    && abs(b - rgba.2) < 0.02 && abs(a - rgba.3) < 0.02
+            }
+            // Custom slot: selected when none of the presets matches.
+            let matchesLight = abs(r - 1) < 0.02 && abs(g - 1) < 0.02 && abs(b - 1) < 0.02 && abs(a - 1) < 0.02
+            let matchesDark  = abs(r - 0.07) < 0.02 && abs(g - 0.07) < 0.02 && abs(b - 0.08) < 0.02 && abs(a - 1) < 0.02
+            let matchesTrans = abs(a) < 0.02
+            return !(matchesLight || matchesDark || matchesTrans)
         }()
         return VStack(spacing: 4) {
             ZStack {
-                if let gradient = gradient {
-                    LinearGradient(gradient: gradient, startPoint: .top, endPoint: .bottom)
-                } else {
-                    // Checkerboard for "Custom"/transparent
-                    Color.white
-                    Image(systemName: "square.grid.4x3.fill")
-                        .resizable().scaledToFit()
-                        .foregroundColor(Color.gray.opacity(0.25))
+                switch style {
+                case .solid(let c):
+                    c
+                case .checkerboard:
+                    // Light/grey checkerboard. macOS-11 safe (Canvas is
+                    // 12+) — built with a fixed grid of small Rectangles
+                    // sized to the swatch.
+                    ZStack {
+                        Color.white
+                        VStack(spacing: 0) {
+                            ForEach(0..<6, id: \.self) { row in
+                                HStack(spacing: 0) {
+                                    ForEach(0..<8, id: \.self) { col in
+                                        Rectangle()
+                                            .fill((row + col).isMultiple(of: 2)
+                                                  ? Color.clear
+                                                  : Color.gray.opacity(0.35))
+                                            .frame(width: 8, height: 8)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                case .custom:
+                    // Live preview of the current Custom color
+                    Color(.sRGB, red: r, green: g, blue: b, opacity: max(a, 0.08))
+                    Image(systemName: "eyedropper")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color.primary.opacity(0.5))
                 }
             }
             .frame(width: 64, height: 44)
@@ -829,12 +892,14 @@ struct ContentView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if let rgb = rgb {
-                userSettings.bgColorRed     = rgb.0
-                userSettings.bgColorGreen   = rgb.1
-                userSettings.bgColorBlue    = rgb.2
-                userSettings.bgColorOpacity = 1.0
+            if let rgba = rgba {
+                userSettings.bgColorRed     = rgba.0
+                userSettings.bgColorGreen   = rgba.1
+                userSettings.bgColorBlue    = rgba.2
+                userSettings.bgColorOpacity = rgba.3
             }
+            // Custom slot has no preset write — it just signals "you'll
+            // configure the color via the ColorPicker below".
         }
     }
 
@@ -926,16 +991,85 @@ struct ContentView: View {
                              isOn: $userSettings.animatedThumbnails,
                              sub: "Encode Finder thumbnails as 12-frame spinning APNGs")
                     RowDivider()
-                    FormRow(label: "Thumbnail style") {
-                        Picker("", selection: $userSettings.thumbnailStyle) {
-                            ForEach(Settings.ThumbnailStyle.allCases) { Text($0.rawValue).tag($0) }
+                    FormRow(label: "Thumbnail style",
+                            hint: "Sets how Finder renders the file icon. Auto picks ribbon for proteins (≥25 Cα), CPK spheres for everything else.") {
+                        HStack(spacing: 10) {
+                            thumbnailSwatch(.auto)
+                            thumbnailSwatch(.cpk)
+                            thumbnailSwatch(.ribbon)
                         }
-                        .labelsHidden()
-                        .frame(width: 180)
                     }
                 }
             }
         }
+    }
+
+    /// One tile for the Thumbnail-style picker. Each tile draws a tiny
+    /// schematic of what Finder will render for that style.
+    private func thumbnailSwatch(_ style: Settings.ThumbnailStyle) -> some View {
+        let isSelected = userSettings.thumbnailStyle == style
+        return VStack(spacing: 4) {
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(red: 0.10, green: 0.10, blue: 0.11),
+                        Color(red: 0.04, green: 0.04, blue: 0.05)
+                    ]),
+                    startPoint: .top, endPoint: .bottom)
+                Group {
+                    switch style {
+                    case .auto:
+                        // Mixed: small ribbon arc + a sphere triplet
+                        Path { p in
+                            p.move(to: CGPoint(x: 8, y: 30))
+                            p.addQuadCurve(to: CGPoint(x: 56, y: 30),
+                                           control: CGPoint(x: 32, y: 10))
+                        }
+                        .stroke(LinearGradient(
+                            gradient: Gradient(colors: [.blue, .red]),
+                            startPoint: .leading, endPoint: .trailing),
+                                style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                        HStack(spacing: 2) {
+                            Circle().fill(Color.gray).frame(width: 7, height: 7)
+                            Circle().fill(Color.blue).frame(width: 7, height: 7)
+                            Circle().fill(Color.red).frame(width: 7, height: 7)
+                        }
+                        .offset(y: 12)
+                    case .cpk:
+                        HStack(spacing: 3) {
+                            Circle().fill(Color.gray).frame(width: 16, height: 16)
+                            Circle().fill(Color.blue).frame(width: 18, height: 18)
+                            Circle().fill(Color.red).frame(width: 14, height: 14)
+                        }
+                    case .ribbon:
+                        Path { p in
+                            p.move(to: CGPoint(x: 6, y: 24))
+                            for i in 1...18 {
+                                let x = 6 + CGFloat(i) * 3.0
+                                let y = 24 + sin(CGFloat(i) / 2.0) * 8
+                                p.addLine(to: CGPoint(x: x, y: y))
+                            }
+                        }
+                        .stroke(LinearGradient(
+                            gradient: Gradient(colors: [.blue, .green, .yellow, .red]),
+                            startPoint: .leading, endPoint: .trailing),
+                                style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    }
+                }
+            }
+            .frame(width: 64, height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.15),
+                                  lineWidth: isSelected ? 2 : 0.5)
+            )
+            Text(style.rawValue)
+                .font(.system(size: 10.5, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? .primary : .secondary)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { userSettings.thumbnailStyle = style }
     }
 
     @ViewBuilder
