@@ -18,7 +18,7 @@
 
 <p align="center"><sub>macOS → signed <code>.dmg</code>, drag to Applications · Windows → single <code>Setup.exe</code>, double-click. <strong>One click each.</strong></sub></p>
 
-<p align="center">macOS · Developer-ID signed &amp; notarised &nbsp;|&nbsp; Windows · QL-Win plugin (unsigned)</p>
+<p align="center">macOS · Developer-ID signed &amp; notarised &nbsp;|&nbsp; Windows · <strong>under development, not stable yet</strong> (QL-Win plugin, unsigned)</p>
 
 **macOS:** open the disk image, drag **QuickLookProtein.app** into **Applications**, then hit <kbd>Space</kbd> on any `.pdb` / `.cif` / `.mol2` / etc. file in Finder.
 
