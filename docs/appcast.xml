@@ -6,6 +6,23 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.68</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.68</link>
+      <pubDate>Tue, 19 May 2026 08:20:53 +0000</pubDate>
+      <sparkle:version>1.7.68</sparkle:version>
+      <sparkle:shortVersionString>1.7.68</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows hotfix — Space-bar showed raw text instead of the 3D preview&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Symptom&lt;/strong&gt;: after a successful &lt;code&gt;QuickLookProtein-Setup.exe&lt;/code&gt; install, pressing &amp;lt;kbd&amp;gt;Space&amp;lt;/kbd&amp;gt; on a &lt;code&gt;.pdb&lt;/code&gt; (or any other supported extension) opened a plain-text dump of the file&amp;#x27;s ATOM lines instead of the 3Dmol viewer. QL-Win&amp;#x27;s text-fallback viewer was kicking in — a sign that our plugin had failed to load.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Root cause&lt;/strong&gt;: QL-Win loads plugin DLLs via &lt;code&gt;Assembly.LoadFile()&lt;/code&gt;, which puts the assembly into the *Load* (not *LoadFrom*) context. That means the CLR&amp;#x27;s standard probing paths (&lt;code&gt;AppDomain.BaseDirectory&lt;/code&gt; + GAC) are the only places it&amp;#x27;ll look for transitive dependencies — &lt;strong&gt;not&lt;/strong&gt; the plugin&amp;#x27;s own directory. When QL-Win called &lt;code&gt;Plugin.View()&lt;/code&gt; and the WPF runtime tried to inflate &lt;code&gt;MoleculePanel.xaml&lt;/code&gt; (which carries &lt;code&gt;xmlns:wv2=&amp;quot;clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf&amp;quot;&lt;/code&gt;), the resolver couldn&amp;#x27;t find &lt;code&gt;Microsoft.Web.WebView2.Wpf.dll&lt;/code&gt; in &lt;code&gt;%LocalAppData%\Programs\QuickLook\&lt;/code&gt; and threw &lt;code&gt;XamlParseException&lt;/code&gt;. QL-Win caught it, blacklisted our plugin for that file, and fell back to text.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Fix&lt;/strong&gt;: &lt;code&gt;Plugin.Init()&lt;/code&gt; now attaches an &lt;code&gt;AppDomain.AssemblyResolve&lt;/code&gt; handler that probes the plugin&amp;#x27;s own directory (&lt;code&gt;%LocalAppData%\QuickLook\plugins\QuickLookProtein\&lt;/code&gt;) for the requested assembly + &lt;code&gt;.dll&lt;/code&gt; and returns &lt;code&gt;Assembly.LoadFrom(...)&lt;/code&gt; on hit. WebView2.Core / .Wpf / .WinForms (and anything else we may add as a transitive dep) resolve in one place. The handler skips &lt;code&gt;*.resources&lt;/code&gt; so we don&amp;#x27;t accidentally shadow localised satellite assemblies QL-Win or another plugin owns, and swallows its own exceptions so a bad probe never crashes the AppDomain.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Diagnostic improvement&lt;/strong&gt;: a &lt;code&gt;Resolved &amp;#x27;X&amp;#x27; -&amp;gt; path&lt;/code&gt; line lands in &lt;code&gt;plugin.log&lt;/code&gt; for every successful late-bind, so future &amp;quot;Space-bar shows raw text&amp;quot; reports can be triaged from the Settings → Diagnostics → Open plugin log button in one click.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.68"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.68/QuickLookProtein-1.7.68.zip" sparkle:edSignature="hZYNRbx/hL471d2Poixr8awuzPt/umT8REJmsxMzUJ0ybKlmn/NQd3acdV99jrAcRRS0nbGHk+TzLxUF7c1xBw==" length="4462832" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.67</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.67</link>
       <pubDate>Tue, 19 May 2026 08:11:27 +0000</pubDate>
