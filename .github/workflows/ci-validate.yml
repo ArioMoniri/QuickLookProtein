@@ -44,16 +44,28 @@ concurrency:
 jobs:
   macos-build:
     name: macOS · xcodebuild (no signing)
-    runs-on: macos-14
+    # macos-15 to match release.yml.  The project is on
+    # objectVersion=70, which Xcode 15.x refuses to open with
+    # "future Xcode project file format (70)"; macos-15 ships
+    # Xcode 16.x by default and parses 70 fine.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode
-        # Pin to the toolchain matching release.yml so a branch CI
-        # green doesn't drift from what the release runner actually
-        # uses to ship.  macos-14 ships Xcode 15.x by default.
+        # Walk a list of Xcode_16.* candidates and use the first
+        # that exists.  /Applications/Xcode.app is the runner's
+        # default selection - usually a recent Xcode 16 minor -
+        # so falling through to it is the safe last resort.
         run: |
-          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer || \
-            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          for x in /Applications/Xcode_16.4.app /Applications/Xcode_16.3.app \
+                   /Applications/Xcode_16.2.app /Applications/Xcode_16.1.app \
+                   /Applications/Xcode_16.0.app /Applications/Xcode.app; do
+            if [ -d "$x" ]; then
+              sudo xcode-select -s "$x/Contents/Developer"
+              echo "Selected: $x"
+              break
+            fi
+          done
           xcodebuild -version
       - name: Build main app target
         # CODE_SIGNING_ALLOWED=NO + CODE_SIGNING_REQUIRED=NO so the

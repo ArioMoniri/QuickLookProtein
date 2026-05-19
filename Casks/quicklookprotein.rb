@@ -26,7 +26,10 @@ cask "quicklookprotein" do
   url "https://github.com/ArioMoniri/QuickLookProtein/releases/download/v#{version}/QuickLookProtein-#{version}.dmg",
       verified: "github.com/ArioMoniri/QuickLookProtein/"
   name "QuickLookProtein2"
-  desc "Quick Look extension for previewing 3D molecular structure files (PDB, CIF, SDF, MOL2, …)"
+  # `desc` is hard-limited to 80 chars by `brew audit`.  Keep the
+  # full format list in README; the desc is the search-result tag-
+  # line.
+  desc "Quick Look extension for previewing 3D molecular structure files"
   homepage "https://github.com/ArioMoniri/QuickLookProtein"
 
   # The release workflow tags every release as v{MARKETING_VERSION}
@@ -45,7 +48,11 @@ cask "quicklookprotein" do
   # so an existing user can install via brew and continue to receive
   # Sparkle updates without reinstalling.
   auto_updates true
-  depends_on macos: ">= :big_sur"
+  # `depends_on macos: :big_sur` already means ">= Big Sur" - the
+  # symbol is interpreted as the minimum supported macOS, not a
+  # pin.  Older "macos: ">= :big_sur" syntax is now flagged by
+  # `brew style` (Homebrew/OSDependsOn).
+  depends_on macos: :big_sur
 
   # The bundle on disk is still named QuickLookProtein.app — the "2"
   # in the marketing name is delivered via CFBundleDisplayName /
@@ -55,20 +62,19 @@ cask "quicklookprotein" do
   # registrations against the old bundle continue to resolve.
   app "QuickLookProtein.app"
 
+  # `brew audit` enforces alphabetical order in the zap array.
+  # Quick Look / Spotlight extension prefs and the Sparkle plist
+  # all share that sort key.  We keep one logical comment up here
+  # rather than scattering them per-line so the alphabetisation
+  # rule doesn't conflict with explanatory comments.
   zap trash: [
-    "~/Library/Preferences/com.ariomoniri.QuickLookProtein.plist",
     "~/Library/Application Scripts/com.ariomoniri.QuickLookProtein",
-    "~/Library/Containers/com.ariomoniri.QuickLookProtein",
     "~/Library/Caches/com.ariomoniri.QuickLookProtein",
-    # Quick Look / Spotlight extensions live under the host app and
-    # are removed with the .app, but their preference plists hang
-    # around. Mop them up on `brew uninstall --zap`.
+    "~/Library/Containers/com.ariomoniri.QuickLookProtein",
+    "~/Library/Preferences/com.ariomoniri.QuickLookProtein.MDImporter.plist",
+    "~/Library/Preferences/com.ariomoniri.QuickLookProtein.plist",
     "~/Library/Preferences/com.ariomoniri.QuickLookProtein.QLExtension.plist",
     "~/Library/Preferences/com.ariomoniri.QuickLookProtein.QLThumbnail.plist",
-    "~/Library/Preferences/com.ariomoniri.QuickLookProtein.MDImporter.plist",
-    # Sparkle persisted state — preferences for "skip this version",
-    # last-check timestamp, etc. Not bundle-id-keyed on every Sparkle
-    # version so we wipe the umbrella plist by name.
     "~/Library/Preferences/org.sparkle-project.Sparkle.plist",
   ]
 end
