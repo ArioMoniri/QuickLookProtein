@@ -6,6 +6,24 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.70</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.70</link>
+      <pubDate>Tue, 19 May 2026 09:31:18 +0000</pubDate>
+      <sparkle:version>1.7.70</sparkle:version>
+      <sparkle:shortVersionString>1.7.70</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows hotfix³ — &lt;code&gt;BadImageFormatException&lt;/code&gt;, plugin DLL was x64-only&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Symptom&lt;/strong&gt;: with 1.7.69 installed, pressing &amp;lt;kbd&amp;gt;Space&amp;lt;/kbd&amp;gt; on a &lt;code&gt;.pdb&lt;/code&gt; *still* showed the raw text dump. &lt;code&gt;plugin.log&lt;/code&gt; still didn&amp;#x27;t exist. The diagnostic block from the README finally surfaced the real loader error from PowerShell: *&amp;quot;Could not load file or assembly &amp;#x27;QuickLook.Plugin.Protein.dll&amp;#x27; or one of its dependencies. An attempt was made to load a program with an incorrect format.&amp;quot;* That&amp;#x27;s &lt;code&gt;BadImageFormatException&lt;/code&gt;, the canonical &amp;quot;your DLL&amp;#x27;s bitness doesn&amp;#x27;t match my process&amp;quot; error.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Root cause&lt;/strong&gt;: &lt;code&gt;Windows/QuickLookProtein.Plugin/QuickLookProtein.Plugin.csproj&lt;/code&gt; pinned &lt;code&gt;&amp;lt;PlatformTarget&amp;gt;x64&amp;lt;/PlatformTarget&amp;gt;&lt;/code&gt;, which writes the PE32+ x64-only marker into the DLL&amp;#x27;s COFF header. QL-Win.exe ships AnyCPU and on the user&amp;#x27;s machine was running as &lt;strong&gt;32-bit (x86, WOW64)&lt;/strong&gt;. The CLR refused to load an x64-marked DLL into a 32-bit process and threw the load error silently from QL-Win&amp;#x27;s plugin discovery → our plugin never showed up in QL-Win&amp;#x27;s IViewer registry → Space-bar fell through to the text viewer. *No amount of AssemblyResolve / static cctor / type-decoupling work from 1.7.68 / 1.7.69 could have helped*: the assembly itself was being rejected at the PE-header check, *before* any IL or metadata was read.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Fix&lt;/strong&gt;: flip the plugin&amp;#x27;s &lt;code&gt;&amp;lt;PlatformTarget&amp;gt;&lt;/code&gt; to &lt;code&gt;AnyCPU&lt;/code&gt; so the CLR can host the assembly in either bitness. To keep the WebView2 native bridge happy in both, the &lt;code&gt;CopyWebView2LoaderNative&lt;/code&gt; MSBuild target now also lays down &lt;strong&gt;both&lt;/strong&gt; &lt;code&gt;runtimes/win-x86/native/WebView2Loader.dll&lt;/code&gt; and &lt;code&gt;runtimes/win-x64/native/WebView2Loader.dll&lt;/code&gt; (the AnyCPU managed wrapper picks the matching one at runtime via &lt;code&gt;Environment.Is64BitProcess&lt;/code&gt;). The flat-folder fallback (sibling &lt;code&gt;WebView2Loader.dll&lt;/code&gt; next to the plugin DLL) is preserved with the x64 copy so 1.7.69-and-earlier install layouts still resolve.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Same fix for &lt;code&gt;QuickLookProtein.Thumbnail.csproj&lt;/code&gt;&lt;/strong&gt;: Explorer&amp;#x27;s thumbnail-cache pipeline includes a 32-bit COM surrogate (&lt;code&gt;dllhost.exe&lt;/code&gt;) for legacy app compat, which would have hit the same &lt;code&gt;BadImageFormatException&lt;/code&gt; on x64-only thumbnail DLLs. &lt;code&gt;PlatformTarget=AnyCPU&lt;/code&gt; there too.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Diagnostic block in the README will now actually work&lt;/strong&gt;: the FileVersion stamping that didn&amp;#x27;t reach the binary in 1.7.69 (MSBuild cascade was masked by explicit &lt;code&gt;&amp;lt;AssemblyVersion&amp;gt;&lt;/code&gt;) lands properly here — &lt;code&gt;(Get-Item ...).VersionInfo.FileVersion&lt;/code&gt; will report &lt;code&gt;1.7.70&lt;/code&gt; after this install.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.70"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.70/QuickLookProtein-1.7.70.zip" sparkle:edSignature="SgnAqFiR6p80spKyIGgznr6qPcRpUq9uqyqy42vchYTx6gxVyIZREYytmyL3VVvo1I/YcJUyynW2UISVd37FCg==" length="4462790" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.69</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.69</link>
       <pubDate>Tue, 19 May 2026 08:49:55 +0000</pubDate>
