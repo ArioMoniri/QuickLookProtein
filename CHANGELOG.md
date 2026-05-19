@@ -4,6 +4,36 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.66] — 2026-05-19
+
+### ✨ Rebrand to **QuickLookProtein2** (display name only)
+
+- **`CFBundleDisplayName` = `QuickLookProtein2`** in `Xcode/QuickLookProtein/Info.plist`; `CFBundleName` shortened to `QLProtein2` to fit Apple's 15-char menu-bar recommendation. **`PRODUCT_NAME`, `CFBundleIdentifier`, and the Sparkle `SUFeedURL` are unchanged**, so the on-disk bundle stays `QuickLookProtein.app` and Sparkle keeps replacing existing installs in place — no orphaned updates.
+- **User-visible sweep**: About panel hero + sidebar + status-line subtitle + "Enable" toggle row + rendering description in `ContentView.swift`; QL extension's "disabled" placeholder in `QLExtension/PreviewViewController.swift`; appcast channel title + future-item title prefix in `docs/appcast.xml` and `scripts/update-appcast.py`; landing page in `docs/index.html`.
+- **Windows parity**: Settings window title `QuickLookProtein2 Settings`, About card emphasising Jethro Hemmann as the original author + a direct link to the upstream repo, MessageBox dialog titles, Add/Remove Programs `DisplayName`, Inno Setup `AppName`. Registry keys, on-disk paths, and the QL-Win plugin folder name kept as `QuickLookProtein` so upgrades land on the same entry.
+
+### 🏛️ Credits — original author emphasis
+
+- About panel (Mac + Windows) now leads with **"Originally built by Jethro Hemmann (2021–2022) — the original QuickLookProtein"** in semibold, followed by a clickable link to <https://github.com/JethroHemmann/QuickLookProtein>. The "Extended by Ariorad Moniri (2026) as QuickLookProtein2" line sits below, with the fork repo linked underneath.
+- README rebranded heading + Credits section reorder Jethro first; new explanatory subheader directly under the title makes the relationship to the original explicit.
+
+### 🛠️ Windows — fix Settings.exe "infinite respawn" on first install
+
+- **Root cause**: `Windows/QuickLookProtein.Settings/MainWindow.xaml` references `<wv2:WebView2 assembly=Microsoft.Web.WebView2.Wpf>`, which the XAML parser resolves at `InitializeComponent` time. The previous `Windows/install.ps1` explicitly excluded `Microsoft.Web.WebView2.*` and `WebView2Loader.dll` from the per-user install dir, and the Inno Setup `[Files]` block in `release.yml` only declared the named Settings.exe + .config files — so the four WebView2 DLLs never shipped. Settings.exe crashed with `XamlParseException` on launch; from the user's perspective the window flashed and closed, looking like an "infinite respawn" if they retried from the Start Menu.
+- **Fix**: removed the exclusion in `install.ps1`, added a `runtimes\win-x64\native\WebView2Loader.dll` fallback lift for cases where MSBuild didn't promote it, and added explicit `Source:` entries in the Inno Setup `.iss` for `Microsoft.Web.WebView2.Core.dll`, `Microsoft.Web.WebView2.Wpf.dll`, `Microsoft.Web.WebView2.WinForms.dll`, and `WebView2Loader.dll`.
+- **Defence in depth**: `App.xaml.cs` now wires `DispatcherUnhandledException` + `AppDomain.UnhandledException` + a try/catch around `base.OnStartup`, so a future XAML-parse / missing-DLL fault shows a MessageBox naming the failure instead of vanishing silently. Added a named single-instance Mutex so accidental double-clicks during a crash-loop activate the existing window instead of spawning N transient processes. Per-step try/catch in `MainWindow_Loaded` so a registry hiccup or WebView2 runtime miss surfaces in the status bar rather than tearing down the UI.
+
+### 🍺 Homebrew cask
+
+- New `Casks/quicklookprotein.rb` — production-grade: real SHA256 against the versioned DMG, versioned URL, `livecheck :github_latest`, `auto_updates true` so Brew doesn't fight Sparkle for control of `/Applications`, `depends_on macos: :big_sur`, alphabetised `zap trash:` array that wipes Sparkle's persisted prefs plus every extension's plist.
+- Install via personal tap: `brew tap ariomoniri/quicklookprotein https://github.com/ArioMoniri/QuickLookProtein` then `brew install --cask quicklookprotein`.
+- README gets a Homebrew Cask badge + a Homebrew SVG download button matching the existing macOS/Windows pair (`docs/download-homebrew.svg`). Mac Settings About card surfaces the one-line install command under the credits row (gated on macOS 12+ for `.textSelection(.enabled)`).
+
+### 🤖 CI
+
+- New `.github/workflows/ci-validate.yml` — runs on every push to `main` / `feature/**` and on PRs. Three parallel jobs: **macos-15 + Xcode 16 xcodebuild** (no signing) of the main app, **dotnet build** of the Plugin + Thumbnail + Settings csprojs on `windows-2022` (with QuickLook.Common.dll fetched from QL-Win's release the same way `release.yml` does), and **brew style + brew audit** of the cask via a synthetic local tap.
+- The Windows job explicitly asserts that `QuickLookProtein.Settings.exe` plus all four WebView2 DLLs land in the build output, so a regression that reintroduces the respawn bug fails CI at PR time. The macOS job asserts `CFBundleDisplayName == QuickLookProtein2` so the rebrand doesn't silently drift.
+
 ## [1.7.32] — 2026-05-14
 
 ### 🆕 Added — cryo-EM density maps (.ccp4 / .mrc / .map)
