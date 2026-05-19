@@ -4,6 +4,19 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.67] — 2026-05-19
+
+### 🛠️ Hotfix — Sparkle update from 1.7.65 to 1.7.66 failed
+
+- **Root cause**: 1.7.66 set `CFBundleName=QLProtein2` (intended to fit Apple's 15-char menu-bar limit). Sparkle's installer compares `CFBundleName` between the installed app (`QuickLookProtein`, from 1.7.65) and the downloaded update (`QLProtein2`, from 1.7.66). When the names diverge Sparkle bails with **"An error occurred while launching the installer"** — its safeguard against accidentally installing a different app's update over yours.
+- **Fix**: revert `CFBundleName` to `$(PRODUCT_NAME)` (still resolves to `QuickLookProtein`). The full "QuickLookProtein2" rebrand now rides exclusively on `CFBundleDisplayName`, which Finder, the menu bar, About panel, and "Get Info" all use, and which Sparkle does *not* consult for the host-vs-update name check. Users on 1.7.65 who already failed to update to 1.7.66 will now be offered 1.7.67 and the install will succeed.
+
+### 📝 Appcast — release notes pane now shows the actual changelog
+
+- **Symptom**: the "What's New" pane in Sparkle's update dialog rendered as essentially empty — only a single "See the GitHub release for full notes" sentence.
+- **Cause**: `scripts/update-appcast.py` always emitted that stub string as the `<description>`; the real CHANGELOG.md entry never reached the appcast.
+- **Fix**: the script now pulls the `## [<version>]` section from `CHANGELOG.md`, renders it through a small stdlib-only Markdown-to-HTML converter (H3, bullet lists, inline `**bold**` / `` `code` `` / `[link](url)`), and writes that as the appcast item's description. Future Sparkle updates show the real notes inline.
+
 ## [1.7.66] — 2026-05-19
 
 ### ✨ Rebrand to **QuickLookProtein2** (display name only)

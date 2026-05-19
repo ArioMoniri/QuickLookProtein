@@ -16,13 +16,125 @@ Why a Python script and not awk/sed:
 from __future__ import annotations
 
 import argparse
+import html
+import os
 import re
 import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from pathlib import Path
 
 SPARKLE_NS = "http://www.andymatuschak.org/xml-namespaces/sparkle"
 ET.register_namespace("sparkle", SPARKLE_NS)
+
+
+def extract_changelog_section(changelog_path: Path, version: str) -> str | None:
+    """
+    Pull the `## [<version>] — …` section out of CHANGELOG.md and return
+    its body (everything up to the next H2). Returns None if the version
+    isn't found. The result is raw markdown - the caller is responsible
+    for rendering / escaping.
+    """
+    if not changelog_path.exists():
+        return None
+    text = changelog_path.read_text(encoding="utf-8")
+    # Match "## [1.7.67]" allowing optional trailing date / dashes.
+    pattern = re.compile(
+        rf"^## \[{re.escape(version)}\][^\n]*\n(?P<body>.*?)(?=^## \[|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    m = pattern.search(text)
+    if not m:
+        return None
+    return m.group("body").strip()
+
+
+def markdown_to_html(md: str) -> str:
+    """
+    Render a *small subset* of CommonMark inline into Sparkle-safe HTML.
+    Sparkle's release-notes view is a WebKit web view, so anything CSS-
+    free and clean works. We deliberately don't pull `markdown` or
+    `mistune` as deps - keeping this stdlib-only matches the rest of
+    the workflow's tooling story.
+
+    Supported:
+      - H3 (`### foo`)              -> <h3>
+      - Bullet list (`- foo`)       -> <ul><li>
+      - **bold** and `code` inline
+      - Paragraphs separated by blank lines
+      - Inline [text](url) links
+    """
+    out: list[str] = []
+    in_list = False
+
+    def flush_list():
+        nonlocal in_list
+        if in_list:
+            out.append("</ul>")
+            in_list = False
+
+    def inline(s: str) -> str:
+        s = html.escape(s)
+        # **bold**
+        s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
+        # `code`
+        s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+        # [text](url)
+        s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)",
+                   r'<a href="\2">\1</a>', s)
+        return s
+
+    for raw in md.splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            flush_list()
+            continue
+        if line.startswith("### "):
+            flush_list()
+            out.append(f"<h3>{inline(line[4:])}</h3>")
+        elif line.startswith("- "):
+            if not in_list:
+                out.append("<ul>")
+                in_list = True
+            out.append(f"<li>{inline(line[2:])}</li>")
+        elif line.startswith("## "):
+            # Should never happen because extract_changelog_section
+            # stops before the next H2, but guard anyway.
+            flush_list()
+            out.append(f"<h2>{inline(line[3:])}</h2>")
+        else:
+            flush_list()
+            out.append(f"<p>{inline(line)}</p>")
+    flush_list()
+    return "\n".join(out)
+
+
+def build_description(*, version: str, release_url: str,
+                      changelog_path: Path) -> str:
+    """
+    Build the HTML payload for the <description> element. Sparkle 2.x
+    accepts HTML escaped via CDATA *or* via XML entity encoding; we use
+    entity encoding (ElementTree's default behaviour) so the appcast
+    diffs cleanly in PRs.
+
+    If we can pull the CHANGELOG section for this version, render that;
+    otherwise fall back to a "See the GitHub release" stub so the
+    dialog never paints empty.
+    """
+    md = extract_changelog_section(changelog_path, version)
+    if md is None:
+        return (
+            f"<p>See <a href=\"{release_url}\">the GitHub release</a> for "
+            f"full notes and the binary download.</p>"
+        )
+
+    rendered = markdown_to_html(md)
+    footer = (
+        f"<p style=\"margin-top:1em;font-size:smaller;color:#888;\">"
+        f"Full release on "
+        f"<a href=\"{release_url}\">GitHub</a>.</p>"
+    )
+    return rendered + "\n" + footer
 
 
 def parse_signature_line(line: str) -> tuple[str, str | None]:
@@ -42,7 +154,8 @@ def parse_signature_line(line: str) -> tuple[str, str | None]:
 
 
 def build_item(*, version: str, asset_url: str, release_url: str,
-               edsig: str, length: str) -> ET.Element:
+               edsig: str, length: str,
+               changelog_path: Path) -> ET.Element:
     item = ET.Element("item")
 
     # "QuickLookProtein2" is the rebranded marketing name shown in
@@ -63,10 +176,15 @@ def build_item(*, version: str, asset_url: str, release_url: str,
     sp_min = ET.SubElement(item, f"{{{SPARKLE_NS}}}minimumSystemVersion")
     sp_min.text = "11.0"
 
+    # Render the version's CHANGELOG.md section as HTML so Sparkle's
+    # WebKit notes pane shows the actual changelog instead of an empty
+    # placeholder. Falls back to the historic "See the GitHub release"
+    # stub if the version isn't found in CHANGELOG.md.
     desc = ET.SubElement(item, "description")
-    desc.text = (
-        f"<p>See <a href=\"{release_url}\">the GitHub release</a> for full "
-        f"notes and the binary download.</p>"
+    desc.text = build_description(
+        version=version,
+        release_url=release_url,
+        changelog_path=changelog_path,
     )
 
     enclosure = ET.SubElement(item, "enclosure")
@@ -89,6 +207,11 @@ def main() -> int:
                         'sparkle:edSignature="..." length="..."')
     p.add_argument("--length", required=True,
                    help="Fallback byte length if the signature line omits it.")
+    p.add_argument("--changelog", default="CHANGELOG.md",
+                   help="Path to CHANGELOG.md (relative to repo root). "
+                        "The matching '## [<version>]' section becomes the "
+                        "appcast <description>; missing entries fall back "
+                        "to the GitHub-release-link stub.")
     args = p.parse_args()
 
     edsig, length_from_sig = parse_signature_line(args.signature_line)
@@ -115,6 +238,7 @@ def main() -> int:
         release_url=args.release_url,
         edsig=edsig,
         length=length,
+        changelog_path=Path(args.changelog),
     )
 
     # Find the insertion index: after the last non-item child of channel.

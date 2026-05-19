@@ -12,16 +12,23 @@
 	<string>6.0</string>
 	<!--
 	  Display rebrand: CFBundleDisplayName drives what Finder, the
-	  About panel, and the "Get Info" pane show ("QuickLookProtein2");
-	  CFBundleName drives the menu-bar app name (kept short to fit
-	  Apple's 15-char recommendation). PRODUCT_NAME and the bundle
-	  identifier are *deliberately unchanged* so the on-disk bundle
-	  stays QuickLookProtein.app and Sparkle replaces the app at the
-	  same install path, preserving the auto-updater for existing
-	  installs.
+	  About panel, and the "Get Info" pane show ("QuickLookProtein2").
+	  CFBundleName is INTENTIONALLY left tracking PRODUCT_NAME
+	  ("QuickLookProtein") — Sparkle's SUInstaller compares the
+	  installed app's CFBundleName against the downloaded update's
+	  CFBundleName in -[SUHost name] / -[SUInstaller applicationName…],
+	  and changing it makes existing 1.7.65 installs reject the
+	  1.7.66 update with "An error occurred while launching the
+	  installer" (Sparkle treats name divergence as a sign the
+	  update is for a different app and bails before unpacking).
+	  CFBundleDisplayName is not in that compare so we deliver the
+	  full "QuickLookProtein2" rebrand through it alone.
+	  PRODUCT_NAME and the bundle identifier are also unchanged so
+	  the on-disk bundle stays QuickLookProtein.app and Sparkle
+	  replaces the app at the same install path.
 	-->
 	<key>CFBundleName</key>
-	<string>QLProtein2</string>
+	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundleDisplayName</key>
 	<string>QuickLookProtein2</string>
 	<key>CFBundlePackageType</key>
