@@ -1,0 +1,197 @@
+# Branch-validation CI for QuickLookProtein2.
+#
+# release.yml only fires on tag push (`v*.*.*`), so an in-flight
+# branch can land code that breaks the macOS / Windows / cask build
+# without anyone noticing until someone tags a release.  This
+# workflow plugs that gap: every push to a feature/* branch (plus
+# main) plus every PR builds the three deliverables and lints the
+# Homebrew cask file, fast, with no signing and no release uploads.
+#
+# Jobs:
+#   - macos-build   : xcodebuild the main app + the QL extension.
+#                     CODE_SIGNING_ALLOWED=NO so we don't need any
+#                     Apple secrets in the branch CI - we only care
+#                     that the project compiles, not that the build
+#                     can be notarised.
+#   - windows-build : dotnet build the three csproj's. WebView2
+#                     SDK comes from NuGet, no host install needed.
+#                     QuickLook.Common.dll is fetched from the QL-Win
+#                     release the same way release.yml does it.
+#   - cask-validate : brew style + brew audit on Casks/quicklookprotein.rb
+#                     so a malformed cask is caught at PR time instead
+#                     of after a release tag has been cut.
+#
+# All three jobs run in parallel.  Job-level concurrency cancels
+# prior runs on the same ref so rapid pushes don't queue.
+
+name: CI (validate branch)
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+      - "feature/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-build:
+    name: macOS · xcodebuild (no signing)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        # Pin to the toolchain matching release.yml so a branch CI
+        # green doesn't drift from what the release runner actually
+        # uses to ship.  macos-14 ships Xcode 15.x by default.
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer || \
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+      - name: Build main app target
+        # CODE_SIGNING_ALLOWED=NO + CODE_SIGNING_REQUIRED=NO so the
+        # branch CI doesn't need any provisioning profile.  We're
+        # only checking that Swift compiles and the SwiftUI views
+        # parse - not that the binary is shippable.
+        run: |
+          xcodebuild \
+            -project Xcode/QuickLookProtein.xcodeproj \
+            -scheme QuickLookProtein \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -derivedDataPath build/ci \
+            build | xcpretty || true
+          # `|| true` + the explicit verification below: xcpretty's
+          # exit code can mask successes; we check the binary
+          # existence instead so a build failure still fails CI.
+          test -f "build/ci/Build/Products/Debug/QuickLookProtein.app/Contents/MacOS/QuickLookProtein" \
+            || (echo "::error::main app binary missing - build failed"; exit 1)
+          echo "OK: QuickLookProtein.app built."
+      - name: Verify display rebrand landed in Info.plist
+        # Belt-and-suspenders: the rename relies on
+        # CFBundleDisplayName being present.  A future merge that
+        # drops the key would silently revert the user-visible
+        # rename; this check catches that at PR time.
+        run: |
+          plist="build/ci/Build/Products/Debug/QuickLookProtein.app/Contents/Info.plist"
+          got=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$plist" 2>/dev/null || echo MISSING)
+          echo "CFBundleDisplayName = $got"
+          [ "$got" = "QuickLookProtein2" ] || \
+            (echo "::error::CFBundleDisplayName drifted from QuickLookProtein2"; exit 1)
+
+  windows-build:
+    name: Windows · dotnet build (Plugin + Thumbnail + Settings)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET (Framework targeting packs)
+        # Framework targeting packs ship with the windows-2022
+        # image already; this just makes the dotnet CLI available
+        # for the dotnet build call below.  We do NOT need .NET 6+
+        # for this project - everything is net472.
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Stage QuickLook.Common.dll reference
+        # The plugin csproj references QuickLook.Common.dll which
+        # ships inside the QL-Win release zip.  release.yml fetches
+        # it explicitly; we mirror that here so the plugin build
+        # has the reference assembly it needs.
+        shell: pwsh
+        run: |
+          $api  = "https://api.github.com/repos/QL-Win/QuickLook/releases/latest"
+          $rel  = Invoke-RestMethod -Uri $api -Headers @{ "User-Agent" = "QLProtein-CI" }
+          $zip  = $rel.assets | Where-Object { $_.name -like "QuickLook-*.zip" } | Select-Object -First 1
+          if (-not $zip) { throw "No QuickLook-*.zip in QL-Win latest release" }
+          New-Item -ItemType Directory -Force -Path build/qlwin | Out-Null
+          $zipPath = "build/qlwin/qlwin.zip"
+          Invoke-WebRequest -Uri $zip.browser_download_url -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath build/qlwin -Force
+          $common = Get-ChildItem -Path build/qlwin -Filter QuickLook.Common.dll -Recurse | Select-Object -First 1
+          if (-not $common) { throw "QuickLook.Common.dll not found in QL-Win release" }
+          New-Item -ItemType Directory -Force -Path Windows/QuickLookProtein.Plugin/libs | Out-Null
+          Copy-Item $common.FullName Windows/QuickLookProtein.Plugin/libs/QuickLook.Common.dll -Force
+      - name: Build plugin
+        run: dotnet build Windows/QuickLookProtein.Plugin/QuickLookProtein.Plugin.csproj -c Release
+      - name: Build thumbnail provider
+        run: dotnet build Windows/QuickLookProtein.Thumbnail/QuickLookProtein.Thumbnail.csproj -c Release
+      - name: Build Settings WPF app
+        # This is the build that fixes the "infinite respawn" bug
+        # would have been caught earlier by - it produces the exe
+        # plus the Microsoft.Web.WebView2.* DLLs that the runtime
+        # XAML parser needs.  The next step verifies they landed.
+        run: dotnet build Windows/QuickLookProtein.Settings/QuickLookProtein.Settings.csproj -c Release -o build/settings
+      - name: Verify Settings.exe build output includes WebView2 DLLs
+        # The Settings app crashes with XamlParseException at
+        # InitializeComponent if these assemblies are missing
+        # (MainWindow.xaml references <wv2:WebView2 assembly=...>).
+        # A regression that drops the NuGet reference or breaks
+        # the runtime copy would silently reintroduce the bug.
+        shell: pwsh
+        run: |
+          $required = @(
+            "QuickLookProtein.Settings.exe",
+            "Microsoft.Web.WebView2.Core.dll",
+            "Microsoft.Web.WebView2.Wpf.dll",
+            "WebView2Loader.dll"
+          )
+          $missing = @()
+          foreach ($f in $required) {
+            if (-not (Test-Path "build/settings/$f")) { $missing += $f }
+          }
+          if ($missing.Count -gt 0) {
+            $list = $missing -join ', '
+            Write-Host "::error::Missing in build/settings: $list"
+            exit 1
+          }
+          Write-Host "OK: all required Settings.exe runtime files present."
+
+  cask-validate:
+    name: macOS · validate Homebrew cask
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify cask filename matches token
+        # Homebrew enforces cask filename == cask token.  We assert
+        # that here so a rename to (say) quicklookprotein2.rb gets
+        # caught before brew style does.
+        run: |
+          test -f Casks/quicklookprotein.rb || \
+            (echo "::error::Casks/quicklookprotein.rb missing"; exit 1)
+          grep -qE '^cask "quicklookprotein"' Casks/quicklookprotein.rb || \
+            (echo "::error::cask token must be 'quicklookprotein'"; exit 1)
+      - name: Tap-local install of cask for style/audit
+        # `brew style` and `brew audit` need the cask file to live
+        # inside a tap.  We construct a throwaway tap pointing at
+        # the checked-out repo so the checks run against the file
+        # without needing a network tap.
+        run: |
+          tap_path="$(brew --repository)/Library/Taps/ariomoniri/homebrew-quicklookprotein"
+          mkdir -p "$tap_path/Casks"
+          cp Casks/quicklookprotein.rb "$tap_path/Casks/"
+          # Re-init git so brew style / audit have a valid tap.
+          (cd "$tap_path" && git init -q && git add -A && \
+            git -c user.email=ci@example.com -c user.name=CI commit -qm ci)
+          brew style "$tap_path/Casks/quicklookprotein.rb"
+      - name: brew audit (online checks disabled)
+        # --online would re-verify the sha256 by fetching the DMG,
+        # which is ~6 MB; skip on branch CI to keep wall time low.
+        # The release pipeline still bumps the sha when version
+        # changes, so a stale digest gets caught when the cask is
+        # touched in a PR that also moves version.
+        run: |
+          brew audit --cask --new --strict --no-online "ariomoniri/quicklookprotein/quicklookprotein" || true
+          # `|| true` because `--new` flags issues that homebrew-cask
+          # core would reject but that are fine for a personal tap
+          # (e.g. lack of upstream test infrastructure).  We log them
+          # in CI output so they're visible; we don't fail the job.

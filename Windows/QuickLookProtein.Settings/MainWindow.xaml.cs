@@ -30,15 +30,36 @@ public partial class MainWindow : Window
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        SetVersionLabel();
-        PopulateAllCombos();
-        LoadCurrentSettings();
-        WireChangeHandlers();
+        // Each step is wrapped so a fault in (say) registry I/O or
+        // the WebView2 bootstrap doesn't tear down the whole window
+        // before the user gets to see *any* settings. The status bar
+        // surfaces what failed; the rest of the UI stays usable.
+        try { SetVersionLabel();    } catch (Exception ex) { ReportStartupError("version label", ex); }
+        try { PopulateAllCombos();  } catch (Exception ex) { ReportStartupError("populating options", ex); }
+        try { LoadCurrentSettings();} catch (Exception ex) { ReportStartupError("loading saved settings", ex); }
+        try { WireChangeHandlers(); } catch (Exception ex) { ReportStartupError("wiring change handlers", ex); }
         _suppressWrites = false;
-        // Kick off the WebView2 init + first sample render. Done after
-        // settings are loaded so the first render honours whatever
-        // preferences are currently set.
-        _ = InitPreviewAsync();
+
+        // WebView2 bootstrap is the most likely source of startup
+        // failure (Evergreen Runtime missing on stripped-down VMs,
+        // or a corporate policy blocking the user-data folder).
+        // Treat it as best-effort: if it fails, the settings UI
+        // still works, the preview pane just shows a caption.
+        _ = InitPreviewAsync().ContinueWith(t =>
+        {
+            if (t.IsFaulted)
+            {
+                Dispatcher.Invoke(() =>
+                    ReportStartupError("live-preview WebView2", t.Exception?.GetBaseException()));
+            }
+        }, System.Threading.Tasks.TaskScheduler.Default);
+    }
+
+    private void ReportStartupError(string stage, Exception? ex)
+    {
+        var msg = ex?.Message ?? "(no detail)";
+        StatusLabel.Text = $"Startup issue in {stage}: {msg}";
+        PreviewCaption.Text = $"Live preview unavailable: {msg}";
     }
 
     private void SetVersionLabel()
@@ -235,11 +256,24 @@ public partial class MainWindow : Window
 
     private void GithubButton_Click(object sender, RoutedEventArgs e)
     {
+        OpenUrl("https://github.com/ArioMoniri/QuickLookProtein");
+    }
+
+    private void OriginalRepoButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Jethro Hemmann's upstream repo. Linked from the About card
+        // to give the original author visible attribution that the
+        // user can follow on one click.
+        OpenUrl("https://github.com/JethroHemmann/QuickLookProtein");
+    }
+
+    private static void OpenUrl(string url)
+    {
         try
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = "https://github.com/ArioMoniri/QuickLookProtein",
+                FileName = url,
                 UseShellExecute = true,
             });
         }
@@ -257,7 +291,7 @@ public partial class MainWindow : Window
                 Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true });
             else
                 MessageBox.Show($"Plugin folder not found at:\n{dir}\n\nReinstall QuickLookProtein-Setup.exe if you've removed it.",
-                                "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Information);
+                                "QuickLookProtein2", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch { }
     }
@@ -273,14 +307,14 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(
                 "No plugin log yet. Open a .pdb / .cif / etc. with Space-bar in Explorer once - the plugin writes here on every preview attempt.\n\nExpected path:\n" + log,
-                "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Information);
+                "QuickLookProtein2", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         try { Process.Start(new ProcessStartInfo { FileName = log, UseShellExecute = true }); }
         catch (Exception ex)
         {
             MessageBox.Show("Could not open log: " + ex.Message,
-                            "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            "QuickLookProtein2", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -297,14 +331,14 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(
                 "QuickLook log not found at:\n" + log + "\n\nIs QuickLook actually installed?",
-                "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Information);
+                "QuickLookProtein2", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         try { Process.Start(new ProcessStartInfo { FileName = log, UseShellExecute = true }); }
         catch (Exception ex)
         {
             MessageBox.Show("Could not open log: " + ex.Message,
-                            "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            "QuickLookProtein2", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -347,7 +381,7 @@ public partial class MainWindow : Window
             }
         }
         MessageBox.Show("Could not find QuickLook.exe. Launch it manually from the Start Menu.",
-                        "QuickLookProtein", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        "QuickLookProtein2", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     // ---- Live preview tiles -------------------------------------------

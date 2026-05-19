@@ -453,7 +453,7 @@ struct ContentView: View {
                     .frame(width: 26, height: 26)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("QuickLookProtein").font(.system(size: 11.5, weight: .semibold))
+                    Text("QuickLookProtein2").font(.system(size: 11.5, weight: .semibold))
                     Text(appVersionString).font(.system(size: 10)).foregroundColor(.secondary)
                 }
                 Spacer(minLength: 0)
@@ -555,7 +555,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 6) {
                 SectionLabel(text: "Quick Look")
                 Card {
-                    ToggleRow(label: "Enable QuickLookProtein",
+                    ToggleRow(label: "Enable QuickLookProtein2",
                               isOn: $userSettings.masterEnabled,
                               accessory: userSettings.masterEnabled
                                 ? "Active — previewing 12 formats"
@@ -570,7 +570,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 6) {
                 SectionLabel(text: "Performance")
                 Card {
-                    Text("QuickLookProtein renders via 3Dmol.js in a WKWebView with hardware-accelerated WebGL. There is no per-app GPU/quality toggle — render cost is set by the structure size and the Default zoom under Appearance.")
+                    Text("QuickLookProtein2 renders via 3Dmol.js in a WKWebView with hardware-accelerated WebGL. There is no per-app GPU/quality toggle — render cost is set by the structure size and the Default zoom under Appearance.")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1453,7 +1453,7 @@ struct ContentView: View {
     private var heroUpdateSubtitle: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-        return "QuickLookProtein \(v) (build \(b))"
+        return "QuickLookProtein2 \(v) (build \(b))"
     }
 
     @ViewBuilder
@@ -1470,7 +1470,7 @@ struct ContentView: View {
                     .frame(width: 96, height: 96)
                     .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                     .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
-                Text("QuickLookProtein").font(.system(size: 24, weight: .bold))
+                Text("QuickLookProtein2").font(.system(size: 24, weight: .bold))
                 Text("Version \(v) (build \(b))\(min.isEmpty ? "" : " · macOS \(min) +")")
                     .font(.system(size: 12)).foregroundColor(.secondary)
             }
@@ -1481,13 +1481,17 @@ struct ContentView: View {
                 SectionLabel(text: "Credits")
                 Card {
                     VStack(alignment: .leading, spacing: 10) {
+                        // Original author gets top billing — the bold,
+                        // larger-font line — to make clear that
+                        // QuickLookProtein2 is an extension of Jethro's
+                        // original work, not a separate project.
                         (Text("Originally built by ") +
                          Text("Jethro Hemmann").bold() +
-                         Text(" (2021–2022)."))
+                         Text(" (2021–2022) — the original QuickLookProtein."))
                             .font(.system(size: 13))
                         (Text("Extended by ") +
                          Text("Ariorad Moniri").bold() +
-                         Text(" (2026) — multi-format support, smart protein+ligand styling, molecular surfaces, Finder thumbnails, Spotlight indexing, drag-and-drop preview, Quick Actions, AR-Quick-Look USDZ, DCD/TRR/XTC trajectories, and Sparkle auto-update."))
+                         Text(" (2026) as QuickLookProtein2 — multi-format support, smart protein+ligand styling, molecular surfaces, Finder thumbnails, Spotlight indexing, drag-and-drop preview, Quick Actions, AR-Quick-Look USDZ, DCD/TRR/XTC trajectories, and Sparkle auto-update."))
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1495,11 +1499,29 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     RowDivider()
+                    // Original repo first, then this fork — same
+                    // ordering principle as the credit lines above.
                     HStack(spacing: 10) {
                         Image(systemName: "link")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.secondary)
-                        Button("github.com/ArioMoniri/QuickLookProtein") {
+                        Button("github.com/JethroHemmann/QuickLookProtein (original)") {
+                            if let u = URL(string: "https://github.com/JethroHemmann/QuickLookProtein") {
+                                NSWorkspace.shared.open(u)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.accentColor)
+                        .font(.system(size: 12.5))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    HStack(spacing: 10) {
+                        Image(systemName: "link")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        Button("github.com/ArioMoniri/QuickLookProtein (this fork)") {
                             if let u = URL(string: "https://github.com/ArioMoniri/QuickLookProtein") {
                                 NSWorkspace.shared.open(u)
                             }
@@ -1510,7 +1532,8 @@ struct ContentView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 6)
+                    .padding(.bottom, 4)
                 }
             }
 
@@ -1680,9 +1703,29 @@ struct ContentView: View {
                     Text("Credits & Source")
                         .font(.headline)
 
-                    Text("Originally built by Jethro Hemmann (2021–2022).")
+                    // Lead with the original author. The "2" rebrand is
+                    // a friendly extension, not a replacement, and we
+                    // want first-time users to recognise that the core
+                    // QuickLookProtein concept is Jethro's work.
+                    (Text("Originally built by ")
+                        + Text("Jethro Hemmann").fontWeight(.semibold)
+                        + Text(" (2021–2022) — the original QuickLookProtein."))
                         .font(.callout)
-                    Text("Extended by Ariorad Moniri (2026) — multi-format support, smart protein+ligand styling, molecular surfaces, Finder thumbnails, Spotlight indexing, drag-and-drop preview, and Sparkle auto-update.")
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "link")
+                            .foregroundColor(.secondary)
+                        Link("github.com/JethroHemmann/QuickLookProtein",
+                             destination: URL(string: "https://github.com/JethroHemmann/QuickLookProtein")!)
+                            .font(.callout)
+                    }
+                    .padding(.top, 2)
+
+                    Divider()
+                        .padding(.vertical, 2)
+
+                    Text("Extended by Ariorad Moniri (2026) as QuickLookProtein2 — multi-format support, smart protein+ligand styling, molecular surfaces, Finder thumbnails, Spotlight indexing, drag-and-drop preview, and Sparkle auto-update.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1693,6 +1736,21 @@ struct ContentView: View {
                         Link("github.com/ArioMoniri/QuickLookProtein",
                              destination: URL(string: "https://github.com/ArioMoniri/QuickLookProtein")!)
                             .font(.callout)
+                    }
+                    .padding(.top, 2)
+
+                    // Homebrew install hint. Surfaces the cask path
+                    // for users who'd rather brew-install than drag
+                    // the .app from a DMG; the in-app Sparkle updater
+                    // continues to handle subsequent upgrades either
+                    // way (auto_updates true in the cask).
+                    HStack(spacing: 6) {
+                        Image(systemName: "mug.fill")
+                            .foregroundColor(.orange)
+                        Text("brew install --cask quicklookprotein")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .textSelection(.enabled)
                     }
                     .padding(.top, 2)
 

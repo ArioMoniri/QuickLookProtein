@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
   <channel>
-    <title>QuickLookProtein</title>
+    <title>QuickLookProtein2</title>
     <link>https://ariomoniri.github.io/QuickLookProtein/appcast.xml</link>
-    <description>Auto-update feed for QuickLookProtein (Ariorad Moniri's signed fork).</description>
+    <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
       <title>QuickLookProtein 1.7.65</title>

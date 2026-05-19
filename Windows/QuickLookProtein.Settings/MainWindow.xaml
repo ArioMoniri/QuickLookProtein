@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
-        Title="QuickLookProtein Settings"
+        Title="QuickLookProtein2 Settings"
         Height="780" Width="900"
         MinHeight="640" MinWidth="760"
         WindowStartupLocation="CenterScreen"
@@ -400,11 +400,25 @@
                                        Text="Version"
                                        Foreground="#CFD2D6"
                                        Margin="0,0,0,8"/>
+                            <!-- Original author gets first-and-bold credit;
+                                 the "2" rebrand is an extension, not a
+                                 replacement. Mirrors the macOS About card. -->
                             <TextBlock Style="{StaticResource Caption}"
-                                       Text="Original Quick Look extension by Jethro Hemmann (2021-2022). Multi-format upgrade, Windows port, Sparkle auto-update by Ariorad Moniri (2026)."/>
+                                       TextWrapping="Wrap">
+                                <Run Text="Originally built by "/>
+                                <Run FontWeight="SemiBold" Foreground="#E8EAED" Text="Jethro Hemmann"/>
+                                <Run Text=" (2021-2022) — the original QuickLookProtein."/>
+                            </TextBlock>
+                            <Button Content="Original repo (JethroHemmann/QuickLookProtein)"
+                                    HorizontalAlignment="Left"
+                                    Padding="10,4" Margin="0,2,0,6"
+                                    Cursor="Hand"
+                                    Click="OriginalRepoButton_Click"/>
+                            <TextBlock Style="{StaticResource Caption}"
+                                       Text="Extended by Ariorad Moniri (2026) as QuickLookProtein2 — multi-format support, smart protein+ligand styling, molecular surfaces, Windows port, Sparkle auto-update."/>
                             <TextBlock Style="{StaticResource Caption}"
                                        Text="Rendering by 3Dmol.js (Rego &amp; Koes, 2015)."/>
-                            <Button Content="Open GitHub"
+                            <Button Content="This fork (ArioMoniri/QuickLookProtein)"
                                     HorizontalAlignment="Left"
                                     Padding="10,4" Margin="0,6,0,0"
                                     Cursor="Hand"

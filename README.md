@@ -1,26 +1,42 @@
-# 🧬 QuickLookProtein
+# 🧬 QuickLookProtein2
 
 > macOS Quick Look extension for previewing 3D molecular structure files (PDB, CIF, SDF, MOL, MOL2, XYZ, GRO, CUBE, PDBQT) — press <kbd>Space</kbd> in Finder, see your structure.
+>
+> **QuickLookProtein2** is the rebranded, extended release of the original [**QuickLookProtein** by **Jethro Hemmann**](https://github.com/JethroHemmann/QuickLookProtein) — same Quick Look workflow, with multi-format support, smart styling, Sparkle auto-update, and a Windows port. The on-disk bundle name and bundle identifier are unchanged, so existing installs upgrade in place through Sparkle.
 
 [![macOS](https://img.shields.io/badge/macOS-11.0%2B-blue?logo=apple)](https://www.apple.com/macos/)
 [![Swift 5](https://img.shields.io/badge/Swift-5-orange?logo=swift)](https://swift.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Rendered by 3Dmol.js](https://img.shields.io/badge/rendered%20by-3Dmol.js-purple)](https://3dmol.csb.pitt.edu)
 [![Latest release](https://img.shields.io/github/v/release/ArioMoniri/QuickLookProtein?display_name=tag)](https://github.com/ArioMoniri/QuickLookProtein/releases)
+[![Homebrew Cask](https://img.shields.io/badge/Homebrew-quicklookprotein-yellow?logo=homebrew)](Casks/quicklookprotein.rb)
 
 ### 📥 Download
 
 <p align="center">
-  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.dmg"><img src="docs/download-macos.svg" alt="Download QuickLookProtein for macOS" height="72"></a>
+  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.dmg"><img src="docs/download-macos.svg" alt="Download QuickLookProtein2 for macOS" height="72"></a>
   &nbsp;
-  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein-Setup.exe"><img src="docs/download-windows.svg" alt="Download QuickLookProtein Setup for Windows" height="72"></a>
+  <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein-Setup.exe"><img src="docs/download-windows.svg" alt="Download QuickLookProtein2 Setup for Windows" height="72"></a>
+  &nbsp;
+  <a href="#-homebrew-macos"><img src="docs/download-homebrew.svg" alt="Install QuickLookProtein2 via Homebrew" height="72"></a>
 </p>
 
-<p align="center"><sub>macOS → signed <code>.dmg</code>, drag to Applications · Windows → single <code>Setup.exe</code>, double-click. <strong>One click each.</strong></sub></p>
+<p align="center"><sub>macOS → signed <code>.dmg</code>, drag to Applications · Windows → single <code>Setup.exe</code>, double-click · macOS+Homebrew → <code>brew install --cask quicklookprotein</code>. <strong>One step each.</strong></sub></p>
 
 <p align="center">macOS · Developer-ID signed &amp; notarised &nbsp;|&nbsp; Windows · <strong>under development, not stable yet</strong> (QL-Win plugin, unsigned)</p>
 
 **macOS:** open the disk image, drag **QuickLookProtein.app** into **Applications**, then hit <kbd>Space</kbd> on any `.pdb` / `.cif` / `.mol2` / etc. file in Finder.
+
+### 🍺 Homebrew (macOS)
+
+You can install QuickLookProtein2 from a personal Homebrew tap — same DMG, no manual drag-to-Applications step:
+
+```bash
+brew tap ariomoniri/quicklookprotein https://github.com/ArioMoniri/QuickLookProtein
+brew install --cask quicklookprotein
+```
+
+Brew handles upgrades the next time the cask version moves (`brew upgrade --cask quicklookprotein`), while Sparkle's in-app update still works for everything in between. The cask file lives at [`Casks/quicklookprotein.rb`](Casks/quicklookprotein.rb) so you can audit it before installing. A submission to the central [`homebrew/homebrew-cask`](https://github.com/Homebrew/homebrew-cask) repo is on the punch list — until that lands, the personal tap above is the supported path.
 
 <details>
 <summary>🎨 UI versions — Settings-app facelift in v1.7.47</summary>
@@ -78,7 +94,7 @@ The Windows installer is **unsigned** — SmartScreen warns on first launch. The
 
 </details>
 
-> 🔱 This is **[Ariorad Moniri](https://github.com/ArioMoniri)'s signed fork** of the original [QuickLookProtein by Jethro Hemmann](https://github.com/JethroHemmann/QuickLookProtein), distributed via [releases on this fork](https://github.com/ArioMoniri/QuickLookProtein/releases) and notarised under Apple Developer team `FF68N39FU5`. Looking for the upstream pull request? See [the PR branch](https://github.com/ArioMoniri/QuickLookProtein/tree/feature/3dmol-upgrade).
+> 🔱 **QuickLookProtein2** is **[Ariorad Moniri](https://github.com/ArioMoniri)'s signed, extended fork** of the original [**QuickLookProtein** by **Jethro Hemmann**](https://github.com/JethroHemmann/QuickLookProtein) (2021–2022). The "2" lives in the display name only — the bundle identifier (`com.ariomoniri.QuickLookProtein…`) and Sparkle appcast are unchanged, so existing installs auto-upgrade. Distributed via [releases on this fork](https://github.com/ArioMoniri/QuickLookProtein/releases) and notarised under Apple Developer team `FF68N39FU5`. Looking for the upstream pull request? See [the PR branch](https://github.com/ArioMoniri/QuickLookProtein/tree/feature/3dmol-upgrade).
 
 QuickLookProtein integrates with macOS Quick Look so you can preview protein and small-molecule structures the same way you preview PDFs and images — just select a file in Finder and tap <kbd>Space</kbd>. Rendering is performed by [3Dmol.js](https://3dmol.csb.pitt.edu) inside a `WKWebView`, so previews are interactive (drag to rotate, scroll to zoom, click an atom to label it).
 
@@ -224,9 +240,9 @@ docs/
 
 ## 🙏 Credits
 
-- Original Quick Look extension authored by **[Jethro Hemmann](https://github.com/JethroHemmann)** (2021–2022).
-- 3D rendering by **[3Dmol.js](https://3dmol.csb.pitt.edu)** — Rego & Koes, *Bioinformatics* 2015.
-- Multi-format support, smart rendering, Finder thumbnails, Spotlight indexing, drag-and-drop, auto-updater, and reliability hardening by **[Ariorad Moniri](https://github.com/ArioMoniri)** (2026).
+- 🏛️ **Originally built by [Jethro Hemmann](https://github.com/JethroHemmann)** (2021–2022) — the **original QuickLookProtein**, source repo: <https://github.com/JethroHemmann/QuickLookProtein>. QuickLookProtein2 is an extension of that work, not a replacement; Jethro's design choices for the Quick Look integration and the small-but-focused settings UI underpin everything here.
+- 🔬 3D rendering by **[3Dmol.js](https://3dmol.csb.pitt.edu)** — Rego & Koes, *Bioinformatics* 2015.
+- 🔧 Multi-format support, smart rendering, Finder thumbnails, Spotlight indexing, drag-and-drop, auto-updater, Windows port, and reliability hardening by **[Ariorad Moniri](https://github.com/ArioMoniri)** (2026) — released as **QuickLookProtein2**.
 
 ### About the maintainer of this fork
 

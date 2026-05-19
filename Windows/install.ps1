@@ -299,7 +299,12 @@ function Register-AddRemoveProgramsEntry {
 
     try {
         New-Item -Path $uninstallRoot -Force | Out-Null
-        Set-ItemProperty -Path $uninstallRoot -Name "DisplayName"     -Value "QuickLookProtein"
+        # DisplayName drives what users see in Settings > Apps and
+        # Add/Remove Programs. Match the rebranded marketing name
+        # ("QuickLookProtein2") while leaving the registry key path
+        # and plugin folder name alone so existing installs upgrade
+        # in place rather than orphaning the previous entry.
+        Set-ItemProperty -Path $uninstallRoot -Name "DisplayName"     -Value "QuickLookProtein2"
         Set-ItemProperty -Path $uninstallRoot -Name "DisplayVersion"  -Value (Get-PluginInstalledVersion)
         Set-ItemProperty -Path $uninstallRoot -Name "Publisher"       -Value "Ariorad Moniri"
         Set-ItemProperty -Path $uninstallRoot -Name "URLInfoAbout"    -Value "https://github.com/ArioMoniri/QuickLookProtein"
@@ -409,6 +414,18 @@ function Install-SettingsApp {
     # script folder that doesn't belong to the plugin (the plugin
     # files are referenced from the .qlplugin's own folder by
     # QL-Win - we don't want duplicates).
+    #
+    # IMPORTANT: Microsoft.Web.WebView2.* and WebView2Loader.dll are
+    # *required* by Settings.exe - MainWindow.xaml references the
+    # <wv2:WebView2> control via
+    #   xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;
+    #             assembly=Microsoft.Web.WebView2.Wpf"
+    # so the XAML parser resolves that assembly at InitializeComponent
+    # time, *before* the window paints. Excluding those DLLs (as a
+    # previous revision of this script did) makes Settings.exe throw
+    # XamlParseException on launch and exit immediately, which to the
+    # user looks like an "infinite respawn" if they click the Start
+    # Menu shortcut repeatedly. Keep them in.
     $exclude = @(
         "QuickLookProtein.qlplugin",
         "install.bat", "install.ps1", "README.txt"
@@ -418,11 +435,18 @@ function Install-SettingsApp {
         ($exclude -notcontains $_.Name) -and
         ($_.Name -notlike "QuickLook-*.exe") -and
         ($_.Name -notlike "QuickLook.Plugin.*") -and
-        ($_.Name -notlike "QuickLookProtein.Thumbnail.dll") -and
-        ($_.Name -notlike "Microsoft.Web.WebView2.*") -and
-        ($_.Name -notlike "WebView2Loader.dll")
+        ($_.Name -notlike "QuickLookProtein.Thumbnail.dll")
     } | ForEach-Object {
         Copy-Item -Path $_.FullName -Destination $appDir -Force
+    }
+    # WebView2Loader.dll lives under runtimes\win-x64\native\ in the
+    # NuGet package on .NET Framework - if the build target promoted
+    # it next to the .exe (CopyWebView2LoaderNative target) it'll
+    # have been copied above; if not, look for it in a runtimes\
+    # subdir alongside the script and lift it up.
+    $loaderNative = Join-Path $scriptDir "runtimes\win-x64\native\WebView2Loader.dll"
+    if ((Test-Path $loaderNative) -and -not (Test-Path (Join-Path $appDir "WebView2Loader.dll"))) {
+        Copy-Item -Path $loaderNative -Destination $appDir -Force
     }
     if (-not (Test-Path (Join-Path $appDir "QuickLookProtein.Settings.exe"))) {
         Write-Host "  Settings app didn't land where expected - skipping shortcut."

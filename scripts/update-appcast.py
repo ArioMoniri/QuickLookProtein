@@ -45,7 +45,12 @@ def build_item(*, version: str, asset_url: str, release_url: str,
                edsig: str, length: str) -> ET.Element:
     item = ET.Element("item")
 
-    ET.SubElement(item, "title").text = f"QuickLookProtein {version}"
+    # "QuickLookProtein2" is the rebranded marketing name shown in
+    # Sparkle's update dialog. The Sparkle comparator still keys off
+    # <sparkle:version> below, not the title, so this is a pure
+    # display change. Past appcast items keep their historical
+    # "QuickLookProtein N.N.N" titles - we only rebrand new entries.
+    ET.SubElement(item, "title").text = f"QuickLookProtein2 {version}"
     ET.SubElement(item, "link").text = release_url
     ET.SubElement(item, "pubDate").text = datetime.now(timezone.utc).strftime(
         "%a, %d %b %Y %H:%M:%S +0000"

@@ -109,7 +109,7 @@ class PreviewViewController: NSViewController,
         let html: String
         if !gateSettings.masterEnabled {
             html = disabledHTML(
-                reason: "QuickLookProtein is disabled in the Settings app. Re-enable it under General → Quick Look to resume molecule previews.",
+                reason: "QuickLookProtein2 is disabled in the Settings app. Re-enable it under General → Quick Look to resume molecule previews.",
                 fileName: url.lastPathComponent)
             let baseUrl = URL(fileURLWithPath: htmlPath)
             self.pendingHandler = handler
