@@ -6,6 +6,23 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.71</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.71</link>
+      <pubDate>Tue, 19 May 2026 09:38:38 +0000</pubDate>
+      <sparkle:version>1.7.71</sparkle:version>
+      <sparkle:shortVersionString>1.7.71</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows hotfix⁴ — ship the bitness-aware native loader into the .qlplugin, then pin it&lt;/h3&gt;
+&lt;p&gt;The 1.7.70 fix flipped the plugin DLL to AnyCPU but left two gaps that would have surfaced after &lt;code&gt;Plugin.Init()&lt;/code&gt; finally got called on a 32-bit QL-Win host:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gap 1 — release packaging missed the &lt;code&gt;runtimes/&lt;/code&gt; subtree.&lt;/strong&gt; The csproj&amp;#x27;s &lt;code&gt;CopyWebView2LoaderNative&lt;/code&gt; target now lays down both &lt;code&gt;runtimes/win-x86/native/WebView2Loader.dll&lt;/code&gt; and &lt;code&gt;runtimes/win-x64/native/WebView2Loader.dll&lt;/code&gt; (so the AnyCPU &lt;code&gt;Microsoft.Web.WebView2.Core&lt;/code&gt; wrapper can pick the matching one at runtime), but &lt;code&gt;release.yml&lt;/code&gt;&amp;#x27;s &lt;code&gt;.qlplugin&lt;/code&gt; package step copied only top-level files via &lt;code&gt;Get-ChildItem -File&lt;/code&gt; without &lt;code&gt;-Recurse&lt;/code&gt;. The subtree never reached the zip, so a 32-bit QL-Win install would still hit &lt;code&gt;BadImageFormatException&lt;/code&gt; when WebView2 tried to load its native bridge. Now &lt;code&gt;Copy-Item -Path &amp;quot;build/plugin/runtimes&amp;quot; -Destination $stage -Recurse&lt;/code&gt; puts both bitness loaders inside the &lt;code&gt;.qlplugin&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Gap 2 — Windows&amp;#x27; default DLL search order doesn&amp;#x27;t include the plugin folder.&lt;/strong&gt; Even with the right &lt;code&gt;WebView2Loader.dll&lt;/code&gt; shipped, when &lt;code&gt;Microsoft.Web.WebView2.Core&lt;/code&gt; P/Invokes &lt;code&gt;&amp;quot;WebView2Loader.dll&amp;quot;&lt;/code&gt; (no path), Windows looks in &lt;code&gt;AppDomain.BaseDirectory&lt;/code&gt; (= &lt;code&gt;QL-Win.exe&lt;/code&gt;&amp;#x27;s folder), system dir, &lt;code&gt;PATH&lt;/code&gt; — never our plugin folder. So &lt;code&gt;Plugin&lt;/code&gt;&amp;#x27;s static constructor now pre-pins the correct loader: it computes &lt;code&gt;runtimes/win-{x86|x64}/native/WebView2Loader.dll&lt;/code&gt; based on &lt;code&gt;IntPtr.Size&lt;/code&gt;, &lt;code&gt;LoadLibraryW&lt;/code&gt;s it explicitly, and falls back to the flat-folder &lt;code&gt;WebView2Loader.dll&lt;/code&gt; if the bitness-specific path is missing. With the DLL in the process&amp;#x27;s loaded-module cache, the managed wrapper&amp;#x27;s P/Invoke later resolves against the already-loaded handle instead of running through search order.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;The two gaps combined are why 1.7.70 wasn&amp;#x27;t quite the end of this — 1.7.71 closes both. After install, the on-disk layout under &lt;code&gt;%LocalAppData%\QuickLook\plugins\QuickLookProtein\&lt;/code&gt; will include &lt;code&gt;runtimes\win-x86\native\WebView2Loader.dll&lt;/code&gt; and &lt;code&gt;runtimes\win-x64\native\WebView2Loader.dll&lt;/code&gt; alongside the existing flat-folder DLLs.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.71"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.71/QuickLookProtein-1.7.71.zip" sparkle:edSignature="sFRAiNQPQkYIGcX4cdfJts502/r8k5M05glDoUhpu6TFxJBULAeVdTGFlYsgerPCR0Fihtudewr5xJmb5J2qCw==" length="4462803" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.70</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.70</link>
       <pubDate>Tue, 19 May 2026 09:31:18 +0000</pubDate>
