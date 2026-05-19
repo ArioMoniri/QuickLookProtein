@@ -4,6 +4,16 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.70] — 2026-05-19
+
+### 🪟 Windows hotfix³ — `BadImageFormatException`, plugin DLL was x64-only
+
+- **Symptom**: with 1.7.69 installed, pressing <kbd>Space</kbd> on a `.pdb` *still* showed the raw text dump. `plugin.log` still didn't exist. The diagnostic block from the README finally surfaced the real loader error from PowerShell: *"Could not load file or assembly 'QuickLook.Plugin.Protein.dll' or one of its dependencies. An attempt was made to load a program with an incorrect format."* That's `BadImageFormatException`, the canonical "your DLL's bitness doesn't match my process" error.
+- **Root cause**: `Windows/QuickLookProtein.Plugin/QuickLookProtein.Plugin.csproj` pinned `<PlatformTarget>x64</PlatformTarget>`, which writes the PE32+ x64-only marker into the DLL's COFF header. QL-Win.exe ships AnyCPU and on the user's machine was running as **32-bit (x86, WOW64)**. The CLR refused to load an x64-marked DLL into a 32-bit process and threw the load error silently from QL-Win's plugin discovery → our plugin never showed up in QL-Win's IViewer registry → Space-bar fell through to the text viewer. *No amount of AssemblyResolve / static cctor / type-decoupling work from 1.7.68 / 1.7.69 could have helped*: the assembly itself was being rejected at the PE-header check, *before* any IL or metadata was read.
+- **Fix**: flip the plugin's `<PlatformTarget>` to `AnyCPU` so the CLR can host the assembly in either bitness. To keep the WebView2 native bridge happy in both, the `CopyWebView2LoaderNative` MSBuild target now also lays down **both** `runtimes/win-x86/native/WebView2Loader.dll` and `runtimes/win-x64/native/WebView2Loader.dll` (the AnyCPU managed wrapper picks the matching one at runtime via `Environment.Is64BitProcess`). The flat-folder fallback (sibling `WebView2Loader.dll` next to the plugin DLL) is preserved with the x64 copy so 1.7.69-and-earlier install layouts still resolve.
+- **Same fix for `QuickLookProtein.Thumbnail.csproj`**: Explorer's thumbnail-cache pipeline includes a 32-bit COM surrogate (`dllhost.exe`) for legacy app compat, which would have hit the same `BadImageFormatException` on x64-only thumbnail DLLs. `PlatformTarget=AnyCPU` there too.
+- **Diagnostic block in the README will now actually work**: the FileVersion stamping that didn't reach the binary in 1.7.69 (MSBuild cascade was masked by explicit `<AssemblyVersion>`) lands properly here — `(Get-Item ...).VersionInfo.FileVersion` will report `1.7.70` after this install.
+
 ## [1.7.69] — 2026-05-19
 
 ### 🪟 Windows hotfix² — plugin still not picked up after 1.7.68

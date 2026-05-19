@@ -34,11 +34,23 @@
     <AssemblyName>QuickLook.Plugin.Protein</AssemblyName>
     <RootNamespace>QuickLookProtein.Plugin</RootNamespace>
     <!--
-      Force x64 so WebView2Loader.dll resolution lands on the x64
-      native binary at runtime. QL-Win is an x64 process, so this
-      matches the host.
+      AnyCPU, NOT x64. A user diagnostic on 1.7.69 showed
+      BadImageFormatException ("An attempt was made to load a
+      program with an incorrect format.") because QL-Win on their
+      machine was running as 32-bit (x86), and our x64-marked
+      plugin DLL refused to load into the 32-bit process. QL-Win's
+      own exe is AnyCPU with Prefer32Bit, so it can run either way
+      depending on Windows configuration - we have to match.
+
+      AnyCPU lets the CLR load the assembly in whatever bitness the
+      host process happens to be in. Microsoft.Web.WebView2 managed
+      wrappers are themselves AnyCPU and pick the correct native
+      WebView2Loader.dll at runtime based on
+      Environment.Is64BitProcess. We ship both x86 and x64 loaders
+      so neither bitness is left without its native bridge - see
+      the CopyWebView2LoaderNative target below.
     -->
-    <PlatformTarget>x64</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
 
     <!--
       Without an explicit version MSBuild defaults to 1.0.0.0 for
@@ -102,17 +114,43 @@
     text viewer - which is exactly what the user saw (raw .pdb
     rendered as plain text after install).
 
-    Manually copy the right architecture's WebView2Loader.dll into
-    OutputPath as a post-build step.
+    Ship BOTH bitnesses' WebView2Loader.dll so a QL-Win host
+    running 32-bit (x86, WOW64) and one running 64-bit (x64) both
+    get their matching native bridge. The managed wrapper
+    (Microsoft.Web.WebView2.Core.dll) is AnyCPU and at runtime
+    P/Invokes WebView2Loader using a path that includes the
+    process's bitness folder, so dropping both copies under
+    runtimes/win-x64/native/ and runtimes/win-x86/native/ lets the
+    wrapper find the right one without any code changes here.
+
+    Also drop a copy of the 64-bit loader at the plugin folder
+    root for backwards compat with the 1.7.69 install layout - the
+    1.7.69 install.ps1 already lifts that flat file if it's
+    present, and Microsoft.Web.WebView2.Core falls back to looking
+    next to its own DLL.
   -->
   <Target Name="CopyWebView2LoaderNative" AfterTargets="Build">
     <ItemGroup>
-      <_WebView2Native Include="$(NuGetPackageRoot)microsoft.web.webview2\1.0.2792.45\runtimes\win-x64\native\WebView2Loader.dll" />
+      <_WebView2Native64 Include="$(NuGetPackageRoot)microsoft.web.webview2\1.0.2792.45\runtimes\win-x64\native\WebView2Loader.dll" />
+      <_WebView2Native86 Include="$(NuGetPackageRoot)microsoft.web.webview2\1.0.2792.45\runtimes\win-x86\native\WebView2Loader.dll" />
     </ItemGroup>
-    <Copy SourceFiles="@(_WebView2Native)"
+    <!-- runtimes/win-x64/native/WebView2Loader.dll -->
+    <Copy SourceFiles="@(_WebView2Native64)"
+          DestinationFolder="$(OutputPath)runtimes\win-x64\native"
+          SkipUnchangedFiles="true"
+          Condition="Exists('%(_WebView2Native64.Identity)')" />
+    <!-- runtimes/win-x86/native/WebView2Loader.dll -->
+    <Copy SourceFiles="@(_WebView2Native86)"
+          DestinationFolder="$(OutputPath)runtimes\win-x86\native"
+          SkipUnchangedFiles="true"
+          Condition="Exists('%(_WebView2Native86.Identity)')" />
+    <!-- Flat-folder fallback (1.7.69-and-earlier install layout):
+         use the 64-bit loader since QL-Win usually runs AnyCPU and
+         x64 is the more common case. install.ps1 will keep this. -->
+    <Copy SourceFiles="@(_WebView2Native64)"
           DestinationFolder="$(OutputPath)"
           SkipUnchangedFiles="true"
-          Condition="Exists('%(_WebView2Native.Identity)')" />
+          Condition="Exists('%(_WebView2Native64.Identity)')" />
   </Target>
 
   <ItemGroup>
