@@ -166,6 +166,45 @@ mdfind 'kMDItemKind == "Protein Data Bank file" && kMDItemKeywords == "X-RAY*"'
 
 This uses Apple's [`CSImportExtension`](https://developer.apple.com/documentation/corespotlight/csimportextension) API with `kMDItem*` metadata keys — there is no Windows counterpart and porting it isn't on the roadmap (Windows Search's `IFilter`/`IPropertyStore` is a fundamentally different shape; the closest analogue would be writing a custom property handler for every extension, which is significantly more code than the macOS importer for less search benefit on Windows).
 
+#### What happens automatically after install vs. what you need to run
+
+| Stage | Automatic? | What you can do |
+|---|:---:|---|
+| `CSImportExtension` registers itself with Launch Services | ✅ | Happens within ~30 s of first launch from `/Applications`. No checkbox to flip in System Settings. |
+| **New or modified** `.pdb` / `.cif` / `.sdf` / `.mol` / `.mol2` / `.xyz` files (downloads, copies, edits) | ✅ | macOS's `mds` daemon sees the FSEvent, calls our extension, indexed within a second or two. |
+| **Files that already existed on disk before you installed** | ⚠️ Eventually | macOS does *not* re-scan existing files when a new importer registers. They'll get indexed the next time the file is touched, the volume is reindexed, or the periodic Spotlight refresh runs. To force it immediately, see below. |
+
+**Force-index files that pre-date the install:**
+
+```bash
+mdimport -r ~                       # entire home dir (~30 s for a typical drive)
+mdimport ~/Downloads/proteins       # one folder
+mdimport ~/Downloads/some.pdb       # one file
+```
+
+**Verify the importer registered:**
+
+```bash
+mdimport -L | grep QuickLookProtein
+# Expect a path inside /Applications/QuickLookProtein.app/Contents/Library/Spotlight/
+```
+
+If it's missing, force a Launch Services rescan of the app bundle:
+
+```bash
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
+  -f /Applications/QuickLookProtein.app
+mdimport -L | grep QuickLookProtein   # re-check
+```
+
+**Spot-check that a specific file actually got indexed:**
+
+```bash
+mdls -name kMDItemKind -name kMDItemKeywords -name kMDItemTitle ~/some.pdb
+```
+
+The `kMDItemKind` row should read *"Protein Data Bank file"* (or similar for the other formats). If it's just *"document"* or missing, run `mdimport <file>` once and re-check — that file is either pre-install or hasn't been touched since the importer landed.
+
 <a id="-windows-search-alternative"></a>
 #### 🪟 Windows search alternative
 
