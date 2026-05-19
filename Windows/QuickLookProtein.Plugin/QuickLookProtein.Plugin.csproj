@@ -39,6 +39,29 @@
       matches the host.
     -->
     <PlatformTarget>x64</PlatformTarget>
+
+    <!--
+      Without an explicit version MSBuild defaults to 1.0.0.0 for
+      both AssemblyVersion and FileVersion, which made the support
+      diagnostic
+        (Get-Item ...\QuickLook.Plugin.Protein.dll).VersionInfo.FileVersion
+      always print "1.0.0.0" regardless of marketing release. We
+      bake the marketing version into FileVersion + InformationalVersion
+      so users running the diagnostic can confirm at a glance whether
+      they're on the build that contains the fix.
+
+      AssemblyVersion stays at 1.0 (no semver minor bumps for binary
+      compat) - QL-Win's plugin loader doesn't care about it, but
+      anything else linking against this DLL would, so we leave it
+      stable.
+
+      The release workflow rewrites <Version> at build time via the
+      `dotnet build /p:Version=...` flag so a tag push of v1.7.69
+      produces a DLL whose FileVersion is 1.7.69. The default below
+      makes local dev builds identifiable as "0.0.0-dev".
+    -->
+    <Version>0.0.0-dev</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <!--

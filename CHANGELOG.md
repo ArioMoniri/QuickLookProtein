@@ -4,6 +4,17 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.69] — 2026-05-19
+
+### 🪟 Windows hotfix² — plugin still not picked up after 1.7.68
+
+- **Symptom**: user on the freshly-installed 1.7.68 Setup.exe ran the diagnostic block from the README and found that `%LocalAppData%\QuickLookProtein\plugin.log` did not exist after pressing <kbd>Space</kbd> on a `.pdb` file. Plugin folder was complete, WebView2 Runtime + DLLs present, QL-Win running — but `Plugin.Init()` was never called. Space-bar still rendered raw text.
+- **Root cause** *(refining the 1.7.68 diagnosis)*: QL-Win discovers IViewer implementations via `Assembly.LoadFrom(...)` + `GetTypes()`. The CLR materialises `Plugin`'s type metadata, which includes the declared types of all its fields. `Plugin` had `private MoleculePanel? _panel;` — a typed field. The CLR followed that reference, loaded `MoleculePanel`, saw its `<wv2:WebView2>` XAML reference, tried to resolve `Microsoft.Web.WebView2.Wpf`, **failed because the AssemblyResolve hook was inside `Plugin.Init()` and `Init()` is only reached *after* `GetTypes()` succeeds**, and surfaced a `ReflectionTypeLoadException`. QL-Win caught it, blacklisted our DLL, and moved on. `Init()` never ran → no `plugin.log` line → user saw text.
+- **Fix in three parts**:
+  1. **Type-decoupling.** `Plugin._panel` is now `object?` instead of `MoleculePanel?`. `MoleculePanel` no longer appears in `Plugin`'s metadata, so `GetTypes()` returns `Plugin` cleanly without touching WebView2. `MoleculePanel` is only loaded when `View()` calls a `[MethodImpl(MethodImplOptions.NoInlining)]` helper that constructs it — the JIT for that helper is deferred until the helper is entered, by which point the resolver below is already attached.
+  2. **AssemblyResolve in static cctor.** Moved the resolver attach from `Plugin.Init()` into `static Plugin()`. The CLR fires the static constructor when `Activator.CreateInstance(typeof(Plugin))` runs — strictly before `Init()`, and strictly before `View()`. So `Microsoft.Web.WebView2.*` resolution requests during `MoleculePanel` inflation always have the hook in scope.
+  3. **Identifiable FileVersion.** `Windows/QuickLookProtein.Plugin/QuickLookProtein.Plugin.csproj` now stamps the DLL's `FileVersion` and `InformationalVersion` from `MARKETING_VERSION` at release-build time (via `dotnet build /p:Version=${VERSION}` in `release.yml`). Previous releases all shipped a `1.0.0.0` plugin DLL, which made the diagnostic check `(Get-Item ...).VersionInfo.FileVersion` useless for confirming which build a user was actually on. From 1.7.69 onward the diagnostic shows the real release number.
+
 ## [1.7.68] — 2026-05-19
 
 ### 🪟 Windows hotfix — Space-bar showed raw text instead of the 3D preview

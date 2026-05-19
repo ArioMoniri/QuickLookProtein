@@ -11,6 +11,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Windows;
 
 namespace QuickLookProtein.Plugin;
@@ -34,12 +35,49 @@ public sealed class Plugin : IViewer
         ".prmtop", ".top"
     };
 
-    private MoleculePanel? _panel;
+    // _panel is intentionally typed as `object?`, NOT `MoleculePanel?`.
+    // Reason: QL-Win discovers our IViewer via Assembly.LoadFrom +
+    // GetTypes(). When the CLR materialises Plugin's metadata it walks
+    // every field's declared type. A `MoleculePanel?` field forces
+    // MoleculePanel to be loaded at type-discovery time, which in turn
+    // forces Microsoft.Web.WebView2.Wpf to resolve, which fails because
+    // QL-Win's plugin folder isn't on the standard probing path. The
+    // result was QL-Win silently dropping our plugin BEFORE Init() ever
+    // ran (plugin.log never appeared in user diagnostics from 1.7.68).
+    // Storing the panel as `object?` keeps Plugin's metadata free of
+    // any WebView2 transitive ref; MoleculePanel is only resolved when
+    // View() actually runs - at which point our static-cctor
+    // AssemblyResolve hook is already in place to redirect the lookup
+    // into the plugin folder.
+    private object? _panel;
 
-    /// Set the first time Init() runs so the AssemblyResolve hook only
-    /// attaches once even if QL-Win re-instantiates the IViewer (some
-    /// QL-Win configurations construct a fresh viewer per file).
-    private static bool _resolverAttached;
+    /// Guarantees the AssemblyResolve hook is attached even when QL-Win
+    /// constructs a fresh IViewer per file. Set once from the static
+    /// constructor.
+    private static readonly bool _resolverAttached;
+
+    /// Static constructor - runs the FIRST time the CLR touches the
+    /// Plugin type, which is when QL-Win does
+    /// `Activator.CreateInstance(typeof(Plugin))`. That's BEFORE Init()
+    /// (which is an instance method called after construction) and
+    /// crucially BEFORE View() (which is what triggers MoleculePanel
+    /// instantiation and therefore WebView2 type-loading). Attaching
+    /// the resolver here means the very first WebView2 reference
+    /// resolution attempt succeeds.
+    static Plugin()
+    {
+        try
+        {
+            AppDomain.CurrentDomain.AssemblyResolve += ResolvePluginAssembly;
+            _resolverAttached = true;
+        }
+        catch
+        {
+            // Static cctor must never throw - the type would be marked
+            // unusable for the lifetime of the AppDomain. Init() will
+            // re-attempt the hook attachment as a fallback.
+        }
+    }
 
     /// QL-Win uses Priority to break ties when several plugins claim the
     /// same file. Higher wins. The bundled TextViewer plugin claims
@@ -52,40 +90,19 @@ public sealed class Plugin : IViewer
 
     public void Init()
     {
-        // Init is the first sign of life - if it's in the log, we
-        // know QL-Win discovered our DLL, loaded it, instantiated
-        // the IViewer class, and dispatched. If it's missing, the
-        // plugin failed earlier - usually a TypeLoadException from
-        // a missing dependency, which QL-Win logs to its own
-        // App.log at %LocalAppData%\QuickLook\App.log.
-        PluginLog.Info($"Plugin.Init - assembly={typeof(Plugin).Assembly.Location}");
-
-        // Plugin-local AssemblyResolve hook. QL-Win loads our DLL
-        // via Assembly.LoadFile(...), which means the CLR's standard
-        // probing paths (AppDomain.BaseDirectory + GAC) do NOT
-        // include the plugin folder. When QL-Win calls View() and
-        // MoleculePanel is instantiated, its XAML references
-        //   xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;
-        //              assembly=Microsoft.Web.WebView2.Wpf"
-        // and the XAML parser asks the CLR to resolve that
-        // assembly. With no resolver pointed at our folder, the load
-        // fails -> XamlParseException -> QL-Win silently drops the
-        // plugin and falls back to its built-in text viewer (which
-        // is what the user sees: raw ATOM lines in Notepad-style
-        // rendering instead of the 3D preview).
-        //
-        // Attach a handler that probes the plugin's *own* directory
-        // (%LocalAppData%\QuickLook\plugins\QuickLookProtein\) for
-        // the requested assembly. WebView2.Core / .Wpf / .WinForms
-        // and any future transitive dep ship alongside the plugin
-        // DLL there, so a directory-local search resolves all of
-        // them in one go.
-        if (!_resolverAttached)
-        {
-            AppDomain.CurrentDomain.AssemblyResolve += ResolvePluginAssembly;
-            _resolverAttached = true;
-            PluginLog.Info("Plugin.Init - AssemblyResolve handler attached");
-        }
+        // Init is the first sign of life QL-Win shows us — if it
+        // lands in plugin.log we know QL-Win successfully discovered
+        // our DLL, materialised the Plugin type via GetTypes(), and
+        // dispatched via Activator.CreateInstance. If plugin.log
+        // never appears the failure is in QL-Win's discovery loop,
+        // before Init() is reached. The static cctor above is the
+        // primary AssemblyResolve attach point precisely so the hook
+        // is armed for that earlier discovery path; this log line
+        // here is just a heartbeat confirming the late path also
+        // worked.
+        PluginLog.Info($"Plugin.Init v{typeof(Plugin).Assembly.GetName().Version} - " +
+                       $"assembly={typeof(Plugin).Assembly.Location}");
+        PluginLog.Info($"Plugin.Init - resolverAttached={_resolverAttached}");
     }
 
     /// AppDomain.AssemblyResolve callback. Returns the assembly if
@@ -161,12 +178,17 @@ public sealed class Plugin : IViewer
         PluginLog.Info($"View({path}) - building MoleculePanel");
         try
         {
-            _panel = new MoleculePanel();
-            context.ViewerContent = _panel;
+            // Indirect through a NoInlining helper. This keeps the
+            // direct reference to MoleculePanel out of View()'s IL
+            // body proper, which means the JIT for View() doesn't
+            // force MoleculePanel's metadata load until the helper
+            // is actually entered. By that point the static cctor's
+            // AssemblyResolve hook is already attached, so the WPF
+            // inflation of <wv2:WebView2> resolves cleanly.
+            var panel = CreateMoleculePanel(path, context);
+            _panel = panel;
+            context.ViewerContent = panel;
             context.Title = Path.GetFileName(path);
-            // The panel turns IsBusy off itself once the WebView signals
-            // the navigation has committed.
-            _panel.LoadFile(path, context);
         }
         catch (Exception ex)
         {
@@ -175,11 +197,25 @@ public sealed class Plugin : IViewer
         }
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static MoleculePanel CreateMoleculePanel(string path, ContextObject context)
+    {
+        var p = new MoleculePanel();
+        // The panel turns IsBusy off itself once the WebView signals
+        // that the navigation has committed.
+        p.LoadFile(path, context);
+        return p;
+    }
+
     public void Cleanup()
     {
         PluginLog.Info("Cleanup");
         GC.SuppressFinalize(this);
-        _panel?.Dispose();
+        // _panel is typed `object?` to keep MoleculePanel out of
+        // Plugin's type metadata; cast via the IDisposable interface
+        // (System namespace, always available) so we don't pull
+        // MoleculePanel back into scope here.
+        if (_panel is IDisposable d) d.Dispose();
         _panel = null;
     }
 }

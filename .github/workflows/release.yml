@@ -875,8 +875,14 @@ jobs:
       - name: Build plugin
         shell: pwsh
         run: |
+          # Pass the marketing version so the plugin DLL's
+          # FileVersion / InformationalVersion stamp matches the tag.
+          # Users running the Windows diagnostic block can confirm at
+          # a glance whether they're on the build with the
+          # static-cctor / AssemblyResolve fix.
           dotnet build Windows/QuickLookProtein.Plugin/QuickLookProtein.Plugin.csproj `
               -c Release `
+              /p:Version=${{ steps.version.outputs.version }} `
               -o build/plugin
 
       - name: Build thumbnail provider
