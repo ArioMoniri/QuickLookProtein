@@ -104,7 +104,30 @@ QuickLookProtein integrates with macOS Quick Look so you can preview protein and
 
 ## ✨ Features
 
+### 🖥️ Platform support at a glance
+
+| Feature | 🍎 macOS | 🪟 Windows | Notes |
+|---|:---:|:---:|---|
+| Space-bar Quick Look preview (3Dmol.js, interactive) | ✅ | ✅ | macOS via QuickLook extension; Windows via [QL-Win](https://github.com/QL-Win/QuickLook) plugin |
+| Finder / Explorer thumbnails in Icon · Gallery · Tile view | ✅ | ✅ | macOS uses QLThumbnail extension; Windows uses a per-extension `IThumbnailProvider` registered in HKCU |
+| Settings app (atom style per format, colors, toggles) | ✅ | ✅ | macOS sidebar UI; Windows WPF with live preview tiles |
+| Smart protein + ligand styling, metal spheres, nucleic-acid cartoons | ✅ | ✅ | Same 3Dmol.js viewer template runs on both |
+| Molecular surface, unit cell overlay, info overlay, click-to-label atoms | ✅ | ✅ | All viewer-side features ride along on both OSes |
+| Drag-and-drop tile in the Settings app | ✅ | ✅ | Drop a `.pdb` / `.cif` / etc. onto the preview tile |
+| **Spotlight indexing** (search by PDB title, accession, author, …) | ✅ | ❌ | macOS-only — uses `CSImportExtension` + `kMDItem*` keys, which have no Windows counterpart. See [Windows alternatives](#-windows-search-alternative) below |
+| **Sparkle auto-update** (signed delta, EdDSA-verified install) | ✅ | ❌ | macOS-only — Windows updates by re-running `QuickLookProtein-Setup.exe`, which is idempotent and re-installs the latest .qlplugin in place |
+| **AR Quick Look** (USDZ export, preview on iPhone) | ✅ | ❌ | Relies on Apple's USDZ / AR Quick Look chain |
+| **Multi-file Quick Action** (merge several files into one preview) | ✅ | ❌ | macOS Quick Action / Finder Services pipeline |
+| **Trajectory loading** (`.dcd` / `.trr` / `.xtc`) | ✅ | ❌ | Pure-Swift trajectory readers live in the macOS QLExtension |
+| **Cryo-EM density maps** (`.ccp4` / `.mrc` / `.map`) | ✅ | ❌ | Native binary parser is Swift-side; Windows port queued |
+| **Notarisation / SmartScreen-style trust** | ✅ Apple Developer ID + notarised | ⚠️ Unsigned | Windows installer triggers a SmartScreen warning; the plugin runs inside QL-Win, not as a standalone .exe |
+
+> Anything not listed here works on both platforms identically.
+
 ### 📁 Supported file formats
+
+Same on both OSes — the viewer template, parsers, and atom-style logic are shared between the macOS QuickLook extension and the Windows QL-Win plugin.
+
 | Format | Extensions | Notes |
 |--------|------------|-------|
 | Protein Data Bank | `.pdb` `.ent` | The classic format from rcsb.org |
@@ -117,7 +140,8 @@ QuickLookProtein integrates with macOS Quick Look so you can preview protein and
 | Gaussian Cube | `.cube` `.cub` | Atoms only (volumetric isosurface in a future release) |
 | AutoDock / Vina | `.pdbqt` | Docking poses |
 
-### 🎨 Smart rendering
+### 🎨 Smart rendering · 🍎 macOS + 🪟 Windows
+
 - **Protein + ligand auto-styling**: when a structure contains both a polymer and a ligand, the polymer renders with your chosen style (cartoon by default) and ligands as sticks — the standard 3Dmol idiom for biology.
 - **Metal-ion spheres**: Zn, Fe, Mg, Mn, Cu and other single-atom hetero residues are rendered as VDW spheres (otherwise they'd be invisible — they have no bonds).
 - **Nucleic-acid cartoons**: DNA and RNA (DA/DT/DG/DC/DU/A/U/G/C/T/I) are detected and shown as cartoons too, not just sticks.
@@ -127,18 +151,30 @@ QuickLookProtein integrates with macOS Quick Look so you can preview protein and
 - **Hide hydrogens**, **Show unit cell** (CIF), **Show info overlay** (filename · atom count · chain count · format), **Background color** with opacity, **Auto-rotate** speed control.
 - **Click any atom** to label it with element · atom name · residue · chain.
 
-### 🖼️ Finder thumbnails
-Each file gets a per-content thumbnail in Cover Flow, Gallery view, and large-icon view — proteins render as molecular surfaces in a canonical isometric pose so two RCSB downloads of the same structure look similar.
+### 🖼️ Thumbnails
 
-### 🔎 Spotlight indexing
+- **🍎 macOS — Finder thumbnails.** Each file gets a per-content thumbnail in Cover Flow, Gallery view, and large-icon view. Proteins render as molecular surfaces in a canonical isometric pose so two RCSB downloads of the same structure look similar.
+- **🪟 Windows — Explorer thumbnails.** The bundled `QuickLookProtein.Thumbnail.dll` registers an `IThumbnailProvider` for the same extensions, so Icon · Tile · Gallery views render CPK / cartoon-ribbon thumbnails too. `.mmtf` is intentionally skipped on the Windows thumbnail path because the binary MessagePack parser isn't worth the ~500 KB it would add to every thumbnail-cache process; Space-bar preview still handles it via 3Dmol's JS-side parser.
+
+### 🔎 Spotlight indexing · 🍎 macOS only
+
 Search by **PDB title**, **PDB accession** (`1CRN`, `6OC6`), **author**, **organism**, **experimental method**, **resolution**, **CCDC refcode**, or **space group**. The Spotlight extension parses PDB, mmCIF, small-molecule CIF, SDF, MOL, MOL2, and XYZ headers.
 
 ```bash
 mdfind 'kMDItemKind == "Protein Data Bank file" && kMDItemKeywords == "X-RAY*"'
 ```
 
-### ⚙️ Settings app
-The bundled settings app lets you set the default atom style per format, color scheme, rotation speed, background color, and rendering toggles. It also has a fifth tile that accepts drag-and-drop — preview any structure with the current settings without invoking Quick Look.
+This uses Apple's [`CSImportExtension`](https://developer.apple.com/documentation/corespotlight/csimportextension) API with `kMDItem*` metadata keys — there is no Windows counterpart and porting it isn't on the roadmap (Windows Search's `IFilter`/`IPropertyStore` is a fundamentally different shape; the closest analogue would be writing a custom property handler for every extension, which is significantly more code than the macOS importer for less search benefit on Windows).
+
+<a id="-windows-search-alternative"></a>
+#### 🪟 Windows search alternative
+
+Windows Explorer's built-in search (and Everything / Listary if you have them) will still find files by **filename** and **extension** — that covers the common case of "give me every `.pdb` in this folder tree". What you give up versus macOS Spotlight is searching by **molecular content** (titles, authors, resolutions baked into the file headers). If that matters for your workflow on Windows, [open an issue](https://github.com/ArioMoniri/QuickLookProtein/issues/new) and it can be revisited.
+
+### ⚙️ Settings app · 🍎 macOS + 🪟 Windows
+
+- **🍎 macOS** — System-Settings-style sidebar (General · File Formats · Appearance · Rendering · Toolbar · Info Overlay · Multi-file · Software Update · About) with live 3Dmol previews per format and a liquid-glass backdrop. Drag-and-drop tile previews any structure with the current settings without invoking Quick Look.
+- **🪟 Windows** — WPF panel with per-format atom-style combos, color scheme, rotation, background color, plus a live WebView2 preview that mirrors the macOS layout. Launched from **Start Menu → QuickLookProtein2 Settings**.
 
 ![Screenshot of the main app](Screenshots/Main_app.png "Main app used to set settings")
 
