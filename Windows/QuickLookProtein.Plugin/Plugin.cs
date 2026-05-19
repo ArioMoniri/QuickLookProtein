@@ -12,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 
 namespace QuickLookProtein.Plugin;
@@ -76,6 +77,55 @@ public sealed class Plugin : IViewer
             // Static cctor must never throw - the type would be marked
             // unusable for the lifetime of the AppDomain. Init() will
             // re-attempt the hook attachment as a fallback.
+        }
+
+        // Pre-load the bitness-matched WebView2Loader.dll. The
+        // managed Microsoft.Web.WebView2.Core wrapper P/Invokes
+        // "WebView2Loader.dll" with no path, so Windows' default
+        // DLL search order kicks in: AppDomain.BaseDirectory (= QL-
+        // Win's exe folder, where there is no WebView2Loader), then
+        // PATH, then system dir - and never the plugin folder. The
+        // 1.7.69 build shipped only the x64 loader at the plugin
+        // root, which fell into the same trap as the plugin DLL
+        // itself: 64-bit binary, 32-bit QL-Win process,
+        // BadImageFormatException. Loading the correct bitness
+        // explicitly here puts the DLL in the process's loaded-
+        // module cache so when the managed wrapper's P/Invoke fires
+        // later, Windows resolves "WebView2Loader.dll" against the
+        // already-loaded module instead of going through its search
+        // order.
+        try { PreloadWebView2Loader(); } catch { /* best-effort */ }
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr LoadLibraryW(string lpFileName);
+
+    /// Probe `runtimes/win-{x86|x64}/native/WebView2Loader.dll`
+    /// inside the plugin folder and pin the matching DLL into the
+    /// process. The path layout mirrors what
+    /// Microsoft.Web.WebView2.Core would look for itself when it's
+    /// shipped via NuGet for a .NET SDK consumer.
+    private static void PreloadWebView2Loader()
+    {
+        var pluginDir = Path.GetDirectoryName(typeof(Plugin).Assembly.Location);
+        if (string.IsNullOrEmpty(pluginDir)) return;
+
+        var arch = IntPtr.Size == 8 ? "x64" : "x86";
+        var candidates = new[]
+        {
+            Path.Combine(pluginDir, "runtimes", "win-" + arch, "native", "WebView2Loader.dll"),
+            // Fallback to the flat-folder copy. For an x64 process
+            // that file is x64 (which is what's bundled at the root
+            // for 1.7.69-and-earlier install layouts). For an x86
+            // process the flat fallback won't match - the
+            // runtimes/win-x86/native/ path above MUST resolve.
+            Path.Combine(pluginDir, "WebView2Loader.dll"),
+        };
+        foreach (var path in candidates)
+        {
+            if (!File.Exists(path)) continue;
+            var handle = LoadLibraryW(path);
+            if (handle != IntPtr.Zero) return;   // pinned; we're done
         }
     }
 

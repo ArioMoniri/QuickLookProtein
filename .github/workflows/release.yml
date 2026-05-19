@@ -940,6 +940,26 @@ jobs:
           # Copy the Resources/ folder (3Dmol.js + viewer.html)
           Copy-Item -Path "build/plugin/Resources" -Destination $stage -Recurse
 
+          # Copy the runtimes/win-{x86,x64}/native/WebView2Loader.dll
+          # subtree shipped by the plugin csproj's
+          # CopyWebView2LoaderNative target. The AnyCPU
+          # Microsoft.Web.WebView2.Core wrapper looks for
+          # WebView2Loader.dll under
+          #   <plugin-folder>/runtimes/win-{x86|x64}/native/
+          # at runtime via `IntPtr.Size == 8 ? "x64" : "x86"`, so
+          # shipping BOTH bitnesses means the plugin works in
+          # whichever bitness QL-Win happens to be running as.
+          # Without this Recurse copy, only the flat-folder fallback
+          # (root-level WebView2Loader.dll) would be in the
+          # .qlplugin, and that copy is x64 so 32-bit QL-Win hosts
+          # would still BadImageFormatException on the native load.
+          if (Test-Path "build/plugin/runtimes") {
+              Copy-Item -Path "build/plugin/runtimes" -Destination $stage -Recurse
+              Write-Host "Bundled runtimes/ subtree."
+          } else {
+              Write-Host "::warning::build/plugin/runtimes not found - bitness-specific WebView2Loader.dll missing from .qlplugin."
+          }
+
           # Bundle the thumbnail provider DLL (separate build output)
           # into the same .qlplugin folder. install.ps1 finds it next
           # to the plugin DLL and registers per-extension shell

@@ -4,6 +4,17 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.71] — 2026-05-19
+
+### 🪟 Windows hotfix⁴ — ship the bitness-aware native loader into the .qlplugin, then pin it
+
+The 1.7.70 fix flipped the plugin DLL to AnyCPU but left two gaps that would have surfaced after `Plugin.Init()` finally got called on a 32-bit QL-Win host:
+
+- **Gap 1 — release packaging missed the `runtimes/` subtree.** The csproj's `CopyWebView2LoaderNative` target now lays down both `runtimes/win-x86/native/WebView2Loader.dll` and `runtimes/win-x64/native/WebView2Loader.dll` (so the AnyCPU `Microsoft.Web.WebView2.Core` wrapper can pick the matching one at runtime), but `release.yml`'s `.qlplugin` package step copied only top-level files via `Get-ChildItem -File` without `-Recurse`. The subtree never reached the zip, so a 32-bit QL-Win install would still hit `BadImageFormatException` when WebView2 tried to load its native bridge. Now `Copy-Item -Path "build/plugin/runtimes" -Destination $stage -Recurse` puts both bitness loaders inside the `.qlplugin`.
+- **Gap 2 — Windows' default DLL search order doesn't include the plugin folder.** Even with the right `WebView2Loader.dll` shipped, when `Microsoft.Web.WebView2.Core` P/Invokes `"WebView2Loader.dll"` (no path), Windows looks in `AppDomain.BaseDirectory` (= `QL-Win.exe`'s folder), system dir, `PATH` — never our plugin folder. So `Plugin`'s static constructor now pre-pins the correct loader: it computes `runtimes/win-{x86|x64}/native/WebView2Loader.dll` based on `IntPtr.Size`, `LoadLibraryW`s it explicitly, and falls back to the flat-folder `WebView2Loader.dll` if the bitness-specific path is missing. With the DLL in the process's loaded-module cache, the managed wrapper's P/Invoke later resolves against the already-loaded handle instead of running through search order.
+
+The two gaps combined are why 1.7.70 wasn't quite the end of this — 1.7.71 closes both. After install, the on-disk layout under `%LocalAppData%\QuickLook\plugins\QuickLookProtein\` will include `runtimes\win-x86\native\WebView2Loader.dll` and `runtimes\win-x64\native\WebView2Loader.dll` alongside the existing flat-folder DLLs.
+
 ## [1.7.70] — 2026-05-19
 
 ### 🪟 Windows hotfix³ — `BadImageFormatException`, plugin DLL was x64-only
