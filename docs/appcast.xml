@@ -6,6 +6,27 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.67</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.67</link>
+      <pubDate>Tue, 19 May 2026 08:11:27 +0000</pubDate>
+      <sparkle:version>1.7.67</sparkle:version>
+      <sparkle:shortVersionString>1.7.67</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🛠️ Hotfix — Sparkle update from 1.7.65 to 1.7.66 failed&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Root cause&lt;/strong&gt;: 1.7.66 set &lt;code&gt;CFBundleName=QLProtein2&lt;/code&gt; (intended to fit Apple&amp;#x27;s 15-char menu-bar limit). Sparkle&amp;#x27;s installer compares &lt;code&gt;CFBundleName&lt;/code&gt; between the installed app (&lt;code&gt;QuickLookProtein&lt;/code&gt;, from 1.7.65) and the downloaded update (&lt;code&gt;QLProtein2&lt;/code&gt;, from 1.7.66). When the names diverge Sparkle bails with &lt;strong&gt;&amp;quot;An error occurred while launching the installer&amp;quot;&lt;/strong&gt; — its safeguard against accidentally installing a different app&amp;#x27;s update over yours.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Fix&lt;/strong&gt;: revert &lt;code&gt;CFBundleName&lt;/code&gt; to &lt;code&gt;$(PRODUCT_NAME)&lt;/code&gt; (still resolves to &lt;code&gt;QuickLookProtein&lt;/code&gt;). The full &amp;quot;QuickLookProtein2&amp;quot; rebrand now rides exclusively on &lt;code&gt;CFBundleDisplayName&lt;/code&gt;, which Finder, the menu bar, About panel, and &amp;quot;Get Info&amp;quot; all use, and which Sparkle does *not* consult for the host-vs-update name check. Users on 1.7.65 who already failed to update to 1.7.66 will now be offered 1.7.67 and the install will succeed.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;📝 Appcast — release notes pane now shows the actual changelog&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Symptom&lt;/strong&gt;: the &amp;quot;What&amp;#x27;s New&amp;quot; pane in Sparkle&amp;#x27;s update dialog rendered as essentially empty — only a single &amp;quot;See the GitHub release for full notes&amp;quot; sentence.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Cause&lt;/strong&gt;: &lt;code&gt;scripts/update-appcast.py&lt;/code&gt; always emitted that stub string as the &lt;code&gt;&amp;lt;description&amp;gt;&lt;/code&gt;; the real CHANGELOG.md entry never reached the appcast.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Fix&lt;/strong&gt;: the script now pulls the &lt;code&gt;## [&amp;lt;version&amp;gt;]&lt;/code&gt; section from &lt;code&gt;CHANGELOG.md&lt;/code&gt;, renders it through a small stdlib-only Markdown-to-HTML converter (H3, bullet lists, inline &lt;code&gt;&lt;strong&gt;bold&lt;/strong&gt;&lt;/code&gt; / `&lt;code&gt; &lt;/code&gt;code&lt;code&gt; &lt;/code&gt;&lt;code&gt; / &lt;/code&gt;&lt;a href="url"&gt;link&lt;/a&gt;`), and writes that as the appcast item&amp;#x27;s description. Future Sparkle updates show the real notes inline.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.67"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.67/QuickLookProtein-1.7.67.zip" sparkle:edSignature="2KbDSfeAR9KQkydvQPIeNHSlgl24zjYWkUkx5UdYlxjLs0GnFbvKejPZoF44JQajkxVAh9PAzooOtN7oKiuxBQ==" length="4462802" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.66</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.66</link>
       <pubDate>Tue, 19 May 2026 07:36:59 +0000</pubDate>
