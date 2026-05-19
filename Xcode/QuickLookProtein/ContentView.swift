@@ -1747,10 +1747,23 @@ struct ContentView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "mug.fill")
                             .foregroundColor(.orange)
-                        Text("brew install --cask quicklookprotein")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .textSelection(.enabled)
+                        // .textSelection is macOS 12+; the app's
+                        // LSMinimumSystemVersion is 11.0 so we
+                        // gate the modifier per-platform. Older
+                        // systems still see the formatted text,
+                        // just without copy-on-drag selection.
+                        Group {
+                            if #available(macOS 12.0, *) {
+                                Text("brew install --cask quicklookprotein")
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                                    .textSelection(.enabled)
+                            } else {
+                                Text("brew install --cask quicklookprotein")
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
                     .padding(.top, 2)
 

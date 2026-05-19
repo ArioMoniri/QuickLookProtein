@@ -195,14 +195,16 @@ jobs:
           (cd "$tap_path" && git init -q && git add -A && \
             git -c user.email=ci@example.com -c user.name=CI commit -qm ci)
           brew style "$tap_path/Casks/quicklookprotein.rb"
-      - name: brew audit (online checks disabled)
-        # --online would re-verify the sha256 by fetching the DMG,
-        # which is ~6 MB; skip on branch CI to keep wall time low.
-        # The release pipeline still bumps the sha when version
-        # changes, so a stale digest gets caught when the cask is
-        # touched in a PR that also moves version.
+      - name: brew audit (offline style/struct checks)
+        # Modern brew audit dropped --no-online; the default is
+        # offline, and --online opts *into* the slower URL/hash
+        # re-fetch. Omit both, leaving us with style + structural
+        # checks that don't hit GitHub. The release pipeline still
+        # bumps the sha when version changes, so a stale digest
+        # gets caught when the cask is touched in a PR that also
+        # moves version.
         run: |
-          brew audit --cask --new --strict --no-online "ariomoniri/quicklookprotein/quicklookprotein" || true
+          brew audit --cask --new --strict "ariomoniri/quicklookprotein/quicklookprotein" || true
           # `|| true` because `--new` flags issues that homebrew-cask
           # core would reject but that are fine for a personal tap
           # (e.g. lack of upstream test infrastructure).  We log them
