@@ -10,8 +10,20 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!--
+	  Display rebrand: CFBundleDisplayName drives what Finder, the
+	  About panel, and the "Get Info" pane show ("QuickLookProtein2");
+	  CFBundleName drives the menu-bar app name (kept short to fit
+	  Apple's 15-char recommendation). PRODUCT_NAME and the bundle
+	  identifier are *deliberately unchanged* so the on-disk bundle
+	  stays QuickLookProtein.app and Sparkle replaces the app at the
+	  same install path, preserving the auto-updater for existing
+	  installs.
+	-->
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>QLProtein2</string>
+	<key>CFBundleDisplayName</key>
+	<string>QuickLookProtein2</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>

@@ -130,10 +130,25 @@ struct ContentView: View {
                     // MARK: About
                     VStack(alignment: .leading, spacing: 6) {
                         Text("About").font(.title).padding(.bottom, 2)
-                        Text("Developed 2021–2022 by Jethro Hemmann.").font(.callout)
+                        // Original author keeps first-and-most-prominent
+                        // billing. The rebranded "2" naming is a display-
+                        // only marker so the user knows this is the
+                        // extended fork, while the original repo link
+                        // below sits as a single-click jump-off to the
+                        // upstream project.
+                        (Text("Originally developed 2021–2022 by ")
+                            + Text("Jethro Hemmann").fontWeight(.semibold)
+                            + Text(" — the original QuickLookProtein."))
+                            .font(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
                         Link("https://github.com/JethroHemmann/QuickLookProtein",
                              destination: URL(string: "https://github.com/JethroHemmann/QuickLookProtein")!)
                             .font(.callout)
+                        Text("Extended (2026) as QuickLookProtein2 — multi-format support, smart styling, Finder thumbnails.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
 
                         if let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
                             Text("Installed version: \(appVersion)").font(.callout).padding(.top, 2)

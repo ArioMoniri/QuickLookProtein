@@ -1,13 +1,15 @@
-# 🧬 QuickLookProtein
+# 🧬 QuickLookProtein2
 
 > macOS Quick Look extension for previewing 3D molecular structure files (PDB, CIF, SDF, MOL, MOL2, XYZ, GRO, CUBE, PDBQT) — press <kbd>Space</kbd> in Finder, see your structure.
+>
+> **QuickLookProtein2** is the rebranded, extended release of the original [**QuickLookProtein** by **Jethro Hemmann**](https://github.com/JethroHemmann/QuickLookProtein). The display name is the only change visible to users — bundle identifier and on-disk app name stay as the original `QuickLookProtein.app`. This branch (`feature/3dmol-upgrade`) is the upstream-PR variant; the fully signed + Sparkle-equipped + Windows-port fork lives on [`feature/ario-signed`](https://github.com/ArioMoniri/QuickLookProtein/tree/feature/ario-signed).
 
 [![macOS](https://img.shields.io/badge/macOS-11.0%2B-blue?logo=apple)](https://www.apple.com/macos/)
 [![Swift 5](https://img.shields.io/badge/Swift-5-orange?logo=swift)](https://swift.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Rendered by 3Dmol.js](https://img.shields.io/badge/rendered%20by-3Dmol.js-purple)](https://3dmol.csb.pitt.edu)
 
-QuickLookProtein integrates with macOS Quick Look so you can preview protein and small-molecule structures the same way you preview PDFs and images — just select a file in Finder and tap <kbd>Space</kbd>. Rendering is performed by [3Dmol.js](https://3dmol.csb.pitt.edu) inside a `WKWebView`, so previews are interactive (drag to rotate, scroll to zoom, click an atom to label it).
+QuickLookProtein2 integrates with macOS Quick Look so you can preview protein and small-molecule structures the same way you preview PDFs and images — just select a file in Finder and tap <kbd>Space</kbd>. Rendering is performed by [3Dmol.js](https://3dmol.csb.pitt.edu) inside a `WKWebView`, so previews are interactive (drag to rotate, scroll to zoom, click an atom to label it).
 
 ![Demonstration of the Quick Look extension in Finder](Screenshots/QuickLook.gif "Demonstration of the Quick Look extension in Finder")
 
@@ -131,11 +133,11 @@ docs/
 
 ## 🙏 Credits
 
-- Original Quick Look extension authored by **[Jethro Hemmann](https://github.com/JethroHemmann)** (2021–2022).
-- 3D rendering by **[3Dmol.js](https://3dmol.csb.pitt.edu)** — Rego & Koes, *Bioinformatics* 2015.
-- Multi-format support, smart rendering, Finder thumbnails, Spotlight indexing, drag-and-drop, and reliability hardening contributed by **[Ariorad Moniri](https://github.com/ArioMoniri)** (2026).
+- 🏛️ **Originally built by [Jethro Hemmann](https://github.com/JethroHemmann)** (2021–2022) — the **original QuickLookProtein**, source repo: <https://github.com/JethroHemmann/QuickLookProtein>. QuickLookProtein2 is an extension of that work, not a replacement.
+- 🔬 3D rendering by **[3Dmol.js](https://3dmol.csb.pitt.edu)** — Rego & Koes, *Bioinformatics* 2015.
+- 🔧 Multi-format support, smart rendering, Finder thumbnails, Spotlight indexing, drag-and-drop, and reliability hardening contributed by **[Ariorad Moniri](https://github.com/ArioMoniri)** (2026) — released as **QuickLookProtein2**.
 
-If you use QuickLookProtein in scientific work, please cite the underlying 3Dmol.js paper:
+If you use QuickLookProtein2 in scientific work, please cite the underlying 3Dmol.js paper:
 
 > Rego N & Koes D. *3Dmol.js: molecular visualization with WebGL.* Bioinformatics, 31(8):1322-4 (2015). DOI: [10.1093/bioinformatics/btu829](https://doi.org/10.1093/bioinformatics/btu829)
 
