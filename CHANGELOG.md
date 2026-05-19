@@ -4,6 +4,15 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.68] — 2026-05-19
+
+### 🪟 Windows hotfix — Space-bar showed raw text instead of the 3D preview
+
+- **Symptom**: after a successful `QuickLookProtein-Setup.exe` install, pressing <kbd>Space</kbd> on a `.pdb` (or any other supported extension) opened a plain-text dump of the file's ATOM lines instead of the 3Dmol viewer. QL-Win's text-fallback viewer was kicking in — a sign that our plugin had failed to load.
+- **Root cause**: QL-Win loads plugin DLLs via `Assembly.LoadFile()`, which puts the assembly into the *Load* (not *LoadFrom*) context. That means the CLR's standard probing paths (`AppDomain.BaseDirectory` + GAC) are the only places it'll look for transitive dependencies — **not** the plugin's own directory. When QL-Win called `Plugin.View()` and the WPF runtime tried to inflate `MoleculePanel.xaml` (which carries `xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"`), the resolver couldn't find `Microsoft.Web.WebView2.Wpf.dll` in `%LocalAppData%\Programs\QuickLook\` and threw `XamlParseException`. QL-Win caught it, blacklisted our plugin for that file, and fell back to text.
+- **Fix**: `Plugin.Init()` now attaches an `AppDomain.AssemblyResolve` handler that probes the plugin's own directory (`%LocalAppData%\QuickLook\plugins\QuickLookProtein\`) for the requested assembly + `.dll` and returns `Assembly.LoadFrom(...)` on hit. WebView2.Core / .Wpf / .WinForms (and anything else we may add as a transitive dep) resolve in one place. The handler skips `*.resources` so we don't accidentally shadow localised satellite assemblies QL-Win or another plugin owns, and swallows its own exceptions so a bad probe never crashes the AppDomain.
+- **Diagnostic improvement**: a `Resolved 'X' -> path` line lands in `plugin.log` for every successful late-bind, so future "Space-bar shows raw text" reports can be triaged from the Settings → Diagnostics → Open plugin log button in one click.
+
 ## [1.7.67] — 2026-05-19
 
 ### 🛠️ Hotfix — Sparkle update from 1.7.65 to 1.7.66 failed
