@@ -877,12 +877,18 @@ jobs:
         run: |
           # Pass the marketing version so the plugin DLL's
           # FileVersion / InformationalVersion stamp matches the tag.
-          # Users running the Windows diagnostic block can confirm at
-          # a glance whether they're on the build with the
-          # static-cctor / AssemblyResolve fix.
+          # Set all three explicitly - the csproj's default
+          # Version/FileVersion (both 0.0.0) wouldn't otherwise be
+          # overridden in the direction we want by /p:Version alone,
+          # because MSBuild's default cascade
+          # (VersionPrefix -> Version -> FileVersion) trips over
+          # explicit values in the csproj.
+          $ver = "${{ steps.version.outputs.version }}"
           dotnet build Windows/QuickLookProtein.Plugin/QuickLookProtein.Plugin.csproj `
               -c Release `
-              /p:Version=${{ steps.version.outputs.version }} `
+              /p:Version=$ver `
+              /p:FileVersion=$ver `
+              /p:InformationalVersion=$ver `
               -o build/plugin
 
       - name: Build thumbnail provider

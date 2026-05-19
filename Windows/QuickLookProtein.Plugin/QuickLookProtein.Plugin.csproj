@@ -60,7 +60,33 @@
       produces a DLL whose FileVersion is 1.7.69. The default below
       makes local dev builds identifiable as "0.0.0-dev".
     -->
-    <Version>0.0.0-dev</Version>
+    <!--
+      `dotnet build /p:Version=X.Y.Z` only flows through to FileVersion
+      and InformationalVersion automatically when those properties
+      AREN'T explicitly set. Our diagnostic from 1.7.69 confirmed
+      "strings" against the shipped DLL showed only "1.0.0.0" — i.e.
+      the SDK's auto-FileVersion-from-Version logic was being masked
+      by the explicit `<AssemblyVersion>` line below. Restate
+      FileVersion and InformationalVersion as derived from $(Version)
+      so the override path is unambiguous: passing /p:Version at
+      build time updates both, while local dev builds get 0.0.0-dev
+      stamped instead of nothing.
+    -->
+    <!--
+      Local dev builds stamp 0.0.0 so a stray dev .dll doesn't look
+      like a released build in the diagnostic block. Release builds
+      override everything explicitly via:
+          dotnet build /p:Version=$VER /p:FileVersion=$VER /p:InformationalVersion=$VER
+      Setting all three keeps the override path direct - no
+      derivation logic in MSBuild's "make Version from VersionPrefix
+      and VersionSuffix" middle layer to second-guess. AssemblyVersion
+      stays at 1.0.0.0 (QL-Win's plugin loader ignores it; bumping
+      it would force a redeploy of anything that pinned us via
+      strong name).
+    -->
+    <Version>0.0.0</Version>
+    <FileVersion>0.0.0</FileVersion>
+    <InformationalVersion>0.0.0-dev</InformationalVersion>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
