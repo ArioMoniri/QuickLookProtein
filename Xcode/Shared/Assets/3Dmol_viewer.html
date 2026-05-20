@@ -31,11 +31,68 @@
                          padding: 24px; text-align: center; color: #b00;
                          font-size: 13px; line-height: 1.4; }
             #error .title { font-weight: 600; margin-bottom: 6px; color: #800; }
+            /* Interactive 3Dmol toolbar (1.7.27+). Shown when
+               {SHOW_CONTROLS} is true. Flat row of small pills the
+               user can tap during a Quick Look preview to re-style,
+               toggle surfaces, recenter, etc. without leaving QL. */
+            #controls  { position: absolute; bottom: 8px; right: 8px; z-index: 12;
+                         display: flex; flex-wrap: wrap; gap: 4px;
+                         max-width: calc(100% - 16px); justify-content: flex-end; }
+            #controls button {
+                font: 500 11px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+                background: rgba(255,255,255,0.85); color: #222;
+                border: 1px solid rgba(0,0,0,0.18); border-radius: 5px;
+                padding: 3px 9px; cursor: pointer;
+                transition: background 0.12s ease; }
+            #controls button:hover  { background: rgba(255,255,255,1.0); }
+            #controls button.active { background: rgba(0,120,215,0.85);
+                                       color: #fff; border-color: rgba(0,120,215,0.95); }
+            /* Corner-pill hide toggles (1.7.38+). Three tiny buttons in the
+               top-right that hide / show the #info overlay, #label badge, and
+               the #controls toolbar without leaving the preview. They live in
+               their own pill so the user can dismiss every other overlay if
+               they want a clean rendering. */
+            #hide-pill { position: absolute; top: 8px; right: 8px; z-index: 13;
+                         display: flex; gap: 2px;
+                         background: rgba(255,255,255,0.65);
+                         border: 1px solid rgba(0,0,0,0.18);
+                         border-radius: 999px; padding: 2px 4px; }
+            #hide-pill button {
+                font: 500 10px -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+                background: transparent; color: #333;
+                border: 0; padding: 2px 5px; cursor: pointer; border-radius: 999px;
+                transition: background 0.1s ease; min-width: 18px; }
+            #hide-pill button:hover  { background: rgba(0,0,0,0.08); }
+            #hide-pill button.muted  { color: #b00; text-decoration: line-through; }
+            /* Ambient-occlusion vignette (1.7.39+). A CSS inset radial
+               shadow that darkens the edges of the canvas, giving a
+               cheap pseudo-AO that deepens crevices in protein surfaces
+               and complements the WebGL render without a real
+               postprocess pass. Pointer-events disabled so it never
+               intercepts mouse interaction with the underlying 3Dmol
+               canvas. The viewer JS toggles its display based on
+               {AMBIENT_OCCLUSION} + current style. */
+            #ao-vignette { position: absolute; inset: 0; z-index: 11;
+                           pointer-events: none; display: none;
+                           box-shadow: inset 0 0 80px rgba(0,0,0,0.40); }
+            @media (prefers-color-scheme: dark) {
+                #ao-vignette { box-shadow: inset 0 0 80px rgba(0,0,0,0.55); }
+            }
             @media (prefers-color-scheme: dark) {
                 #info  { color: #ddd; background: rgba(30,30,30,0.70); }
                 #label { color: #fff; background: rgba(30,30,30,0.92); }
                 #error { color: #ff8a8a; }
                 #error .title { color: #ffb0b0; }
+                #controls button { background: rgba(40,40,42,0.85); color: #ddd;
+                                   border-color: rgba(255,255,255,0.18); }
+                #controls button:hover  { background: rgba(60,60,62,0.95); }
+                #controls button.active { background: rgba(58,145,235,0.85);
+                                          color: #fff; border-color: rgba(58,145,235,0.95); }
+                #hide-pill { background: rgba(40,40,42,0.75);
+                              border-color: rgba(255,255,255,0.18); }
+                #hide-pill button { color: #ddd; }
+                #hide-pill button:hover { background: rgba(255,255,255,0.12); }
+                #hide-pill button.muted { color: #ff8a8a; }
             }
         </style>
     </head>
@@ -45,9 +102,48 @@
              inline styles before script-eval; styles applied via stylesheet
              can race the createViewer call. -->
         <div style="height: 100vh; width: 100%; position: relative;" id="3dviewer"></div>
+        <!-- Ambient-occlusion vignette overlay (1.7.39+). Hidden by
+             default; the viewer JS enables it when {AMBIENT_OCCLUSION}
+             is true and the current style benefits visually (cartoon
+             or surface). Skipped for stick-only previews so small
+             molecules don't get washed out. -->
+        <div id="ao-vignette"></div>
         <div id="info"></div>
         <div id="label"></div>
+        <!-- Corner-pill hide toggles (1.7.38+). Tap to mute the info strip,
+             label badge, or controls toolbar without leaving the preview.
+             State is local to this preview; reopening the file restores
+             the defaults from Settings. -->
+        <div id="hide-pill">
+            <button data-target="info"     title="Toggle info strip">i</button>
+            <button data-target="controls" title="Toggle controls">⋯</button>
+        </div>
+        <!-- Interactive 3Dmol controls (1.7.27+). Bottom-right pill
+             toolbar visible only when {SHOW_CONTROLS} is true. The JS
+             below wires each button to the corresponding 3Dmol API
+             call. Buttons that act like radios (the style group)
+             share the .active highlight; toggles (surface, labels)
+             flip themselves on each click. -->
+        <div id="controls" style="display: none;">
+            <button data-cmd="style:stick"   data-show="{CTL_SHOW_STICK}">Stick</button>
+            <button data-cmd="style:line"    data-show="{CTL_SHOW_LINE}">Line</button>
+            <button data-cmd="style:sphere"  data-show="{CTL_SHOW_SPHERE}">Sphere</button>
+            <button data-cmd="style:cartoon" data-show="{CTL_SHOW_CARTOON}">Cartoon</button>
+            <button data-cmd="surface"       data-show="{CTL_SHOW_SURFACE}">Surface</button>
+            <button data-cmd="colorss"       data-show="{CTL_SHOW_COLORSS}">Color SS</button>
+            <button data-cmd="labelca"       data-show="{CTL_SHOW_LABELCA}">Label αC</button>
+            <button data-cmd="recenter"      data-show="{CTL_SHOW_RECENTER}">Recenter</button>
+            <button data-cmd="rotation"      data-show="{CTL_SHOW_ROTATION}" title="Toggle auto-rotation">Spin</button>
+            <button data-cmd="share"         data-show="{SHOW_SHARE_BUTTON}" title="Share rendering">Share</button>
+        </div>
         <script type="text/plain" id="mol-data">{MOL_DATA}</script>
+        <!-- Merge mode (multi-file Quick Look) extras. Each sibling
+             structure rides along in its own script block; the JS
+             below iterates the EXTRA_MODELS array and calls
+             viewer.addModel for each. In single-file mode both the
+             HTML payload and the JS array are empty so nothing extra
+             happens. -->
+        {EXTRA_MODELS_HTML}
         <script>
             // jQuery is bundled inside 3Dmol.js (verified: 3Dmol.js's first
             // 2000 lines are jQuery 3.6.0). Using $(…) DOMReady + $('#…')
@@ -104,6 +200,18 @@
                     }
                     viewer.setBackgroundColor(0x{BG_COLOR}, {BG_ALPHA});
 
+                    // High-DPI render path (1.7.37+). 3Dmol leaves the WebGL
+                    // renderer at devicePixelRatio = 1, which makes Retina
+                    // previews look soft. Bump to the display ratio (capped
+                    // at 2× so 4K displays don't blow up the pixel budget).
+                    try {
+                        var renderer = viewer.getRenderer && viewer.getRenderer();
+                        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+                        if (renderer && renderer.setPixelRatio) {
+                            renderer.setPixelRatio(dpr);
+                        }
+                    } catch (e) { /* not fatal — older 3Dmol builds */ }
+
                     // === parse model =========================================
                     var format  = "{DATA_FORMAT}";
                     var addOpts = { keepH: true, multimodel: false };
@@ -118,14 +226,73 @@
                         addOpts.assignBonds = true;
                     }
                     try {
-                        viewer.addModel(data, format, addOpts);
+                        if (format === 'mmtf') {
+                            // MMTF binary bridge (1.7.57+). The Swift side
+                            // base64-encodes the raw MessagePack bytes into
+                            // #mol-data instead of pasting the byte string
+                            // directly (which gets mangled by UTF-8). Decode
+                            // back to Uint8Array, then hand to 3Dmol's MMTF
+                            // parser as a binary array.
+                            var raw = data;
+                            // tolerate accidental whitespace in the base64
+                            raw = raw.replace(/\s+/g, '');
+                            var bin = atob(raw);
+                            var arr = new Uint8Array(bin.length);
+                            for (var i = 0; i < bin.length; i++) {
+                                arr[i] = bin.charCodeAt(i);
+                            }
+                            viewer.addModel(arr, 'mmtf', addOpts);
+                        } else {
+                            viewer.addModel(data, format, addOpts);
+                        }
                     } catch (parseErr) {
                         return showError('Could not parse ' + format.toUpperCase(),
                                          parseErr && parseErr.message ? parseErr.message : String(parseErr));
                     }
 
-                    var model = viewer.getModel();
-                    var atoms = model ? model.selectedAtoms({}) : [];
+                    // Multi-file merge mode (1.7.23+): when the user
+                    // picked "Merge all in same folder" in Settings,
+                    // the Swift side embeds one <script type="text/plain">
+                    // per sibling structure plus a JS array of
+                    // {id, format, name} records. Walk it and addModel
+                    // each. Empty array in single-file mode = no-op.
+                    var extraModels = {EXTRA_MODELS_JSON};
+                    for (var emI = 0; emI < extraModels.length; emI++) {
+                        var em = extraModels[emI];
+                        var emBlock = document.getElementById(em.id);
+                        if (!emBlock) continue;
+                        var emData = emBlock.textContent || emBlock.innerText;
+                        if (!emData || emData.length === 0) continue;
+                        var emOpts = { keepH: true, multimodel: false };
+                        if (em.format === 'xyz'  || em.format === 'vasp' ||
+                            em.format === 'cube' || em.format === 'cdjson') {
+                            emOpts.assignBonds = true;
+                        }
+                        try {
+                            viewer.addModel(emData, em.format, emOpts);
+                        } catch (extraErr) {
+                            // Don't blow up the whole preview if one
+                            // sibling has a parse error - log and
+                            // carry on so the primary file (and the
+                            // siblings that did parse) still render.
+                            console.warn('merge mode: addModel failed for',
+                                         em.name, extraErr);
+                        }
+                    }
+
+                    // Walk EVERY model the viewer knows about so merge
+                    // mode (multiple addModel calls above) gets a
+                    // unified atom list for styling + the info-overlay
+                    // chain/atom counts. Falls back to the single-
+                    // model path if the viewer's flat-atom helper
+                    // isn't available on this 3Dmol build.
+                    var atoms;
+                    try {
+                        atoms = viewer.selectedAtoms({}) || [];
+                    } catch (atomErr) {
+                        var model = viewer.getModel();
+                        atoms = model ? model.selectedAtoms({}) : [];
+                    }
                     if (!atoms || atoms.length === 0) {
                         return showError('No atoms found',
                                          'The file parsed successfully but contained no atoms.');
@@ -174,6 +341,39 @@
                             case 'ssJmol':  return hasProtein ? { colorscheme: 'ssJmol' }
                                                               : { colorscheme: 'Jmol' };
                             case 'residue': return { colorscheme: 'amino' };
+                            // B-factor / pLDDT coloring (1.7.29+).
+                            // For AlphaFold-style predicted models the
+                            // B-factor field actually carries pLDDT
+                            // confidence (0-100). For X-ray crystallo-
+                            // graphic structures it's thermal motion
+                            // (typically 0-80 Angstroms^2). Either way
+                            // 3Dmol's "RWB" gradient (red-white-blue)
+                            // gives a useful visualization with a
+                            // domain-sensitive range.
+                            case 'bfactor': {
+                                // Detect AlphaFold-style pLDDT: if EVERY
+                                // observed B-factor is between 0 and
+                                // 100 with at least one value above 50,
+                                // treat it as confidence (inverted - low
+                                // B = red = LOW confidence in AlphaFold's
+                                // convention; we flip so high = blue =
+                                // confident, matching pLDDT's intuition).
+                                var bs = [], plddtLike = true, sawAny = false;
+                                for (var bi = 0; bi < atoms.length; bi++) {
+                                    var bv = atoms[bi].b;
+                                    if (bv === undefined || bv === null) continue;
+                                    sawAny = true;
+                                    bs.push(bv);
+                                    if (bv < 0 || bv > 100.5) plddtLike = false;
+                                }
+                                if (!sawAny) return { color: 'spectrum' };
+                                var lo = Math.min.apply(null, bs);
+                                var hi = Math.max.apply(null, bs);
+                                if (plddtLike) {
+                                    return { colorscheme: { prop: 'b', gradient: 'roygb', min: 50, max: 90 } };
+                                }
+                                return { colorscheme: { prop: 'b', gradient: 'rwb', min: lo, max: hi } };
+                            }
                             default:        return { color: 'spectrum' };
                         }
                     }
@@ -186,8 +386,47 @@
                     // Base style FIRST — guarantees every atom has *some* style
                     // even if the smart-style serial-array selectors below match
                     // nothing on a particular 3Dmol build.
+                    //
+                    // Outline shading (1.7.29+): adds a thin dark border around
+                    // every atom/bond. 3Dmol exposes this via the per-style
+                    // `outline: true` flag - we splat it into every style
+                    // object below so cartoon / stick / sphere / line all
+                    // honour it consistently.
+                    var outlineOn = {OUTLINE_SHADING};
+                    function withOutline(s) {
+                        if (!outlineOn) return s;
+                        var k, dup = {};
+                        for (k in s) {
+                            if (typeof s[k] === 'object' && s[k] !== null) {
+                                var inner = {};
+                                for (var ik in s[k]) inner[ik] = s[k][ik];
+                                inner.outline = true;
+                                dup[k] = inner;
+                            } else {
+                                dup[k] = s[k];
+                            }
+                        }
+                        return dup;
+                    }
                     var baseStyle = {}; baseStyle[styleType] = colorFor();
-                    viewer.setStyle({}, baseStyle);
+                    viewer.setStyle({}, withOutline(baseStyle));
+
+                    // Ambient occlusion vignette (1.7.39+). Show the
+                    // CSS inset-shadow overlay when AO is enabled and
+                    // the current style benefits visually. Skip for
+                    // line/stick on small molecules - the vignette
+                    // washes out tiny atom rendering. Cartoon, sphere,
+                    // and surface styles all keep it on.
+                    var aoOn = {AMBIENT_OCCLUSION};
+                    if (aoOn) {
+                        var aoBenefits = (styleType === 'cartoon' ||
+                                          styleType === 'sphere'  ||
+                                          {SHOW_SURFACE});
+                        if (aoBenefits) {
+                            var aoEl = document.getElementById('ao-vignette');
+                            if (aoEl) aoEl.style.display = 'block';
+                        }
+                    }
 
                     // Smart styling — gated on the user toggle. We previously
                     // required the structure to have BOTH a polymer AND a
@@ -227,7 +466,15 @@
                     if ({HIDE_H}) viewer.setStyle({ elem: 'H' }, {});
 
                     // === surface (capped + thumbnail-mode override) ==========
-                    var doSurface = {SHOW_SURFACE} || ({THUMBNAIL_MODE} && hasProtein);
+                    // Floor of 30 atoms (1.7.44+): 3Dmol's VDW surface
+                    // generator produces visibly malformed meshes — half-
+                    // floating shadow blobs offset from the molecule — when
+                    // run on very small ligand-only structures (~50 atoms).
+                    // Small molecules don't gain anything from a surface
+                    // anyway, so silently skip it; the toolbar Surface
+                    // button can still force one if the user really wants.
+                    var doSurface = ({SHOW_SURFACE} && atoms.length >= 30)
+                                  || ({THUMBNAIL_MODE} && hasProtein);
                     if (doSurface && atoms.length <= 3000) {
                         try {
                             var surfSel = hasPolymer ? { serial: polySerials } : {};
@@ -235,10 +482,92 @@
                                 ? { opacity: 1.0, colorscheme: 'whiteCarbon' }
                                 : { opacity: 0.50, color: 'white' };
                             viewer.addSurface($3Dmol.SurfaceType.VDW, surfStyle, surfSel);
+                            // Explicit render commits the mesh before auto-
+                            // orient rotations, avoiding a half-drawn surface.
+                            viewer.render();
                         } catch (e) {}
                     }
 
                     viewer.zoomTo();
+
+                    // === auto-orient by principal axes (1.7.30+) =============
+                    // Rotate the camera so the molecule's longest principal
+                    // axis is horizontal. Standard trick: compute the 3x3
+                    // covariance matrix of the centered atom coordinates,
+                    // then power-iterate (10 rounds is plenty for the
+                    // largest eigenvector) to find the dominant axis. Use
+                    // 3Dmol's `viewer.rotate` to align it with the X axis.
+                    if ({AUTO_ORIENT} && atoms.length > 4) {
+                        try {
+                            var cx = 0, cy = 0, cz = 0;
+                            for (var aoI = 0; aoI < atoms.length; aoI++) {
+                                cx += atoms[aoI].x;
+                                cy += atoms[aoI].y;
+                                cz += atoms[aoI].z;
+                            }
+                            cx /= atoms.length;
+                            cy /= atoms.length;
+                            cz /= atoms.length;
+                            var cxx=0, cxy=0, cxz=0, cyy=0, cyz=0, czz=0;
+                            for (var aoJ = 0; aoJ < atoms.length; aoJ++) {
+                                var dx = atoms[aoJ].x - cx;
+                                var dy = atoms[aoJ].y - cy;
+                                var dz = atoms[aoJ].z - cz;
+                                cxx += dx*dx; cxy += dx*dy; cxz += dx*dz;
+                                cyy += dy*dy; cyz += dy*dz; czz += dz*dz;
+                            }
+                            // Power iteration for the dominant eigenvector.
+                            var vx = 1, vy = 1, vz = 1;
+                            for (var pi = 0; pi < 10; pi++) {
+                                var nx = cxx*vx + cxy*vy + cxz*vz;
+                                var ny = cxy*vx + cyy*vy + cyz*vz;
+                                var nz = cxz*vx + cyz*vy + czz*vz;
+                                var n  = Math.sqrt(nx*nx + ny*ny + nz*nz);
+                                if (n < 1e-9) break;
+                                vx = nx/n; vy = ny/n; vz = nz/n;
+                            }
+                            // Align eigenvector with the X axis. Yaw around Y,
+                            // then pitch around Z. Angles in degrees because
+                            // that's what viewer.rotate expects.
+                            var yawDeg   = Math.atan2(vz, vx) * 180 / Math.PI;
+                            var pitchDeg = Math.atan2(vy,
+                                Math.sqrt(vx*vx + vz*vz)) * 180 / Math.PI;
+                            viewer.rotate(-yawDeg,   'y');
+                            viewer.rotate( pitchDeg, 'z');
+                        } catch (orientErr) {
+                            console.warn('auto-orient failed:', orientErr);
+                        }
+                    }
+
+                    // === cube isosurface (1.7.30+) ===========================
+                    // When the source file is a Gaussian Cube and the user
+                    // turned on Cube isosurface, render the volumetric data
+                    // as a real isosurface (3Dmol's VolumetricData -> surface
+                    // pipeline) instead of just showing the bare atoms. The
+                    // user can switch back via the Surface toolbar button
+                    // (the addSurface call here adds a named surface that
+                    // the toolbar's removeAllSurfaces respects).
+                    if ({CUBE_ISOSURFACE} && format === 'cube') {
+                        try {
+                            var rawMol = document.getElementById('mol-data');
+                            if (rawMol) {
+                                var vd = new $3Dmol.VolumeData(rawMol.textContent, 'cube');
+                                viewer.addIsosurface(vd, {
+                                    isoval: 0.02,
+                                    color: 'blue',
+                                    opacity: 0.7,
+                                });
+                                viewer.addIsosurface(vd, {
+                                    isoval: -0.02,
+                                    color: 'red',
+                                    opacity: 0.7,
+                                });
+                            }
+                        } catch (cubeErr) {
+                            console.warn('cube isosurface failed:', cubeErr);
+                        }
+                    }
+
                     // User-configurable default zoom: 3Dmol's zoomTo() picks a
                     // distance that fits the bounding sphere; a multiplicative
                     // viewer.zoom() afterwards tightens (>1) or loosens (<1)
@@ -255,10 +584,102 @@
                         var infoEl = document.getElementById('info');
                         var parts = [];
                         var fileName = "{FILE_NAME}";
-                        if (fileName) parts.push(fileName);
-                        parts.push(atoms.length.toLocaleString() + ' atoms');
-                        if (chainCount > 0) parts.push(chainCount + ' chain' + (chainCount === 1 ? '' : 's'));
-                        parts.push(format.toUpperCase());
+                        var pdbTitle = "{PDB_TITLE}";
+
+                        // PDB header title (only meaningful for .pdb / .ent).
+                        if ({INFO_PDB_TITLE} && pdbTitle && pdbTitle.length > 0) {
+                            // Truncate long titles so the overlay doesn't wrap into
+                            // a wall of text - keep first ~60 chars + ellipsis.
+                            var t = pdbTitle.length > 60
+                                  ? pdbTitle.substring(0, 60).replace(/\s+$/, '') + '...'
+                                  : pdbTitle;
+                            parts.push(t);
+                        }
+
+                        if ({INFO_FILE_NAME} && fileName) parts.push(fileName);
+
+                        if ({INFO_ATOM_COUNT}) {
+                            parts.push(atoms.length.toLocaleString() + ' atoms');
+                        }
+
+                        if ({INFO_CHAIN_COUNT} && chainCount > 0) {
+                            parts.push(chainCount + ' chain' + (chainCount === 1 ? '' : 's'));
+                        }
+
+                        // Residue count: unique tuples of (chain, resi, resn).
+                        if ({INFO_RES_COUNT}) {
+                            var residueSet = {};
+                            for (var ri = 0; ri < atoms.length; ri++) {
+                                var ai = atoms[ri];
+                                if (ai.resi === undefined || ai.resi === '') continue;
+                                var key = (ai.chain || '') + '|' + ai.resi + '|' + (ai.resn || '');
+                                residueSet[key] = 1;
+                            }
+                            var rc = Object.keys(residueSet).length;
+                            if (rc > 0) parts.push(rc.toLocaleString() + ' residue' + (rc === 1 ? '' : 's'));
+                        }
+
+                        // Element breakdown: top 4 most abundant elements.
+                        if ({INFO_ELEMENT_BREAKDOWN}) {
+                            var elemCount = {};
+                            for (var ei = 0; ei < atoms.length; ei++) {
+                                var e = (atoms[ei].elem || '?').toUpperCase();
+                                elemCount[e] = (elemCount[e] || 0) + 1;
+                            }
+                            var pairs = [];
+                            for (var k in elemCount) pairs.push([k, elemCount[k]]);
+                            pairs.sort(function (a, b) { return b[1] - a[1]; });
+                            var top = pairs.slice(0, 4).map(function (p) {
+                                return p[0] + ':' + p[1];
+                            }).join(' ');
+                            if (top.length > 0) parts.push(top);
+                        }
+
+                        // Molecular weight in Daltons. IUPAC 2021 standard
+                        // atomic weights for the common elements; unknowns
+                        // contribute 0.
+                        if ({INFO_MOL_WEIGHT}) {
+                            var ATOMIC_MASS = {
+                                'H': 1.008, 'HE': 4.0026,
+                                'LI': 6.94,   'BE': 9.0122, 'B':  10.81,
+                                'C':  12.011, 'N':  14.007, 'O':  15.999,
+                                'F':  18.998, 'NE': 20.180,
+                                'NA': 22.990, 'MG': 24.305, 'AL': 26.982, 'SI': 28.085,
+                                'P':  30.974, 'S':  32.06,  'CL': 35.45,  'AR': 39.948,
+                                'K':  39.098, 'CA': 40.078,
+                                'MN': 54.938, 'FE': 55.845, 'CO': 58.933, 'NI': 58.693,
+                                'CU': 63.546, 'ZN': 65.38,
+                                'BR': 79.904, 'I': 126.904,
+                                'SE': 78.971, 'MO': 95.95,
+                            };
+                            var mw = 0;
+                            for (var mi = 0; mi < atoms.length; mi++) {
+                                var em = (atoms[mi].elem || '').toUpperCase();
+                                if (ATOMIC_MASS[em] !== undefined) mw += ATOMIC_MASS[em];
+                            }
+                            if (mw > 0) {
+                                var disp = mw >= 1000
+                                         ? (mw / 1000).toFixed(2) + ' kDa'
+                                         : mw.toFixed(1) + ' Da';
+                                parts.push(disp);
+                            }
+                        }
+
+                        // Bond count: 3Dmol atoms have a `bonds` array of
+                        // partner serials. Each bond appears twice (once per
+                        // partner) so divide by 2.
+                        if ({INFO_BOND_COUNT}) {
+                            var bondTotal = 0;
+                            for (var bi = 0; bi < atoms.length; bi++) {
+                                var b = atoms[bi].bonds;
+                                if (b && b.length) bondTotal += b.length;
+                            }
+                            var bondCount = Math.floor(bondTotal / 2);
+                            if (bondCount > 0) parts.push(bondCount.toLocaleString() + ' bonds');
+                        }
+
+                        if ({INFO_FORMAT}) parts.push(format.toUpperCase());
+
                         infoEl.textContent = parts.join(' · ');
                     }
 
@@ -279,7 +700,12 @@
                     // === EXACTLY upstream's render+spin pattern ==============
                     viewer.render();
                     var spin = {ROTATION_SPEED};
-                    if (spin > 0) viewer.spin('y', spin);
+                    if (spin > 0) {
+                        viewer.spin('y', spin);
+                        window._qlpSpinning = true;
+                    } else {
+                        window._qlpSpinning = false;
+                    }
 
                     // === thumbnail bridge ====================================
                     if ({THUMBNAIL_MODE}) {
@@ -302,6 +728,265 @@
                             });
                         } catch (e) {}
                     }
+
+                    // === interactive controls (1.7.27+) ====================
+                    // Bottom-right toolbar visible only when the user
+                    // enabled it in Settings. Each button reaches into
+                    // the same `viewer` we built above and re-styles /
+                    // toggles in-place without a re-load. We DON'T
+                    // touch the smart-styling logic above - the user
+                    // can override it and the heuristics will re-apply
+                    // on the next preview if they re-open the file.
+                    if ({SHOW_CONTROLS}) {
+                        (function () {
+                            var bar = document.getElementById('controls');
+                            if (!bar) return;
+                            // Per-button visibility (1.7.29+). Swift / C#
+                            // fill paths replace data-show with "true" or
+                            // "false"; remove the button entirely if false.
+                            var allBtns = bar.querySelectorAll('button[data-show]');
+                            allBtns.forEach(function (b) {
+                                if (b.getAttribute('data-show') !== 'true') {
+                                    b.parentNode.removeChild(b);
+                                }
+                            });
+                            // If every button got removed, hide the bar too.
+                            if (bar.querySelectorAll('button').length === 0) return;
+                            bar.style.display = 'flex';
+                            var styleButtons = bar.querySelectorAll('button[data-cmd^="style:"]');
+                            var surfaceState = false;
+                            var surfaceID = null;
+                            var labelState = false;
+                            var labelHandles = [];
+                            var ssColored = false;
+                            // Mark the button matching the current
+                            // ATOM_STYLE so the user can see where we
+                            // started.
+                            function syncStyleActive(active) {
+                                styleButtons.forEach(function (b) {
+                                    b.classList.toggle('active', b === active);
+                                });
+                            }
+                            var initialStyle = '{ATOM_STYLE}';
+                            styleButtons.forEach(function (b) {
+                                if (b.getAttribute('data-cmd') === 'style:' + initialStyle) {
+                                    b.classList.add('active');
+                                }
+                            });
+
+                            function setStyleAll(name) {
+                                viewer.removeAllSurfaces();
+                                surfaceState = false;
+                                surfaceID = null;
+                                bar.querySelector('[data-cmd="surface"]').classList.remove('active');
+                                var s = {};
+                                if (name === 'stick')    s = { stick: {} };
+                                if (name === 'line')     s = { line: { linewidth: 2 } };
+                                if (name === 'sphere')   s = { sphere: {} };
+                                if (name === 'cartoon')  s = { cartoon: ssColored
+                                                                ? { colorscheme: 'ssJmol' }
+                                                                : { color: 'spectrum' } };
+                                viewer.setStyle({}, s);
+                                viewer.render();
+                            }
+                            function toggleSurface(btn) {
+                                if (surfaceState) {
+                                    viewer.removeAllSurfaces();
+                                    surfaceID = null;
+                                    surfaceState = false;
+                                    btn.classList.remove('active');
+                                } else {
+                                    try {
+                                        viewer.addSurface($3Dmol.SurfaceType.VDW,
+                                            { opacity: 0.78, color: 'whiteCarbon' });
+                                        surfaceState = true;
+                                        btn.classList.add('active');
+                                    } catch (e) { console.warn(e); }
+                                }
+                                viewer.render();
+                            }
+                            function toggleSSColor(btn) {
+                                ssColored = !ssColored;
+                                btn.classList.toggle('active', ssColored);
+                                if (ssColored) {
+                                    viewer.setStyle({ cartoon: true },
+                                                    { cartoon: { colorscheme: 'ssJmol' } });
+                                } else {
+                                    viewer.setStyle({ cartoon: true },
+                                                    { cartoon: { color: 'spectrum' } });
+                                }
+                                viewer.render();
+                            }
+                            function toggleLabels(btn) {
+                                if (labelState) {
+                                    labelHandles.forEach(function (h) {
+                                        try { viewer.removeLabel(h); } catch (e) {}
+                                    });
+                                    labelHandles = [];
+                                    labelState = false;
+                                    btn.classList.remove('active');
+                                } else {
+                                    var caAtoms = viewer.selectedAtoms({ atom: 'CA' });
+                                    caAtoms.forEach(function (a) {
+                                        try {
+                                            var h = viewer.addLabel(
+                                                (a.resn || '') + ' ' + (a.resi || ''),
+                                                { position: { x: a.x, y: a.y, z: a.z },
+                                                  fontSize: 9, backgroundOpacity: 0.6,
+                                                  backgroundColor: 'black',
+                                                  fontColor: 'white' });
+                                            labelHandles.push(h);
+                                        } catch (e) {}
+                                    });
+                                    labelState = true;
+                                    btn.classList.add('active');
+                                }
+                                viewer.render();
+                            }
+
+                            bar.addEventListener('click', function (e) {
+                                var b = e.target.closest('button');
+                                if (!b) return;
+                                var cmd = b.getAttribute('data-cmd');
+                                if (cmd && cmd.indexOf('style:') === 0) {
+                                    syncStyleActive(b);
+                                    setStyleAll(cmd.substring(6));
+                                    return;
+                                }
+                                if (cmd === 'surface')  return toggleSurface(b);
+                                if (cmd === 'colorss')  return toggleSSColor(b);
+                                if (cmd === 'labelca')  return toggleLabels(b);
+                                if (cmd === 'recenter') {
+                                    try {
+                                        viewer.center();
+                                        viewer.zoomTo();
+                                        viewer.render();
+                                    } catch (e) {}
+                                }
+                                if (cmd === 'rotation') {
+                                    // Toggle auto-spin. Resumes at the
+                                    // user's configured rate ({ROTATION_SPEED})
+                                    // — falls back to 1.0 if the setting is
+                                    // 0 (i.e. "No rotation" globally; the
+                                    // in-preview button still lets the user
+                                    // kickstart it manually).
+                                    try {
+                                        if (!window._qlpSpinning) {
+                                            var s = {ROTATION_SPEED};
+                                            if (s <= 0) s = 1.0;
+                                            viewer.spin('y', s);
+                                            window._qlpSpinning = true;
+                                            b.classList.add('active');
+                                        } else {
+                                            viewer.spin(false);
+                                            window._qlpSpinning = false;
+                                            b.classList.remove('active');
+                                        }
+                                    } catch (e) {}
+                                }
+                                if (cmd === 'share') {
+                                    // Snap a PNG of the current frame and hand
+                                    // the data URI to native code. On macOS we
+                                    // post to webkit.messageHandlers.shareImage
+                                    // and PreviewViewController unpacks the
+                                    // base64 + presents NSSharingServicePicker.
+                                    // On Windows (WebView2) the same payload
+                                    // goes through webView.PostWebMessageAsString
+                                    // and MoleculePanel's WebMessageReceived
+                                    // handler.
+                                    try {
+                                        var uri = viewer.pngURI();
+                                        if (window.webkit && window.webkit.messageHandlers
+                                            && window.webkit.messageHandlers.shareImage) {
+                                            window.webkit.messageHandlers.shareImage.postMessage(uri);
+                                        } else if (window.chrome && window.chrome.webview
+                                                   && window.chrome.webview.postMessage) {
+                                            window.chrome.webview.postMessage({ kind: 'share', uri: uri });
+                                        }
+                                    } catch (shareErr) {
+                                        console.warn('share snapshot failed:', shareErr);
+                                    }
+                                }
+                            });
+
+                            // Keyboard shortcuts (1.7.29+):
+                            //   1 / 2 / 3 / 4 : switch to Stick / Line / Sphere / Cartoon
+                            //   S            : toggle Surface
+                            //   R            : Recenter
+                            //   L            : toggle Label αC
+                            //   C            : toggle Color by SS
+                            //   Tab          : cycle to next style
+                            // We only fire on plain keys (no modifier) so we
+                            // don't fight Quick Look's own shortcuts like
+                            // Cmd-W and the spacebar that dismisses the
+                            // preview.
+                            function fireCmd(c) {
+                                var btn = bar.querySelector('button[data-cmd="' + c + '"]');
+                                if (btn) btn.click();
+                            }
+                            var styleOrder = ['style:stick','style:line','style:sphere','style:cartoon'];
+                            window.addEventListener('keydown', function (e) {
+                                if (e.metaKey || e.ctrlKey || e.altKey) return;
+                                if (e.target && e.target.tagName === 'INPUT') return;
+                                switch (e.key) {
+                                    case '1': fireCmd('style:stick');   break;
+                                    case '2': fireCmd('style:line');    break;
+                                    case '3': fireCmd('style:sphere');  break;
+                                    case '4': fireCmd('style:cartoon'); break;
+                                    case 's': case 'S': fireCmd('surface');  break;
+                                    case 'r': case 'R': fireCmd('recenter'); break;
+                                    case 'l': case 'L': fireCmd('labelca');  break;
+                                    case 'c': case 'C': fireCmd('colorss');  break;
+                                    case 'Tab': {
+                                        // Cycle through visible style buttons.
+                                        var visible = styleOrder.filter(function (s) {
+                                            return bar.querySelector('button[data-cmd="' + s + '"]');
+                                        });
+                                        if (visible.length === 0) return;
+                                        var cur = bar.querySelector('button[data-cmd^="style:"].active');
+                                        var idx = cur ? visible.indexOf(cur.getAttribute('data-cmd')) : -1;
+                                        idx = (idx + 1) % visible.length;
+                                        fireCmd(visible[idx]);
+                                        e.preventDefault();
+                                        break;
+                                    }
+                                    default: return;
+                                }
+                            });
+                        })();
+                    }
+
+                    // === corner-pill hide toggles (1.7.38+) ==================
+                    // Three tiny buttons in the top-right that mute / unmute
+                    // the info strip, label badge, and controls toolbar in
+                    // place. State is local to this preview — closing and
+                    // re-opening restores defaults from Settings.
+                    (function () {
+                        var pill = document.getElementById('hide-pill');
+                        if (!pill) return;
+                        pill.querySelectorAll('button[data-target]').forEach(function (btn) {
+                            var target = btn.getAttribute('data-target');
+                            var el = document.getElementById(target);
+                            if (!el) {
+                                btn.style.display = 'none';
+                                return;
+                            }
+                            // Reflect initial visibility — if the element was
+                            // already hidden via Settings, start in the muted
+                            // state so the user can choose to reveal it.
+                            var cs = window.getComputedStyle(el).display;
+                            if (cs === 'none') btn.classList.add('muted');
+                            btn.addEventListener('click', function () {
+                                var hidden = btn.classList.toggle('muted');
+                                if (hidden) {
+                                    el.dataset.qlpPrevDisplay = el.style.display || '';
+                                    el.style.display = 'none';
+                                } else {
+                                    el.style.display = el.dataset.qlpPrevDisplay || '';
+                                }
+                            });
+                        });
+                    })();
 
                     // === window-resize → canvas-resize =======================
                     var resizeTimer = null;

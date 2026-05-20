@@ -3,10 +3,15 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		05D0F5A02FB46E020059B3CB /* QuickLookThumbnailing.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05D0F59F2FB46E020059B3CB /* QuickLookThumbnailing.framework */; };
+		05D0F5A12FB46E020059B3CB /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4B0FDF9426C9A38000C94DDE /* Quartz.framework */; };
+		05D0F5A82FB46E020059B3CB /* QLThumbnail.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 05D0F59E2FB46E020059B3CB /* QLThumbnail.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		0A1B2C3D2FB46E020059B40B /* QLActions.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0A1B2C3D2FB46E020059B404 /* QLActions.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		05DD438D2FB452B000444B3A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 05DD438C2FB452B000444B3A /* Sparkle */; };
 		4B0FDF7F26C9A31F00C94DDE /* QuickLookProteinApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B0FDF7E26C9A31F00C94DDE /* QuickLookProteinApp.swift */; };
 		4B0FDF8126C9A31F00C94DDE /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B0FDF8026C9A31F00C94DDE /* ContentView.swift */; };
 		4B0FDF8326C9A32100C94DDE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4B0FDF8226C9A32100C94DDE /* Assets.xcassets */; };
@@ -21,23 +26,44 @@
 		4B20116F26D2D43B00B77CEF /* 3Dmol_viewer.html in Resources */ = {isa = PBXBuildFile; fileRef = 4B0FDFA826C9A45B00C94DDE /* 3Dmol_viewer.html */; };
 		4B450AC326D2D6D1007F0A39 /* SharedFunctions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B450AC226D2D6D1007F0A39 /* SharedFunctions.swift */; };
 		4B450AC426D2D6D1007F0A39 /* SharedFunctions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B450AC226D2D6D1007F0A39 /* SharedFunctions.swift */; };
+		MM010001AAAA00000000A001 /* MoleculeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MM010000AAAA00000000A000 /* MoleculeModel.swift */; };
+		MM010002AAAA00000000A002 /* MoleculeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MM010000AAAA00000000A000 /* MoleculeModel.swift */; };
+		UZ010001AAAA00000000B001 /* USDZExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = UZ010000AAAA00000000B000 /* USDZExporter.swift */; };
+		UZ010002AAAA00000000B002 /* USDZExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = UZ010000AAAA00000000B000 /* USDZExporter.swift */; };
 		4B99E5C526E4FD7200B44AD9 /* VersionCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B99E5C426E4FD7200B44AD9 /* VersionCheck.swift */; };
 		4BE18E02281F38DA00034BE4 /* PQQ.sdf in Resources */ = {isa = PBXBuildFile; fileRef = 4BE18E01281F38D900034BE4 /* PQQ.sdf */; };
 		4BE18E04281F3B4900034BE4 /* 1565673.cif in Resources */ = {isa = PBXBuildFile; fileRef = 4BE18E03281F3B4900034BE4 /* 1565673.cif */; };
 		4BE18E06281F3D0200034BE4 /* 6oc6.pdb in Resources */ = {isa = PBXBuildFile; fileRef = 4BE18E05281F3D0200034BE4 /* 6oc6.pdb */; };
 		4BED22A32821CD6D003F66A0 /* 3Dmol.js in Resources */ = {isa = PBXBuildFile; fileRef = 4BED22A22821CD6D003F66A0 /* 3Dmol.js */; };
 		4BED22A42821CD6D003F66A0 /* 3Dmol.js in Resources */ = {isa = PBXBuildFile; fileRef = 4BED22A22821CD6D003F66A0 /* 3Dmol.js */; };
-		A1CAF1E01A2B3C4D00000001 /* caffeine.mol2 in Resources */ = {isa = PBXBuildFile; fileRef = A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */; };
-		A1ME74A1E1A2B3C4D00000001 /* methane.mol in Resources */ = {isa = PBXBuildFile; fileRef = A1ME74A1E1A2B3C4D00000002 /* methane.mol */; };
+		A1AR10AA1A2B3C4D00000001 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AR10AA1A2B3C4D00000002 /* Updater.swift */; };
+		A1AR10AA1A2B3C4D00000003 /* LoginItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AR10AA1A2B3C4D00000004 /* LoginItem.swift */; };
 		A1BE7Z1E2A2B3C4D00000001 /* benzene.xyz in Resources */ = {isa = PBXBuildFile; fileRef = A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */; };
-		A1WA7G1E3A2B3C4D00000001 /* water.gro in Resources */ = {isa = PBXBuildFile; fileRef = A1WA7G1E3A2B3C4D00000002 /* water.gro */; };
-		A1WA7C1E4A2B3C4D00000001 /* water.cube in Resources */ = {isa = PBXBuildFile; fileRef = A1WA7C1E4A2B3C4D00000002 /* water.cube */; };
+		A1CAF1E01A2B3C4D00000001 /* caffeine.mol2 in Resources */ = {isa = PBXBuildFile; fileRef = A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */; };
+		A1CDJ1E7A2B3C4D00000001 /* methane.cdjson in Resources */ = {isa = PBXBuildFile; fileRef = A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */; };
+		A1MMT1E8A2B3C4D00000001 /* methane.mmtf in Resources */ = {isa = PBXBuildFile; fileRef = A1MMT1E8A2B3C4D00000002 /* methane.mmtf */; };
+		A1ME74A1E1A2B3C4D00000001 /* methane.mol in Resources */ = {isa = PBXBuildFile; fileRef = A1ME74A1E1A2B3C4D00000002 /* methane.mol */; };
 		A1PQR1E5A2B3C4D00000001 /* methane.pqr in Resources */ = {isa = PBXBuildFile; fileRef = A1PQR1E5A2B3C4D00000002 /* methane.pqr */; };
 		A1VSP1E6A2B3C4D00000001 /* diamond.vasp in Resources */ = {isa = PBXBuildFile; fileRef = A1VSP1E6A2B3C4D00000002 /* diamond.vasp */; };
-		A1CDJ1E7A2B3C4D00000001 /* methane.cdjson in Resources */ = {isa = PBXBuildFile; fileRef = A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */; };
+		A1WA7C1E4A2B3C4D00000001 /* water.cube in Resources */ = {isa = PBXBuildFile; fileRef = A1WA7C1E4A2B3C4D00000002 /* water.cube */; };
+		A1WA7G1E3A2B3C4D00000001 /* water.gro in Resources */ = {isa = PBXBuildFile; fileRef = A1WA7G1E3A2B3C4D00000002 /* water.gro */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		05D0F5A62FB46E020059B3CB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4B0FDF7326C9A31F00C94DDE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 05D0F59D2FB46E020059B3CB;
+			remoteInfo = QLThumbnail;
+		};
+		0A1B2C3D2FB46E020059B40D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4B0FDF7326C9A31F00C94DDE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0A1B2C3D2FB46E020059B401;
+			remoteInfo = QLActions;
+		};
 		4B0FDF9E26C9A38000C94DDE /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4B0FDF7326C9A31F00C94DDE /* Project object */;
@@ -54,6 +80,8 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				05D0F5A82FB46E020059B3CB /* QLThumbnail.appex in Embed Foundation Extensions */,
+				0A1B2C3D2FB46E020059B40B /* QLActions.appex in Embed Foundation Extensions */,
 				4B0FDFA026C9A38000C94DDE /* QuickLookProtein Extension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
@@ -62,6 +90,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		05D0F59E2FB46E020059B3CB /* QLThumbnail.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QLThumbnail.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A1B2C3D2FB46E020059B404 /* QLActions.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = QLActions.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		05D0F59F2FB46E020059B3CB /* QuickLookThumbnailing.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuickLookThumbnailing.framework; path = System/Library/Frameworks/QuickLookThumbnailing.framework; sourceTree = SDKROOT; };
 		4B0FDF7B26C9A31F00C94DDE /* QuickLookProtein.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuickLookProtein.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4B0FDF7E26C9A31F00C94DDE /* QuickLookProteinApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLookProteinApp.swift; sourceTree = "<group>"; };
 		4B0FDF8026C9A31F00C94DDE /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -78,26 +109,88 @@
 		4B0FDFA826C9A45B00C94DDE /* 3Dmol_viewer.html */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.html; path = 3Dmol_viewer.html; sourceTree = "<group>"; };
 		4B20116026D2692200B77CEF /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		4B450AC226D2D6D1007F0A39 /* SharedFunctions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFunctions.swift; sourceTree = "<group>"; };
+		MM010000AAAA00000000A000 /* MoleculeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoleculeModel.swift; sourceTree = "<group>"; };
+		UZ010000AAAA00000000B000 /* USDZExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USDZExporter.swift; sourceTree = "<group>"; };
 		4B99E5C426E4FD7200B44AD9 /* VersionCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionCheck.swift; sourceTree = "<group>"; };
 		4BE18E01281F38D900034BE4 /* PQQ.sdf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = PQQ.sdf; sourceTree = "<group>"; };
 		4BE18E03281F3B4900034BE4 /* 1565673.cif */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 1565673.cif; sourceTree = "<group>"; };
 		4BE18E05281F3D0200034BE4 /* 6oc6.pdb */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 6oc6.pdb; sourceTree = "<group>"; };
 		4BED22A22821CD6D003F66A0 /* 3Dmol.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = 3Dmol.js; sourceTree = "<group>"; };
-		A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = caffeine.mol2; sourceTree = "<group>"; };
-		A1ME74A1E1A2B3C4D00000002 /* methane.mol */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.mol; sourceTree = "<group>"; };
+		A1AR10AA1A2B3C4D00000002 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
+		A1AR10AA1A2B3C4D00000004 /* LoginItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginItem.swift; sourceTree = "<group>"; };
 		A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = benzene.xyz; sourceTree = "<group>"; };
-		A1WA7G1E3A2B3C4D00000002 /* water.gro */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = water.gro; sourceTree = "<group>"; };
-		A1WA7C1E4A2B3C4D00000002 /* water.cube */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = water.cube; sourceTree = "<group>"; };
+		A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = caffeine.mol2; sourceTree = "<group>"; };
+		A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.cdjson; sourceTree = "<group>"; };
+		A1MMT1E8A2B3C4D00000002 /* methane.mmtf */ = {isa = PBXFileReference; lastKnownFileType = file; path = methane.mmtf; sourceTree = "<group>"; };
+		A1ME74A1E1A2B3C4D00000002 /* methane.mol */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.mol; sourceTree = "<group>"; };
 		A1PQR1E5A2B3C4D00000002 /* methane.pqr */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.pqr; sourceTree = "<group>"; };
 		A1VSP1E6A2B3C4D00000002 /* diamond.vasp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = diamond.vasp; sourceTree = "<group>"; };
-		A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.cdjson; sourceTree = "<group>"; };
+		A1WA7C1E4A2B3C4D00000002 /* water.cube */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = water.cube; sourceTree = "<group>"; };
+		A1WA7G1E3A2B3C4D00000002 /* water.gro */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = water.gro; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		05D0F5B12FB46E020059B3CB /* Exceptions for "QLThumbnail" folder in "QLThumbnail" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 05D0F59D2FB46E020059B3CB /* QLThumbnail */;
+		};
+		0A1B2C3D2FB46E020059B403 /* Exceptions for "QLActions" folder in "QLActions" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0A1B2C3D2FB46E020059B401 /* QLActions */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		05D0F5A22FB46E020059B3CB /* QLThumbnail */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				05D0F5B12FB46E020059B3CB /* Exceptions for "QLThumbnail" folder in "QLThumbnail" target */,
+			);
+			explicitFileTypes = {};
+			explicitFolders = ();
+			path = QLThumbnail;
+			sourceTree = "<group>";
+		};
+		0A1B2C3D2FB46E020059B402 /* QLActions */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0A1B2C3D2FB46E020059B403 /* Exceptions for "QLActions" folder in "QLActions" target */,
+			);
+			explicitFileTypes = {};
+			explicitFolders = ();
+			path = QLActions;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
+		05D0F59B2FB46E020059B3CB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				05D0F5A02FB46E020059B3CB /* QuickLookThumbnailing.framework in Frameworks */,
+				05D0F5A12FB46E020059B3CB /* Quartz.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A1B2C3D2FB46E020059B406 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4B0FDF7826C9A31F00C94DDE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				05DD438D2FB452B000444B3A /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -126,6 +219,7 @@
 				A1PQR1E5A2B3C4D00000002 /* methane.pqr */,
 				A1VSP1E6A2B3C4D00000002 /* diamond.vasp */,
 				A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */,
+				A1MMT1E8A2B3C4D00000002 /* methane.mmtf */,
 			);
 			path = Assets;
 			sourceTree = "<group>";
@@ -136,6 +230,8 @@
 				4B20115E26D268DE00B77CEF /* Shared */,
 				4B0FDF7D26C9A31F00C94DDE /* QuickLookProtein */,
 				4B0FDF9626C9A38000C94DDE /* QLExtension */,
+				05D0F5A22FB46E020059B3CB /* QLThumbnail */,
+				0A1B2C3D2FB46E020059B402 /* QLActions */,
 				4B0FDF9326C9A38000C94DDE /* Frameworks */,
 				4B0FDF7C26C9A31F00C94DDE /* Products */,
 			);
@@ -146,6 +242,8 @@
 			children = (
 				4B0FDF7B26C9A31F00C94DDE /* QuickLookProtein.app */,
 				4B0FDF9226C9A38000C94DDE /* QuickLookProtein Extension.appex */,
+				05D0F59E2FB46E020059B3CB /* QLThumbnail.appex */,
+				0A1B2C3D2FB46E020059B404 /* QLActions.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -155,6 +253,8 @@
 			children = (
 				4B0888B626D64B54009492C5 /* Assets */,
 				4B0FDF7E26C9A31F00C94DDE /* QuickLookProteinApp.swift */,
+				A1AR10AA1A2B3C4D00000002 /* Updater.swift */,
+				A1AR10AA1A2B3C4D00000004 /* LoginItem.swift */,
 				4B0FDF8026C9A31F00C94DDE /* ContentView.swift */,
 				4B0FDF8226C9A32100C94DDE /* Assets.xcassets */,
 				4B0FDF8726C9A32100C94DDE /* Info.plist */,
@@ -177,6 +277,7 @@
 			isa = PBXGroup;
 			children = (
 				4B0FDF9426C9A38000C94DDE /* Quartz.framework */,
+				05D0F59F2FB46E020059B3CB /* QuickLookThumbnailing.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -207,6 +308,8 @@
 				4B0FDFA726C9A45400C94DDE /* Assets */,
 				4B20116026D2692200B77CEF /* Settings.swift */,
 				4B450AC226D2D6D1007F0A39 /* SharedFunctions.swift */,
+				MM010000AAAA00000000A000 /* MoleculeModel.swift */,
+				UZ010000AAAA00000000B000 /* USDZExporter.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -214,6 +317,50 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		05D0F59D2FB46E020059B3CB /* QLThumbnail */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 05D0F5AC2FB46E020059B3CB /* Build configuration list for PBXNativeTarget "QLThumbnail" */;
+			buildPhases = (
+				05D0F59A2FB46E020059B3CB /* Sources */,
+				05D0F59B2FB46E020059B3CB /* Frameworks */,
+				05D0F59C2FB46E020059B3CB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				05D0F5A22FB46E020059B3CB /* QLThumbnail */,
+			);
+			name = QLThumbnail;
+			packageProductDependencies = (
+			);
+			productName = QLThumbnail;
+			productReference = 05D0F59E2FB46E020059B3CB /* QLThumbnail.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		0A1B2C3D2FB46E020059B401 /* QLActions */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A1B2C3D2FB46E020059B408 /* Build configuration list for PBXNativeTarget "QLActions" */;
+			buildPhases = (
+				0A1B2C3D2FB46E020059B405 /* Sources */,
+				0A1B2C3D2FB46E020059B406 /* Frameworks */,
+				0A1B2C3D2FB46E020059B407 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0A1B2C3D2FB46E020059B402 /* QLActions */,
+			);
+			name = QLActions;
+			packageProductDependencies = (
+			);
+			productName = QLActions;
+			productReference = 0A1B2C3D2FB46E020059B404 /* QLActions.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		4B0FDF7A26C9A31F00C94DDE /* QuickLookProtein */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4B0FDF8B26C9A32100C94DDE /* Build configuration list for PBXNativeTarget "QuickLookProtein" */;
@@ -227,6 +374,8 @@
 			);
 			dependencies = (
 				4B0FDF9F26C9A38000C94DDE /* PBXTargetDependency */,
+				05D0F5A72FB46E020059B3CB /* PBXTargetDependency */,
+				0A1B2C3D2FB46E020059B40C /* PBXTargetDependency */,
 			);
 			name = QuickLookProtein;
 			productName = QuickLookProtein;
@@ -257,9 +406,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastSwiftUpdateCheck = 1250;
+				LastSwiftUpdateCheck = 2610;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					05D0F59D2FB46E020059B3CB = {
+						CreatedOnToolsVersion = 26.1.1;
+					};
+					0A1B2C3D2FB46E020059B401 = {
+						CreatedOnToolsVersion = 26.1.1;
+					};
 					4B0FDF7A26C9A31F00C94DDE = {
 						CreatedOnToolsVersion = 12.5.1;
 					};
@@ -277,17 +432,36 @@
 				Base,
 			);
 			mainGroup = 4B0FDF7226C9A31F00C94DDE;
+			packageReferences = (
+				05DD438B2FB452B000444B3A /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			productRefGroup = 4B0FDF7C26C9A31F00C94DDE /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				4B0FDF7A26C9A31F00C94DDE /* QuickLookProtein */,
 				4B0FDF9126C9A38000C94DDE /* QuickLookProtein Extension */,
+				05D0F59D2FB46E020059B3CB /* QLThumbnail */,
+				0A1B2C3D2FB46E020059B401 /* QLActions */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		05D0F59C2FB46E020059B3CB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A1B2C3D2FB46E020059B407 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4B0FDF7926C9A31F00C94DDE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -306,6 +480,7 @@
 				A1PQR1E5A2B3C4D00000001 /* methane.pqr in Resources */,
 				A1VSP1E6A2B3C4D00000001 /* diamond.vasp in Resources */,
 				A1CDJ1E7A2B3C4D00000001 /* methane.cdjson in Resources */,
+				A1MMT1E8A2B3C4D00000001 /* methane.mmtf in Resources */,
 				4B0FDF8326C9A32100C94DDE /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -323,6 +498,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		05D0F59A2FB46E020059B3CB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A1B2C3D2FB46E020059B405 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4B0FDF7726C9A31F00C94DDE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -330,8 +519,12 @@
 				4B20116126D2692200B77CEF /* Settings.swift in Sources */,
 				4B0FDF8126C9A31F00C94DDE /* ContentView.swift in Sources */,
 				4B0FDF7F26C9A31F00C94DDE /* QuickLookProteinApp.swift in Sources */,
+				A1AR10AA1A2B3C4D00000001 /* Updater.swift in Sources */,
+				A1AR10AA1A2B3C4D00000003 /* LoginItem.swift in Sources */,
 				4B99E5C526E4FD7200B44AD9 /* VersionCheck.swift in Sources */,
 				4B450AC326D2D6D1007F0A39 /* SharedFunctions.swift in Sources */,
+				MM010001AAAA00000000A001 /* MoleculeModel.swift in Sources */,
+				UZ010001AAAA00000000B001 /* USDZExporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -342,12 +535,24 @@
 				4B20116226D2692200B77CEF /* Settings.swift in Sources */,
 				4B0FDF9826C9A38000C94DDE /* PreviewViewController.swift in Sources */,
 				4B450AC426D2D6D1007F0A39 /* SharedFunctions.swift in Sources */,
+				MM010002AAAA00000000A002 /* MoleculeModel.swift in Sources */,
+				UZ010002AAAA00000000B002 /* USDZExporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		05D0F5A72FB46E020059B3CB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 05D0F59D2FB46E020059B3CB /* QLThumbnail */;
+			targetProxy = 05D0F5A62FB46E020059B3CB /* PBXContainerItemProxy */;
+		};
+		0A1B2C3D2FB46E020059B40C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0A1B2C3D2FB46E020059B401 /* QLActions */;
+			targetProxy = 0A1B2C3D2FB46E020059B40D /* PBXContainerItemProxy */;
+		};
 		4B0FDF9F26C9A38000C94DDE /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 4B0FDF9126C9A38000C94DDE /* QuickLookProtein Extension */;
@@ -367,6 +572,160 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		05D0F5A92FB46E020059B3CB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = QLThumbnail/QLThumbnail.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FF68N39FU5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QLThumbnail/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QLThumbnail;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.7.79;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein.QLThumbnail;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		05D0F5AA2FB46E020059B3CB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = QLThumbnail/QLThumbnail.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FF68N39FU5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QLThumbnail/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = QLThumbnail;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.7.79;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein.QLThumbnail;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		0A1B2C3D2FB46E020059B409 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = QLActions/QLActions.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FF68N39FU5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QLActions/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Render Molecule to PNG";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.7.79;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein.QLActions;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		0A1B2C3D2FB46E020059B40A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = QLActions/QLActions.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FF68N39FU5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = QLActions/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Render Molecule to PNG";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.7.79;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein.QLActions;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		4B0FDF8926C9A32100C94DDE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -498,7 +857,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"QuickLookProtein/Preview Content\"";
-				DEVELOPMENT_TEAM = W3SKSV7VPT;
+				DEVELOPMENT_TEAM = FF68N39FU5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = QuickLookProtein/Info.plist;
@@ -507,7 +866,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 1.7.79;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -526,7 +885,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"QuickLookProtein/Preview Content\"";
-				DEVELOPMENT_TEAM = W3SKSV7VPT;
+				DEVELOPMENT_TEAM = FF68N39FU5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = QuickLookProtein/Info.plist;
@@ -535,7 +894,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 1.7.79;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -550,7 +909,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = W3SKSV7VPT;
+				DEVELOPMENT_TEAM = FF68N39FU5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = QLExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -558,7 +917,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 1.7.79;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -574,7 +933,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = W3SKSV7VPT;
+				DEVELOPMENT_TEAM = FF68N39FU5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = QLExtension/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -582,7 +941,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5;
+				MARKETING_VERSION = 1.7.79;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jethrohemmann.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -593,6 +952,24 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		05D0F5AC2FB46E020059B3CB /* Build configuration list for PBXNativeTarget "QLThumbnail" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				05D0F5A92FB46E020059B3CB /* Debug */,
+				05D0F5AA2FB46E020059B3CB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0A1B2C3D2FB46E020059B408 /* Build configuration list for PBXNativeTarget "QLActions" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A1B2C3D2FB46E020059B409 /* Debug */,
+				0A1B2C3D2FB46E020059B40A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		4B0FDF7626C9A31F00C94DDE /* Build configuration list for PBXProject "QuickLookProtein" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -621,6 +998,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		05DD438B2FB452B000444B3A /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		05DD438C2FB452B000444B3A /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 05DD438B2FB452B000444B3A /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4B0FDF7326C9A31F00C94DDE /* Project object */;
 }
