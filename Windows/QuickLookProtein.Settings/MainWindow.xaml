@@ -993,12 +993,27 @@
                                 <TextBlock x:Name="UpdateStatusLabel"
                                            Style="{StaticResource Caption}"
                                            Text="Checking installed version..."/>
-                                <TextBlock x:Name="UpdateNotesLabel"
-                                           Style="{StaticResource Caption}"
-                                           Foreground="{DynamicResource TextMuted}"
-                                           TextWrapping="Wrap"
-                                           MaxHeight="220"
-                                           Visibility="Collapsed"/>
+                                <!--
+                                  Release notes are HTML-stripped + markdown-
+                                  collapsed in UpdateChecker.TruncateMarkdown.
+                                  Wrap the TextBlock in a ScrollViewer so
+                                  longer notes are reachable; without this
+                                  the bottom of the changelog (and the
+                                  Install / Open release page button row)
+                                  could clip below the card. (v1.7.87+)
+                                -->
+                                <ScrollViewer x:Name="UpdateNotesScroller"
+                                              MaxHeight="260"
+                                              Margin="0,4,0,4"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              Visibility="Collapsed">
+                                    <TextBlock x:Name="UpdateNotesLabel"
+                                               Style="{StaticResource Caption}"
+                                               Foreground="{DynamicResource TextMuted}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,0,8,0"/>
+                                </ScrollViewer>
                                 <WrapPanel Margin="0,4,0,4">
                                     <Button x:Name="CheckForUpdatesButton"
                                             Content="Check for updates"

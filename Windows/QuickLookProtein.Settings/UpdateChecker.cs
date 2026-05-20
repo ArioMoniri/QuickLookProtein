@@ -285,7 +285,7 @@ internal static class UpdateChecker
                 TagName = tag!,
                 ReleaseUrl = url!,
                 SetupExeUrl = setupUrl ?? "",
-                ReleaseNotes = TruncateMarkdown(body ?? "", 500),
+                ReleaseNotes = TruncateMarkdown(body ?? "", 4000),
             };
         }
         catch (RateLimitedException)
@@ -460,14 +460,43 @@ internal static class UpdateChecker
     private static string TruncateMarkdown(string md, int maxChars)
     {
         if (string.IsNullOrEmpty(md)) return "";
-        // Collapse markdown headers + bullets to plain-ish lines so
-        // the WPF TextBlock renders something readable. The full
-        // notes are at info.ReleaseUrl for users who want them.
+        // Collapse markdown headers + bullets to plain-ish lines and
+        // strip HTML markup so the WPF TextBlock renders something
+        // readable. The full notes are at info.ReleaseUrl for users
+        // who want them.
+        //
+        // GitHub release bodies routinely contain raw HTML
+        // (<kbd>Space</kbd>, <details>, <summary>, <p>, …) that
+        // GitHub renders client-side. WPF's TextBlock has no HTML
+        // parser, so the literal tags would otherwise leak through.
+        // We swap <kbd>X</kbd> → "[X]" since the inner content is
+        // user-meaningful (key names), then drop the rest of the
+        // tags wholesale.
         var s = md.Replace("\r\n", "\n");
+        // <kbd>Space</kbd> → [Space]
+        s = Regex.Replace(s, @"<kbd[^>]*>(.*?)</kbd>", "[$1]", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        // Drop <details>/<summary> wrappers but keep their content;
+        // the wrapper turns into a leading "▸ " for the summary line.
+        s = Regex.Replace(s, @"<summary[^>]*>(.*?)</summary>", "▸ $1", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        s = Regex.Replace(s, @"</?details[^>]*>",  "", RegexOptions.IgnoreCase);
+        // Everything else: strip tags, keep inner text.
+        s = Regex.Replace(s, @"<[^>]+>", "");
+        // HTML entities the GitHub renderer normally decodes.
+        s = s.Replace("&nbsp;", " ")
+             .Replace("&amp;", "&")
+             .Replace("&lt;", "<")
+             .Replace("&gt;", ">")
+             .Replace("&quot;", "\"");
+        // Markdown noise.
         s = Regex.Replace(s, @"^#{1,6}\s*", "", RegexOptions.Multiline);
         s = Regex.Replace(s, @"^\s*[-*]\s*", "• ", RegexOptions.Multiline);
         s = Regex.Replace(s, @"`+", "");
         s = Regex.Replace(s, @"\*\*([^*]+)\*\*", "$1");
+        // Inline link [text](url) → "text (url)"; standalone URLs left as-is.
+        s = Regex.Replace(s, @"\[([^\]]+)\]\(([^)]+)\)", "$1 ($2)");
+        // Collapse 3+ blank lines (common in our changelog) to 2 so
+        // the ScrollViewer doesn't waste space.
+        s = Regex.Replace(s, @"\n{3,}", "\n\n");
         s = s.Trim();
         if (s.Length > maxChars) s = s.Substring(0, maxChars) + " …";
         return s;

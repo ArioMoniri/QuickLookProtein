@@ -4,6 +4,21 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.87] — 2026-05-20
+
+### 🪟 Windows — readable + scrollable release notes in the updater card
+
+Two paper cuts in the "Update available" panel surfaced when v1.7.86 was offered to a 1.7.84 install:
+
+- **Notes are now scrollable.** The `UpdateNotesLabel` was a plain `TextBlock` with `MaxHeight=220` — content past 220 px clipped silently, hiding the Option B / Homebrew install paths + everything else below the fold. v1.7.87 wraps it in a `ScrollViewer` (`MaxHeight=260`, `VerticalScrollBarVisibility=Auto`); the new Fluent-thin scrollbar template kicks in automatically.
+- **HTML tags stripped instead of leaking through.** GitHub release bodies routinely contain `<kbd>Space</kbd>`, `<details>`, `<summary>` and friends that GitHub's web UI renders client-side. WPF's `TextBlock` has no HTML parser, so the raw tags were rendering literally ("press `<kbd>Space</kbd>` in Finder"). `TruncateMarkdown` now:
+  - Converts `<kbd>X</kbd>` → `[X]` (preserves the keyboard-key meaning)
+  - Converts `<summary>X</summary>` → `▸ X` (preserves the disclosure-row meaning)
+  - Strips every other `<…>` tag, keeps inner text
+  - Decodes the common HTML entities (`&nbsp;`, `&amp;`, `&lt;`, `&gt;`, `&quot;`)
+  - Rewrites Markdown links `[text](url)` → `text (url)` so the URL stays visible after tag-strip
+- **Truncate limit 500 → 4000 chars** so the typical multi-paragraph release entry fits without trailing ellipsis.
+
 ## [1.7.86] — 2026-05-20
 
 ### 🪟 Windows — make broken-registration recovery a single click

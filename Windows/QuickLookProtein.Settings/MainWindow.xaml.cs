@@ -903,7 +903,12 @@ public partial class MainWindow : Window
                 UpdateStatusLabel.Text =
                     $"Update available: {info.TagName} (you have {current.Major}.{current.Minor}.{current.Build}).";
                 UpdateNotesLabel.Text = info.ReleaseNotes;
-                UpdateNotesLabel.Visibility = string.IsNullOrEmpty(info.ReleaseNotes)
+                // v1.7.87+ wraps the notes in a ScrollViewer so the
+                // user can read past the visible portion. Toggle the
+                // wrapper's Visibility (not the inner TextBlock's)
+                // so the scroll affordance is hidden too when there
+                // are no notes.
+                UpdateNotesScroller.Visibility = string.IsNullOrEmpty(info.ReleaseNotes)
                     ? Visibility.Collapsed : Visibility.Visible;
                 InstallUpdateButton.Visibility = string.IsNullOrEmpty(info.SetupExeUrl)
                     ? Visibility.Collapsed : Visibility.Visible;
@@ -912,7 +917,7 @@ public partial class MainWindow : Window
             else
             {
                 _pendingUpdate = null;
-                UpdateNotesLabel.Visibility = Visibility.Collapsed;
+                UpdateNotesScroller.Visibility = Visibility.Collapsed;
                 InstallUpdateButton.Visibility = Visibility.Collapsed;
                 OpenReleasePageButton.Visibility = Visibility.Collapsed;
                 if (showNoUpdateMessage)
