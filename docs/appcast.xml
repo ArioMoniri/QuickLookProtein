@@ -6,6 +6,29 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.89</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.89</link>
+      <pubDate>Wed, 20 May 2026 10:29:46 +0000</pubDate>
+      <sparkle:version>1.7.89</sparkle:version>
+      <sparkle:shortVersionString>1.7.89</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows — fix &amp;quot;Could not render molecule: ArgumentException&amp;quot; on large PDBs&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;WebView.CoreWebView2.NavigateToString(html)&lt;/code&gt; is capped at ~2 MB of content. Large PDBs (e.g. a fully-assembled ribosome with hundreds of thousands of atoms) inlined into the viewer template blow past the limit and crash with &lt;code&gt;ArgumentException: Value does not fall within the expected range&lt;/code&gt; — the QL-Win preview window then shows the canned &amp;quot;Could not render molecule&amp;quot; error page instead of the structure.&lt;/p&gt;
+&lt;p&gt;v1.7.89 sidesteps the limit: the rendered HTML is written to a per-load temp file under &lt;code&gt;%LocalAppData%\QuickLookProtein\preview\preview-&amp;lt;guid&amp;gt;.html&lt;/code&gt;, mapped to a new virtual host &lt;code&gt;https://quicklookprotein-preview.local/&lt;/code&gt;, and navigated to via &lt;code&gt;Navigate(...)&lt;/code&gt;. No content-size limit on the file path. The previous load&amp;#x27;s temp file is deleted on the next load (and on &lt;code&gt;Dispose&lt;/code&gt;) so the dir doesn&amp;#x27;t grow one file per Space-bar press.&lt;/p&gt;
+&lt;h3&gt;🪟 Windows — detect Microsoft Store QuickLook to avoid double-install&lt;/h3&gt;
+&lt;p&gt;A user reported two &lt;code&gt;QuickLook-4.5.0.exe&lt;/code&gt; processes running simultaneously after a Setup.exe install — one suspended (the Store version&amp;#x27;s app container), one running (our GitHub-bundled install). &lt;code&gt;Test-QuickLookInstalled&lt;/code&gt; was only checking the legacy &lt;code&gt;%LocalAppData%\Programs\QuickLook&lt;/code&gt; / Program Files paths; the Microsoft Store version lives under &lt;code&gt;%ProgramFiles%\WindowsApps&lt;/code&gt; and was missed.&lt;/p&gt;
+&lt;p&gt;v1.7.89 adds &lt;code&gt;Test-StoreQuickLookInstalled&lt;/code&gt; (calls &lt;code&gt;Get-AppxPackage -Name &amp;quot;*QuickLook*&amp;quot;&lt;/code&gt;); when the Store version is present, install.ps1 skips &lt;code&gt;Install-QuickLookHost&lt;/code&gt; entirely. The Store path is now recommended in the README + &lt;code&gt;docs/INSTALL.md&lt;/code&gt; as the primary install route — it&amp;#x27;s signed by Microsoft, auto-updates, and runs in a sandbox.&lt;/p&gt;
+&lt;h3&gt;📄 README simplified; details moved to docs/&lt;/h3&gt;
+&lt;p&gt;The README grew to nearly 400 lines of version-stamped paragraphs and per-feature prose. v1.7.89 trims it to a tight intro + install + features matrix + troubleshooting pointer, with the long-form content moved to:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="docs/INSTALL.md"&gt;&lt;code&gt;docs/INSTALL.md&lt;/code&gt;&lt;/a&gt; — every install path with the implementation notes&lt;/li&gt;
+&lt;li&gt;&lt;a href="docs/TROUBLESHOOTING.md"&gt;&lt;code&gt;docs/TROUBLESHOOTING.md&lt;/code&gt;&lt;/a&gt; — symptom → log → fix table for both OSes&lt;/li&gt;
+&lt;li&gt;&lt;a href="CHANGELOG.md"&gt;&lt;code&gt;CHANGELOG.md&lt;/code&gt;&lt;/a&gt; (existing) — version history&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.89"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.89/QuickLookProtein-1.7.89.zip" sparkle:edSignature="HwDQMxDMXBK7D7cNckeOK7JQTq6DLYq2zpud9MjZ/VOw7wC+R4cU3rgbXZut+v6k3s4ZEU6G1dHdXjQH2VcvCA==" length="4550005" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.88</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.88</link>
       <pubDate>Wed, 20 May 2026 09:13:49 +0000</pubDate>
