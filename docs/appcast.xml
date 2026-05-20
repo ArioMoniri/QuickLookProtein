@@ -6,6 +6,27 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.83</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.83</link>
+      <pubDate>Wed, 20 May 2026 07:52:40 +0000</pubDate>
+      <sparkle:version>1.7.83</sparkle:version>
+      <sparkle:shortVersionString>1.7.83</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows — real PNG logo + thumbnail self-test&lt;/h3&gt;
+&lt;p&gt;Two follow-ups from the v1.7.82 round of fixes:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Sidebar logo finally renders crisp.&lt;/strong&gt; v1.7.82&amp;#x27;s &amp;quot;BitmapImage with &lt;code&gt;DecodePixelWidth=256&lt;/code&gt;&amp;quot; trick didn&amp;#x27;t actually upscale the icon — &lt;code&gt;DecodePixelWidth&lt;/code&gt; is a no-op on multi-frame ICOs, and WPF&amp;#x27;s &lt;code&gt;IconBitmapDecoder&lt;/code&gt; returns &lt;code&gt;Frames[0]&lt;/code&gt; (the 16-px entry) regardless. v1.7.83 ships &lt;code&gt;Resources\AppLogo-256.png&lt;/code&gt; (the 256-px frame extracted from the ICO at build prep time) and references that directly. The ICO still drives the EXE icon + taskbar + window title-bar entries where the OS picks the right frame itself.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Thumbnail provider self-test button in About → Diagnostics.&lt;/strong&gt; v1.7.82&amp;#x27;s thumbnail logger only fires when Explorer actually loads the DLL — if registration is broken or Explorer rejects the load, the log stays empty (which is exactly what users reported). The new &lt;strong&gt;&amp;quot;Test thumbnail provider&amp;quot;&lt;/strong&gt; button walks the chain explicitly:&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;  1. Reads &lt;code&gt;HKCU\…\Classes\.pdb\ShellEx\{E357…E96}&lt;/code&gt; (per-extension shell handler)&lt;/p&gt;
+&lt;p&gt;  2. Reads &lt;code&gt;HKCU\…\Classes\CLSID\{B7E4…7A1}\InProcServer32&lt;/code&gt; (CLSID + CodeBase)&lt;/p&gt;
+&lt;p&gt;  3. &lt;code&gt;Assembly.LoadFrom(CodeBase)&lt;/code&gt; (managed assembly loads at all)&lt;/p&gt;
+&lt;p&gt;  4. &lt;code&gt;Activator.CreateInstance(Type.GetTypeFromCLSID(...))&lt;/code&gt; (COM activates — the exact path Explorer uses)&lt;/p&gt;
+&lt;p&gt;  Result of each step is appended to &lt;code&gt;thumbnail.log&lt;/code&gt; and shown in a MessageBox; the user gets actionable text (&amp;quot;step 1 MISSING → re-run Setup.exe&amp;quot;, &amp;quot;step 4 ERROR: CLR conflict → ship the log&amp;quot;) rather than another silent failure.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.83"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.83/QuickLookProtein-1.7.83.zip" sparkle:edSignature="CH4O+fsAx/NQRaAREZdzUTon6UAkPUo0QRUoZkwd+QtYz6Nu0/CskwCiVwrhjjI3pr20AZELmaqcQ/wtI9q/AA==" length="4502461" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.82</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.82</link>
       <pubDate>Wed, 20 May 2026 06:39:08 +0000</pubDate>
