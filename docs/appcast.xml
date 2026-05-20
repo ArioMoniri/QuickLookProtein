@@ -6,6 +6,39 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.92</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.92</link>
+      <pubDate>Wed, 20 May 2026 11:26:11 +0000</pubDate>
+      <sparkle:version>1.7.92</sparkle:version>
+      <sparkle:shortVersionString>1.7.92</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🍎 macOS — fix two false negatives in the diagnostic self-test&lt;/h3&gt;
+&lt;p&gt;User reported the v1.7.91 self-test failing two steps on a perfectly-working install:&lt;/p&gt;
+&lt;p&gt;```&lt;/p&gt;
+&lt;p&gt;1. Extension bundles: MISSING — QLExtension.appex, MDImporter.appex&lt;/p&gt;
+&lt;p&gt;3. Sparkle install path NOT WRITABLE — /Applications.&lt;/p&gt;
+&lt;p&gt;```&lt;/p&gt;
+&lt;p&gt;Both were bugs in the *checker*, not the install.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Step 1&lt;/strong&gt;: v1.7.90 hardcoded the wrong filenames. The QL preview extension is actually &lt;code&gt;QuickLookProtein Extension.appex&lt;/code&gt; (with a space; matches the pbxproj &lt;code&gt;WRAPPER_NAME&lt;/code&gt;), not &lt;code&gt;QLExtension.appex&lt;/code&gt;. &lt;code&gt;MDImporter.appex&lt;/code&gt; isn&amp;#x27;t built into PlugIns/ at all — the Spotlight target ships separately on macOS 12+. v1.7.92 splits the expected list into REQUIRED (&lt;code&gt;QuickLookProtein Extension.appex&lt;/code&gt;, &lt;code&gt;QLThumbnail.appex&lt;/code&gt;) and OPTIONAL (&lt;code&gt;QLActions.appex&lt;/code&gt;, &lt;code&gt;MDImporter.appex&lt;/code&gt;); missing optionals report as &amp;quot;not built — fine&amp;quot; instead of failure.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Step 3&lt;/strong&gt;: the sandboxed Settings app can&amp;#x27;t write-probe &lt;code&gt;/Applications&lt;/code&gt;, but Sparkle&amp;#x27;s installer XPC service has the &lt;code&gt;com.apple.security.files.user-selected.read-write&lt;/code&gt; entitlement and absolutely can. The &amp;quot;NOT WRITABLE — move the app to /Applications&amp;quot; message was misleading when the app *was* in /Applications. v1.7.92 special-cases the standard locations (&lt;code&gt;/Applications&lt;/code&gt;, &lt;code&gt;~/Applications&lt;/code&gt;) as OK, fails read-only prefixes (&lt;code&gt;/System/&lt;/code&gt;, &lt;code&gt;/Volumes/&lt;/code&gt;), and uses &lt;code&gt;URL.resourceValues(.isWritableKey)&lt;/code&gt; for everything else — the kernel-level writable bit respects the sandbox correctly.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;🪟 Windows — full diagnostic self-test (Mac parity)&lt;/h3&gt;
+&lt;p&gt;The existing &amp;quot;Test thumbnail provider&amp;quot; only walks the thumbnail registration chain. v1.7.92 adds &lt;strong&gt;&amp;quot;Run diagnostic self-test&amp;quot;&lt;/strong&gt; (primary button in About → Diagnostics) that walks the whole stack — 7 steps, result shown in a MessageBox and written to &lt;code&gt;update.log&lt;/code&gt;:&lt;/p&gt;
+&lt;p&gt;1. Settings.exe &lt;code&gt;FileVersion&lt;/code&gt; (warns if 1.0.0.0 — means pre-1.7.82 or local dev)&lt;/p&gt;
+&lt;p&gt;2. QuickLook host installed (any of 3 standard paths, or Microsoft Store running)&lt;/p&gt;
+&lt;p&gt;3. Plugin DLL present in QL-Win 4.x scan path (or legacy 3.x fallback)&lt;/p&gt;
+&lt;p&gt;4. Thumbnail handler CLSID &lt;code&gt;InProcServer32&lt;/code&gt; registered in HKCU&lt;/p&gt;
+&lt;p&gt;5. WebView2 Evergreen Runtime installed (HKLM probe under EdgeUpdate\Clients\{F3017226-…})&lt;/p&gt;
+&lt;p&gt;6. SettingsStore hive readable in HKCU&lt;/p&gt;
+&lt;p&gt;7. Update-log directory writable&lt;/p&gt;
+&lt;p&gt;Each step&amp;#x27;s outcome is &amp;quot;OK&amp;quot; / &amp;quot;MISSING …&amp;quot; / specific instruction — no guess-work.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.92"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.92/QuickLookProtein-1.7.92.zip" sparkle:edSignature="GD9lC0Y7sN3P6MpEKN41WsJdjFZg9ffkAa8NxLCQfCK1P+I3c78o8aVl1rljyPwojZ0QnOUDozeqsOp4A2MwCA==" length="4580482" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.91</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.91</link>
       <pubDate>Wed, 20 May 2026 11:02:26 +0000</pubDate>
