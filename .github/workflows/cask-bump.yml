@@ -1,0 +1,161 @@
+name: Cask bump
+
+# ---------------------------------------------------------------------------
+# Automatically updates Casks/quicklookprotein.rb whenever release.yml
+# publishes a new GitHub Release.
+#
+# Why a separate workflow rather than a step inside release.yml:
+#   - release.yml uploads its DMG/Setup.exe via softprops/action-gh-release
+#     in a *draft* phase, then marks the release "published". The SHA256
+#     of the asset we want to pin only exists *after* the upload settles
+#     and the release flips to published, which is exactly the event this
+#     workflow listens for.
+#   - Keeping it separate means a flaky cask-bump never fails the release
+#     itself. The DMG is already up on GitHub; worst case we re-run this
+#     workflow by hand against the same tag.
+#
+# Trigger sequence:
+#   release.yml  → tag pushed   → builds DMG → uploads → publishes release
+#   cask-bump.yml → release published event fires → downloads DMG →
+#                   sha256 → patches Casks/quicklookprotein.rb →
+#                   commits to the same branch the tag points at.
+#
+# Inputs / outputs:
+#   - Trigger:  release: types: [published]  (workflow_dispatch for manual reruns)
+#   - Reads:    github.event.release.tag_name and the QuickLookProtein-X.Y.Z.dmg
+#               asset from the release.
+#   - Writes:   Casks/quicklookprotein.rb (version + sha256 fields only),
+#               commits to the branch the tag is on (feature/ario-signed
+#               today; resolved via `git branch --contains <tag>`).
+#
+# Safety: the only file this workflow ever touches is
+# Casks/quicklookprotein.rb. The sed substitutions are anchored to the
+# `version "..."` and `sha256 "..."` lines emitted by Homebrew's cask
+# DSL — anything else in the file is left untouched.
+# ---------------------------------------------------------------------------
+
+on:
+  # Fires when release.yml flips the GitHub Release from draft → published.
+  release:
+    types: [published]
+  # Manual re-run path: pick a tag from the Actions UI when a previous run
+  # failed and we don't want to re-tag the repo. The input is consumed below
+  # to override `github.event.release.tag_name` for the dispatch case.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to bump the cask against (e.g. v1.7.81). Must already exist as a published GitHub Release with QuickLookProtein-<version>.dmg attached.'
+        required: true
+        type: string
+
+permissions:
+  contents: write     # we push a commit to the repo
+
+jobs:
+  bump:
+    name: Patch Casks/quicklookprotein.rb and commit
+    runs-on: ubuntu-latest
+    steps:
+      # We checkout the *default branch* first so that `git push` knows
+      # what HEAD looks like; we resolve the actual target branch (the
+      # branch the tag points to) in the next step.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # need full history to find tag-containing branch
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve target tag and version
+        id: resolve
+        run: |
+          set -euo pipefail
+          # workflow_dispatch passes the tag explicitly; release event
+          # puts it on github.event.release.tag_name.
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${{ github.event.release.tag_name }}"
+          fi
+          # Strip the leading v for the cask "version" field (Homebrew
+          # convention is bare semver; the tag has the v prefix).
+          version="${tag#v}"
+          echo "tag=$tag"          >> "$GITHUB_OUTPUT"
+          echo "version=$version"  >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=$tag version=$version"
+
+      - name: Resolve target branch from tag
+        id: branch
+        run: |
+          set -euo pipefail
+          tag="${{ steps.resolve.outputs.tag }}"
+          # `git branch --contains <tag>` lists every branch that has the
+          # tagged commit in its history. We pick the first remote branch
+          # so the workflow follows whichever branch the release was cut
+          # from (today feature/ario-signed, tomorrow main).
+          # Strip the "remotes/origin/" prefix and skip HEAD aliases.
+          branch=$(git branch -r --contains "$tag" \
+            | sed 's@^[ *]*@@; s@^remotes/origin/@@' \
+            | grep -vE '^HEAD$|->' \
+            | head -n1 || true)
+          if [[ -z "$branch" ]]; then
+            echo "::error::Could not find a branch containing tag $tag"
+            exit 1
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "Will commit to branch: $branch"
+
+      - name: Checkout target branch
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ steps.branch.outputs.branch }}"
+          git checkout "${{ steps.branch.outputs.branch }}"
+
+      - name: Download release DMG and compute SHA256
+        id: digest
+        run: |
+          set -euo pipefail
+          version="${{ steps.resolve.outputs.version }}"
+          asset="QuickLookProtein-${version}.dmg"
+          url="https://github.com/${{ github.repository }}/releases/download/${{ steps.resolve.outputs.tag }}/${asset}"
+          echo "Fetching $url"
+          curl -sLfo "/tmp/${asset}" "$url"
+          sha=$(sha256sum "/tmp/${asset}" | awk '{print $1}')
+          size=$(stat -c%s "/tmp/${asset}")
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "DMG size: $size bytes, sha256=$sha"
+
+      - name: Patch Casks/quicklookprotein.rb
+        run: |
+          set -euo pipefail
+          version="${{ steps.resolve.outputs.version }}"
+          sha="${{ steps.digest.outputs.sha256 }}"
+          file=Casks/quicklookprotein.rb
+
+          # Anchored sed: the cask DSL emits exactly one `version "..."`
+          # and one `sha256 "..."` at the top of the file. We match the
+          # full line including the quoted value so a typo elsewhere
+          # (say, in a comment) can't accidentally clobber the wrong line.
+          sed -i -E "s@^( *version )\"[^\"]+\"\$@\1\"${version}\"@" "$file"
+          sed -i -E "s@^( *sha256 )\"[^\"]+\"\$@\1\"${sha}\"@"     "$file"
+
+          echo "--- After patch ---"
+          grep -E '^( *)(version|sha256) ' "$file"
+
+      - name: Commit and push if changed
+        run: |
+          set -euo pipefail
+          version="${{ steps.resolve.outputs.version }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- Casks/quicklookprotein.rb; then
+            echo "Casks/quicklookprotein.rb is already up-to-date for ${version}. Nothing to commit."
+            exit 0
+          fi
+
+          git add Casks/quicklookprotein.rb
+          # [skip ci] keeps ci-validate from re-running on this auto-commit
+          # — it's a cask metadata bump, not an app change, and the cask
+          # workflow doesn't have anything else to test on it.
+          git commit -m "Cask: bump to ${version} + matching SHA256 [skip ci]"
+          git push origin HEAD:"${{ steps.branch.outputs.branch }}"
