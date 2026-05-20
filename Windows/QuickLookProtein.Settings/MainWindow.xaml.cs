@@ -55,6 +55,13 @@ public partial class MainWindow : Window
                     ReportStartupError("live-preview WebView2", t.Exception?.GetBaseException()));
             }
         }, System.Threading.Tasks.TaskScheduler.Default);
+
+        // Auto-check at launch (opt-in). Fire-and-forget on a
+        // worker so a slow network never blocks the UI showing.
+        if (UpdateChecker.AutoCheckEnabled)
+        {
+            _ = RunUpdateCheckAsync(showNoUpdateMessage: false);
+        }
     }
 
     private void ReportStartupError(string stage, Exception? ex)
@@ -141,6 +148,15 @@ public partial class MainWindow : Window
         // the registry between Settings-app sessions.
         LaunchAtStartupCheck.IsChecked = IsLaunchAtStartupEnabled();
 
+        // Updates card (1.7.77+). Show the current installed
+        // version unconditionally; auto-check at launch is opt-in
+        // (off by default for the first release - users have to
+        // tick the box to enable it).
+        var v = UpdateChecker.CurrentVersion;
+        UpdateStatusLabel.Text =
+            $"Installed version: {v.Major}.{v.Minor}.{v.Build}  (build {v})";
+        AutoCheckUpdatesCheck.IsChecked = UpdateChecker.AutoCheckEnabled;
+
         // Preview window size — populate slider + text box. The
         // text-box-changed handler updates the slider and vice versa
         // (both wired in WireChangeHandlers below).
@@ -214,6 +230,15 @@ public partial class MainWindow : Window
         InfoBondCountCheck.Click        += (_, _) => Save(() => SettingsStore.SetInfoShowBondCount(InfoBondCountCheck.IsChecked == true));
         InfoPDBTitleCheck.Click         += (_, _) => Save(() => SettingsStore.SetInfoShowPDBTitle(InfoPDBTitleCheck.IsChecked == true));
         InfoFormatCheck.Click           += (_, _) => Save(() => SettingsStore.SetInfoShowFormat(InfoFormatCheck.IsChecked == true));
+
+        AutoCheckUpdatesCheck.Click += (_, _) =>
+        {
+            if (_suppressWrites) return;
+            UpdateChecker.AutoCheckEnabled = AutoCheckUpdatesCheck.IsChecked == true;
+            StatusLabel.Text = AutoCheckUpdatesCheck.IsChecked == true
+                ? "Auto-check enabled. We'll check GitHub each time Settings opens."
+                : "Auto-check disabled. Use 'Check for updates' to check manually.";
+        };
 
         LaunchAtStartupCheck.Click += (_, _) =>
         {
@@ -778,6 +803,108 @@ public partial class MainWindow : Window
 
     private const int SHCNE_ASSOCCHANGED = 0x08000000;
     private const int SHCNF_IDLIST       = 0x0000;
+
+    // ---- Software Update (1.7.77+) -----------------------------------
+    //
+    // GitHub /releases/latest checker. Manual button always works;
+    // the AutoCheckUpdates checkbox gates a fire-and-forget run on
+    // every Settings-window open.
+
+    private UpdateInfo? _pendingUpdate;
+
+    private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUpdateCheckAsync(showNoUpdateMessage: true);
+    }
+
+    private async System.Threading.Tasks.Task RunUpdateCheckAsync(bool showNoUpdateMessage)
+    {
+        try
+        {
+            CheckForUpdatesButton.IsEnabled = false;
+            UpdateStatusLabel.Text = "Checking GitHub for updates...";
+            var info = await UpdateChecker.CheckAsync();
+            if (info == null)
+            {
+                UpdateStatusLabel.Text = "Couldn't reach GitHub. Check your network and try again.";
+                return;
+            }
+            var current = UpdateChecker.CurrentVersion;
+            if (UpdateChecker.IsNewer(info))
+            {
+                _pendingUpdate = info;
+                UpdateStatusLabel.Text =
+                    $"Update available: {info.TagName} (you have {current.Major}.{current.Minor}.{current.Build}).";
+                UpdateNotesLabel.Text = info.ReleaseNotes;
+                UpdateNotesLabel.Visibility = string.IsNullOrEmpty(info.ReleaseNotes)
+                    ? Visibility.Collapsed : Visibility.Visible;
+                InstallUpdateButton.Visibility = string.IsNullOrEmpty(info.SetupExeUrl)
+                    ? Visibility.Collapsed : Visibility.Visible;
+                OpenReleasePageButton.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                _pendingUpdate = null;
+                UpdateNotesLabel.Visibility = Visibility.Collapsed;
+                InstallUpdateButton.Visibility = Visibility.Collapsed;
+                OpenReleasePageButton.Visibility = Visibility.Collapsed;
+                if (showNoUpdateMessage)
+                {
+                    UpdateStatusLabel.Text =
+                        $"You're up to date ({current.Major}.{current.Minor}.{current.Build}).";
+                }
+                else
+                {
+                    // Restore the resting status line for the auto-check path.
+                    UpdateStatusLabel.Text =
+                        $"Installed version: {current.Major}.{current.Minor}.{current.Build}  (build {current})";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusLabel.Text = "Update check failed: " + ex.Message;
+        }
+        finally
+        {
+            CheckForUpdatesButton.IsEnabled = true;
+        }
+    }
+
+    private async void InstallUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pendingUpdate == null)
+        {
+            UpdateStatusLabel.Text = "No update is currently pending.";
+            return;
+        }
+        try
+        {
+            InstallUpdateButton.IsEnabled = false;
+            CheckForUpdatesButton.IsEnabled = false;
+            UpdateStatusLabel.Text = $"Downloading {_pendingUpdate.TagName} setup...";
+            var progress = new Progress<double>(p =>
+                UpdateStatusLabel.Text = $"Downloading {_pendingUpdate.TagName} setup... {p * 100:F0}%");
+            await UpdateChecker.DownloadAndInstallAsync(_pendingUpdate, progress);
+            // DownloadAndInstallAsync launches Setup.exe and calls
+            // Application.Shutdown() - control normally doesn't
+            // return here. If it does, surface the state so the
+            // user knows what happened.
+            UpdateStatusLabel.Text = "Setup launched. Settings will close shortly so the installer can replace it.";
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusLabel.Text = "Install failed: " + ex.Message;
+            InstallUpdateButton.IsEnabled = true;
+            CheckForUpdatesButton.IsEnabled = true;
+        }
+    }
+
+    private void OpenReleasePage_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pendingUpdate == null) return;
+        OpenUrl(_pendingUpdate.ReleaseUrl);
+    }
 
     private void RefreshThumbnails_Click(object sender, RoutedEventArgs e)
     {

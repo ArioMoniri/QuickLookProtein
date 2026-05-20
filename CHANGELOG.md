@@ -4,6 +4,27 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.77] — 2026-05-20
+
+### 🪟 Windows — in-process auto-updater (finally)
+
+The Mac has had Sparkle since the rebrand; Windows has been re-downloading `Setup.exe` manually for every release. Fixed.
+
+- **New `UpdateChecker.cs`** in the Settings WPF app — managed-only, ~250 lines, no native dependencies (deliberately not pulling in WinSparkle's 1.6 MB native DLL when our flow is just "GET releases/latest → compare versions → run Setup.exe"). Hits `https://api.github.com/repos/ArioMoniri/QuickLookProtein/releases/latest`, parses `tag_name` + `html_url` + the assets array, finds `QuickLookProtein-Setup.exe`, and compares the version against the running Settings.exe's `FileVersion`.
+- **New "Software Update" card** in Settings (right above Startup). Shows the installed version on load. Three buttons: **Check for updates** (manual, always works), **Install update** (downloads + runs `Setup.exe` + quits Settings so Setup.exe can replace files without an in-use lock), **Open release page** (browser jump to the GitHub release).
+- **Opt-in auto-check at launch** via the "Check for updates automatically when this window opens" checkbox. Off by default for the first release of this feature so existing users aren't surprised by a network call they didn't ask for; on means a fire-and-forget GitHub round-trip every time Settings opens (the UI is never blocked).
+- **Settings.exe FileVersion now stamped** by the release workflow (`dotnet build /p:Version=$ver /p:FileVersion=$ver /p:InformationalVersion=$ver`) — same pattern the Plugin DLL has used since 1.7.70. Local dev builds default to `0.0.0` so a stray dev EXE is identifiable.
+- **Force TLS 1.2** on the HttpClient before hitting GitHub — .NET Framework 4.7.2 sometimes defaults to TLS 1.0 which GitHub's API has rejected since 2018.
+- **No upgrade required** to switch over: the next release a 1.7.77+ user installs surfaces the Update card automatically; the "Check for updates" button works the moment the Settings window opens.
+
+Update flow on the user's machine:
+1. Settings opens → checks GitHub (if auto-check on) or user clicks **Check for updates**.
+2. If a newer release is published, the status line reads `Update available: vX.Y.Z (you have …)`, the release notes excerpt populates below it (first 500 chars of the GitHub release body, with markdown stripped to plain-ish text), and **Install update** appears.
+3. User clicks **Install update** → progress bar in the status line as bytes stream to `%TEMP%\QuickLookProtein-Setup-vX.Y.Z.exe` → Setup.exe launches → Settings.exe shuts down so Setup.exe can replace it.
+4. Setup.exe handles the plugin DLL install at the QL-Win 4.x path (since 1.7.73), the auto-thumbnail-refresh broadcast (since 1.7.76), and re-launches the Settings app at the end (since 1.7.76).
+
+README's Settings-app section gains a "Software Update on Windows" subsection alongside the Mac Sparkle one so users discover the feature.
+
 ## [1.7.76] — 2026-05-20
 
 ### 🪟 Windows — first-run experience and thumbnail cache refresh

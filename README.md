@@ -237,6 +237,15 @@ Both Settings apps expose a **Preview size** control that drives the initial geo
 
 `QuickLookProtein-Setup.exe` enables launch-at-startup by default (it now passes `/TASKS=startup` to QL-Win's installer). Untick the Settings checkbox if you'd rather start QuickLook manually.
 
+#### Auto-update (1.7.77+)
+
+| Platform | How it works | Where to check it |
+|---|---|---|
+| 🍎 macOS | **Sparkle** — auto-checks the appcast every 24 h, shows an Install/Skip/Later dialog with the EdDSA-verified zip + the actual changelog rendered inline. | Settings → About → **Check for Updates…** |
+| 🪟 Windows | **In-process GitHub releases checker.** Settings.exe queries `/releases/latest`, compares the tag's version to the running `FileVersion`, and (when newer) offers a one-click **Install update** that downloads `QuickLookProtein-Setup.exe` from the release, runs it, and quits Settings so Setup.exe can replace its own EXE. | Settings → **Software Update** card → **Check for updates** / **Install update**. Tick "Check for updates automatically when this window opens" to make the check happen on every Settings launch. |
+
+The Windows updater is **opt-in for auto-check** — the box is unticked on first run so existing users aren't surprised by a network call they didn't authorize. **Manual "Check for updates" works regardless.**
+
 #### "My thumbnails are white after install" (Windows, 1.7.76+)
 
 Explorer caches the `<extension> → IThumbnailProvider CLSID` mapping at startup. After a fresh install of a thumbnail handler it doesn't re-query our entry until either (a) `SHChangeNotify(SHCNE_ASSOCCHANGED)` is broadcast or (b) `explorer.exe` restarts. `install.ps1` now broadcasts that signal at the end of the thumbnail-handler registration step, but for users whose Explorer didn't pick it up (RDP sessions, fast-user-switching, etc.) the Settings app exposes a **Refresh thumbnails** button under Diagnostics. **Shift-click** that button to do a nuclear `explorer.exe` kill (the shell auto-respawns) for cases where SHChangeNotify alone isn't enough.

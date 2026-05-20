@@ -661,6 +661,55 @@
                     </Border>
 
                     <!--
+                      Updates card (1.7.77+). In-process auto-updater
+                      using GitHub's /releases/latest endpoint. macOS
+                      gets this via Sparkle; Windows previously
+                      required the user to manually re-download the
+                      Setup.exe. The "Check for updates" button works
+                      regardless of the auto-check toggle. When an
+                      update is available, "Install update" downloads
+                      QuickLookProtein-Setup.exe from the latest
+                      release and runs it; Setup.exe replaces the
+                      installed files and re-launches QuickLook.
+                    -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Software Update"
+                                       Style="{StaticResource SectionTitle}"/>
+                            <TextBlock x:Name="UpdateStatusLabel"
+                                       Style="{StaticResource Caption}"
+                                       Text="Checking installed version..."/>
+                            <TextBlock x:Name="UpdateNotesLabel"
+                                       Style="{StaticResource Caption}"
+                                       Foreground="#9A9DA3"
+                                       TextWrapping="Wrap"
+                                       MaxHeight="160"
+                                       Visibility="Collapsed"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                <Button x:Name="CheckForUpdatesButton"
+                                        Content="Check for updates"
+                                        Padding="10,4" Margin="0,0,6,0"
+                                        Cursor="Hand"
+                                        Click="CheckForUpdates_Click"/>
+                                <Button x:Name="InstallUpdateButton"
+                                        Content="Install update"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Padding="14,7" Margin="0,0,6,0"
+                                        Visibility="Collapsed"
+                                        Click="InstallUpdate_Click"/>
+                                <Button x:Name="OpenReleasePageButton"
+                                        Content="Open release page"
+                                        Padding="10,4"
+                                        Visibility="Collapsed"
+                                        Click="OpenReleasePage_Click"/>
+                            </StackPanel>
+                            <CheckBox x:Name="AutoCheckUpdatesCheck"
+                                      Content="Check for updates automatically when this window opens"
+                                      Margin="0,4"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!--
                       Startup card (1.7.76+).  Mirrors QL-Win's own
                       tray-menu "Run at startup" toggle, but writes
                       directly to HKCU\Software\Microsoft\Windows\

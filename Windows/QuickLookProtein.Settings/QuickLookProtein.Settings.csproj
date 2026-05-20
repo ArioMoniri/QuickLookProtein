@@ -33,6 +33,22 @@
       blank Windows app icon.
     -->
     <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
+
+    <!--
+      Version stamping (1.7.77+). The in-process update checker
+      compares Assembly.GetExecutingAssembly().GetName().Version
+      against the GitHub /releases/latest tag, so the exe must
+      carry the real marketing version not the SDK's default
+      1.0.0.0. Release workflow overrides via
+      `dotnet build /p:Version=X /p:FileVersion=X /p:InformationalVersion=X`
+      (same pattern the Plugin csproj uses since 1.7.70).
+      AssemblyVersion stays pinned at 1.0 - WPF binding redirects
+      would break if it floated with marketing version.
+    -->
+    <Version>0.0.0</Version>
+    <FileVersion>0.0.0</FileVersion>
+    <InformationalVersion>0.0.0-dev</InformationalVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -912,8 +912,18 @@ jobs:
         # the .exe + dll alongside the plugin and writes a Start
         # Menu shortcut.
         run: |
+          # Stamp the marketing version into Settings.exe's
+          # FileVersion + InformationalVersion. The in-process
+          # update checker (UpdateChecker.cs, 1.7.77+) reads
+          # Assembly.GetExecutingAssembly().GetName().Version and
+          # compares against the GitHub releases tag, so the binary
+          # needs the real release number.
+          $ver = "${{ steps.version.outputs.version }}"
           dotnet build Windows/QuickLookProtein.Settings/QuickLookProtein.Settings.csproj `
               -c Release `
+              /p:Version=$ver `
+              /p:FileVersion=$ver `
+              /p:InformationalVersion=$ver `
               -o build/settings
 
       - name: Package .qlplugin
