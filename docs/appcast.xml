@@ -6,6 +6,35 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.88</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.88</link>
+      <pubDate>Wed, 20 May 2026 09:13:49 +0000</pubDate>
+      <sparkle:version>1.7.88</sparkle:version>
+      <sparkle:shortVersionString>1.7.88</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows — race fix on Quick Look fast-advance&lt;/h3&gt;
+&lt;p&gt;Plugin log captured:&lt;/p&gt;
+&lt;p&gt;```&lt;/p&gt;
+&lt;p&gt;System.ObjectDisposedException: Cannot access a disposed object.&lt;/p&gt;
+&lt;p&gt;Object name: &amp;#x27;WebView&amp;#x27;.&lt;/p&gt;
+&lt;p&gt;  at Microsoft.Web.WebView2.Wpf.WebView2Base.VerifyNotDisposed()&lt;/p&gt;
+&lt;p&gt;  at QuickLookProtein.Plugin.MoleculePanel.EnsureWebViewReadyAsync&lt;/p&gt;
+&lt;p&gt;  at QuickLookProtein.Plugin.MoleculePanel.LoadFile&lt;/p&gt;
+&lt;p&gt;```&lt;/p&gt;
+&lt;p&gt;QL-Win disposes the &lt;code&gt;IViewer&lt;/code&gt; (and therefore &lt;code&gt;MoleculePanel&lt;/code&gt;) the instant the user advances to the next file or closes the popover. If &lt;code&gt;LoadFile&lt;/code&gt; was still awaiting &lt;code&gt;Task.Run(File.ReadAllText)&lt;/code&gt; or &lt;code&gt;CoreWebView2Environment.CreateAsync&lt;/code&gt;, the continuation would resume after Dispose ran and touch &lt;code&gt;WebView.CoreWebView2&lt;/code&gt; — boom, &lt;code&gt;ObjectDisposedException&lt;/code&gt; into the dispatcher&amp;#x27;s unhandled-exception handler.&lt;/p&gt;
+&lt;p&gt;v1.7.88 fixes this:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;New &lt;code&gt;_disposed&lt;/code&gt; flag on &lt;code&gt;MoleculePanel&lt;/code&gt;, set first in &lt;code&gt;Dispose()&lt;/code&gt; before &lt;code&gt;WebView?.Dispose()&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;EnsureWebViewReadyAsync&lt;/code&gt; re-checks &lt;code&gt;_disposed&lt;/code&gt; after every &lt;code&gt;await&lt;/code&gt; and throws &lt;code&gt;ObjectDisposedException&lt;/code&gt; instead of letting the next line dereference a dead WebView.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;LoadFile&lt;/code&gt; catches &lt;code&gt;ObjectDisposedException&lt;/code&gt; specifically and logs it as INFO (&amp;quot;cancelled (WebView disposed)&amp;quot;) rather than ERR — that&amp;#x27;s the correct outcome for fast-advance, not a real failure.&lt;/li&gt;
+&lt;li&gt;The error-render fallback also short-circuits when &lt;code&gt;_disposed&lt;/code&gt; so a slow render failure doesn&amp;#x27;t itself trigger a second ObjectDisposedException trying to display the first one.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;🪟 Windows — README: &amp;quot;thumbnails in Details view&amp;quot; is expected&lt;/h3&gt;
+&lt;p&gt;Added a section explaining Windows shell behaviour: &lt;code&gt;IThumbnailProvider&lt;/code&gt; is only invoked for Icon / Tile / Gallery / Content views; Details / List / Small-icon use &lt;code&gt;IExtractIcon&lt;/code&gt; (which we don&amp;#x27;t implement). Users seeing white icons in Details view should switch view modes — it&amp;#x27;s not a bug, just how Explorer&amp;#x27;s column renderer works.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.88"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.88/QuickLookProtein-1.7.88.zip" sparkle:edSignature="2it57hnsb5qDm4gv0KZwAagBUq63QW7GQ0+BNg7xGnS5/ZW/MsAwCn0opAGE1PhOp9oBIoLvaC1JX+X48VYtDw==" length="4549970" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.86</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.86</link>
       <pubDate>Wed, 20 May 2026 08:56:14 +0000</pubDate>
