@@ -222,6 +222,34 @@ function Install-Plugin {
     Write-Host "  Primary path (QL-Win 4.x): $pluginDirNew"
     Write-Host "  Legacy path  (QL-Win 3.x): $pluginDirOld"
 
+    # Stop QuickLook BEFORE the wipe.  Our plugin's static cctor
+    # (1.7.71+) calls LoadLibraryW("WebView2Loader.dll") to pin the
+    # bitness-matched loader into QL-Win's process, which leaves an
+    # open handle on the DLL.  Remove-Item -Force can't delete a
+    # locked file - 1.7.66-1.7.78 installs hit
+    #   Access to the path 'WebView2Loader.dll' is denied
+    # on EVERY upgrade-over-running-QL-Win install (the very common
+    # case), and because $ErrorActionPreference="Stop" the script
+    # exits immediately and downstream steps (Settings app copy,
+    # Add/Remove Programs entry, Start Menu shortcut, app launch)
+    # all get skipped - users see "nothing happened" + no entry in
+    # Settings > Apps.  Stop QL-Win up-front so the handles release.
+    # Restart-QuickLookHost at the end of the script brings it back.
+    $qlProcs = Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue
+    if ($qlProcs) {
+        Write-Host "  Stopping running QuickLook so locked DLLs can be replaced..."
+        if (-not (Try-StopQuickLook -Processes $qlProcs)) {
+            Write-Host "  WARNING: couldn't stop QuickLook cleanly. Wipe may fail."
+            Write-Host "  If install fails, exit QuickLook manually from the tray icon and re-run Setup.exe."
+        } else {
+            # Give the OS a moment to actually release the DLL handles
+            # after the process exit. 750 ms is generous but cheap;
+            # without this delay the very next Remove-Item can still
+            # race the kernel and hit "file in use".
+            Start-Sleep -Milliseconds 750
+        }
+    }
+
     # Wipe any prior install at BOTH locations so a clean upgrade
     # doesn't leave stale DLLs from a different version anywhere
     # QL-Win might scan.

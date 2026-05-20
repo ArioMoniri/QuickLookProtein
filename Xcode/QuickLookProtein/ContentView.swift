@@ -578,6 +578,36 @@ struct ContentView: View {
                     ToggleRow(label: "Run on first preview",
                               isOn: $userSettings.runOnFirstPreview,
                               hint: "Render immediately on the first spacebar-press. Off shows a tap-to-render placeholder on slow disks.")
+                    RowDivider()
+                    // Open-at-Login (1.7.76+, moved from Appearance
+                    // -> General in 1.7.79 per UI feedback). Belongs
+                    // here next to the "Enable QuickLookProtein2"
+                    // master toggle since both control the app's
+                    // baseline behaviour rather than viewer
+                    // appearance.  macOS 13+ flips SMAppService;
+                    // 11/12 deep-links into System Settings.
+                    HStack {
+                        Text("Open at login")
+                            .font(.system(size: 13))
+                        Spacer()
+                        if LoginItemController.shared.isAutomaticToggleSupported {
+                            Toggle("", isOn: Binding(
+                                get: { LoginItemController.shared.isEnabled },
+                                set: { LoginItemController.shared.setEnabled($0) }
+                            ))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .help("Launch QuickLookProtein2 automatically when you sign in.")
+                        } else {
+                            Button("Open Login Items…") {
+                                LoginItemController.shared.openSystemSettingsLoginItems()
+                            }
+                            .controlSize(.small)
+                            .help("macOS 11 and 12 don't expose a programmatic toggle. Open the Login Items pane in System Settings and add QuickLookProtein2 there.")
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                 }
             }
 
@@ -793,29 +823,6 @@ struct ContentView: View {
                         .labelsHidden()
                         .frame(width: 160)
                     }
-                    RowDivider()
-                    // Open-at-Login toggle (1.7.76+). On macOS 13+
-                    // this flips SMAppService.mainApp.register() /
-                    // .unregister(); on macOS 11/12 the toggle row
-                    // shows a deep-link button instead because the
-                    // sandboxed app can't query LSSharedFileList.
-                    FormRow(label: "Open at login") {
-                        if LoginItemController.shared.isAutomaticToggleSupported {
-                            Toggle("", isOn: Binding(
-                                get: { LoginItemController.shared.isEnabled },
-                                set: { LoginItemController.shared.setEnabled($0) }
-                            ))
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                            .help("Launch QuickLookProtein2 automatically when you sign in.")
-                        } else {
-                            Button("Open Login Items…") {
-                                LoginItemController.shared.openSystemSettingsLoginItems()
-                            }
-                            .help("macOS 11 and 12 don't expose a programmatic toggle. Open the Login Items pane in System Settings and add QuickLookProtein2 there.")
-                        }
-                    }
-
                     RowDivider()
                     // QL preview popover starting size (1.7.75+).
                     // macOS Quick Look honours this on the FIRST
@@ -1672,6 +1679,39 @@ struct ContentView: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
+        // Whole-row tooltip pairs the short extension with the
+        // full descriptive name so users hovering a truncated
+        // entry (e.g. "Crystallographic..." in a narrow grid
+        // column) get the unabridged information.  Pulled from a
+        // lookup table rather than the visible `name` string so
+        // the tooltip is always the full spelling even when the
+        // visible label was shortened to fit the column.
+        .help(Self.formatTooltip(ext: ext, shortName: name))
+    }
+
+    /// Map the short extension tag to a tooltip that includes both
+    /// the file extension list and a fully-spelled description.
+    /// The visible row truncates aggressively to fit the four-column
+    /// grid; this is what users see when they hover.
+    private static func formatTooltip(ext: String, shortName: String) -> String {
+        let fullName: String
+        let extensions: String
+        switch ext {
+        case "PDB":    fullName = "Protein Data Bank";                       extensions = ".pdb, .ent"
+        case "CIF":    fullName = "Crystallographic Information File";       extensions = ".cif, .mmcif"
+        case "SDF":    fullName = "MDL Structure-Data File";                 extensions = ".sdf"
+        case "MOL":    fullName = "MDL Molfile";                             extensions = ".mol"
+        case "MOL2":   fullName = "Tripos Mol2";                             extensions = ".mol2"
+        case "XYZ":    fullName = "XYZ Coordinates";                         extensions = ".xyz"
+        case "GRO":    fullName = "GROMACS structure";                       extensions = ".gro"
+        case "CUBE":   fullName = "Gaussian Cube";                           extensions = ".cube, .cub"
+        case "PQR":    fullName = "PDB with Charge and Radius (APBS/PDB2PQR)"; extensions = ".pqr"
+        case "VASP":   fullName = "VASP POSCAR";                             extensions = ".vasp, .poscar"
+        case "CDJSON": fullName = "ChemDraw JSON";                           extensions = ".cdjson"
+        case "MMTF":   fullName = "Macromolecular Transmission Format";       extensions = ".mmtf"
+        default:       fullName = shortName;                                 extensions = "." + ext.lowercased()
+        }
+        return "\(fullName) — \(extensions)"
     }
 
     /// Shared option list for every per-format atom-style Picker.

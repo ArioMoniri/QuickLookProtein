@@ -4,6 +4,30 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.79] — 2026-05-20
+
+### 🪟 Windows — fix silent-install failure on upgrade-over-running-QL-Win
+
+User reported `Setup.exe` ran but **nothing happened** afterward — Settings app didn't appear in Start Menu or Add/Remove Programs, and `%TEMP%\QuickLookProtein-install.log` revealed:
+
+```
+==> Installing plugin
+Remove-Item : Cannot remove item …\WebView2Loader.dll: Access to the path 'WebView2Loader.dll' is denied.
+At …\install.ps1:229 char:29
++         if (Test-Path $d) { Remove-Item -Recurse -Force $d }
+```
+
+**Root cause**: `Plugin.cs`'s static cctor (1.7.71+) calls `LoadLibraryW("WebView2Loader.dll")` to pin the bitness-matched native loader into QL-Win's process. That leaves an open handle on the DLL. When the user re-ran `Setup.exe` to upgrade (the common case once auto-update is wired up), `install.ps1`'s wipe-then-reinstall step couldn't delete the locked DLL → `Remove-Item` threw → `$ErrorActionPreference = "Stop"` exited the script immediately → **every subsequent step was skipped**: Settings.exe never copied, Add/Remove Programs entry never written, Start Menu shortcut never created, app-launch step never fired. Hence "nothing happens".
+
+**Fix**: `install.ps1`'s `Install-Plugin` now stops the running QuickLook process *before* the wipe, then `Restart-QuickLookHost` brings it back at the end of the script (existing behaviour). Uses the same `Try-StopQuickLook` graceful-then-firm sequence the script already had for `Restart-QuickLookHost`, plus a 750 ms breather so the kernel finishes releasing DLL handles before `Remove-Item` retries.
+
+Every install path is now upgrade-safe regardless of QL-Win running state. Users who hit the silent-install bug on 1.7.66 → 1.7.78 just need to grab v1.7.79's Setup.exe; no manual cleanup required.
+
+### 🍎 macOS — UI polish
+
+- **"Open at login" toggle moved from Appearance to General** → Quick Look card, sitting next to the master "Enable QuickLookProtein2" toggle. Belongs in General since both control the app's baseline behaviour, not viewer appearance. (User feedback: "this button in mac should be under general tab".)
+- **Hover tooltips on the About → Supported Formats grid** so users hovering a truncated entry (e.g. "Crystallographic..." in a narrow four-column layout) see the unabridged name + the file extensions. Tooltip wires through a per-extension lookup so the hover text is always the canonical spelling regardless of the visible truncation.
+
 ## [1.7.78] — 2026-05-20
 
 ### 🔧 Hotfix for v1.7.77's partial-release
