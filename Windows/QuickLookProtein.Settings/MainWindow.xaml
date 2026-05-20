@@ -3,105 +3,116 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="QuickLookProtein2 Settings"
-        Height="780" Width="900"
-        MinHeight="640" MinWidth="760"
+        Height="780" Width="980"
+        MinHeight="640" MinWidth="820"
         WindowStartupLocation="CenterScreen"
-        Background="#16181C"
+        Background="{DynamicResource AppBg}"
         FontFamily="Segoe UI Variable, Segoe UI"
-        Foreground="#E8EAED"
+        Foreground="{DynamicResource TextPrimary}"
         Icon="pack://application:,,,/Resources/AppIcon.ico">
     <!--
-      Settings UI for the Windows side. Mirrors the macOS app's tile
-      layout: left panel = per-format atom-display style + global
-      rendering options + appearance, right panel = an About / quick
-      tips card. No tabs - everything fits in a single scrollable
-      surface so users can see at a glance what's configurable.
-      Looks good on both light + dark themes; we paint our own
-      surfaces so the contrast doesn't change with system theme.
+      Windows Settings UI for QuickLookProtein2 — v1.7.81 redesign.
+      Mac-System-Settings-style sidebar nav + system-following light/dark theme.
+      On Win11 the window paints over a Mica backdrop (set via DwmSetWindowAttribute
+      from code-behind); on older Windows we fall back to opaque AppBg.
+
+      All theme-sensitive colours are DynamicResource so the code-behind can
+      flip the active palette when Windows switches between light & dark mode
+      (we listen to SystemEvents.UserPreferenceChanged).
+
+      Adding a new card: drop it inside one of the existing
+      <StackPanel x:Name="*Tab"> containers; the nav-list on the left
+      toggles each tab's Visibility.
     -->
     <Window.Resources>
         <!--
-          Theme colours.  Keep them as resources so a future light-mode
-          theme can swap by overriding just these.  Naming follows
-          Fluent / WinUI conventions where possible (Surface, Subtle,
-          Accent, …) so the relationship between resources is
-          self-documenting.
+          Theme brushes — defaults are the LIGHT palette so the XAML
+          designer + first-paint look right. Code-behind swaps brush
+          .Color in ApplyTheme() when the system is in dark mode or
+          flips between modes.
+
+          Colour values follow Windows 11's Fluent palette
+          (https://learn.microsoft.com/en-us/windows/apps/design/style/color)
+          so the window blends with native chrome.
         -->
-        <Color x:Key="SurfaceColor">#1F2228</Color>
-        <Color x:Key="SurfaceHoverColor">#262A31</Color>
-        <Color x:Key="SurfaceStrokeColor">#2A2E36</Color>
-        <Color x:Key="AccentColor">#3D6BE0</Color>
-        <Color x:Key="AccentHoverColor">#557DEA</Color>
-        <Color x:Key="AccentPressedColor">#2F58C9</Color>
-        <SolidColorBrush x:Key="SurfaceBrush"        Color="{StaticResource SurfaceColor}"/>
-        <SolidColorBrush x:Key="SurfaceHoverBrush"   Color="{StaticResource SurfaceHoverColor}"/>
-        <SolidColorBrush x:Key="SurfaceStrokeBrush"  Color="{StaticResource SurfaceStrokeColor}"/>
-        <SolidColorBrush x:Key="AccentBrush"         Color="{StaticResource AccentColor}"/>
-        <SolidColorBrush x:Key="AccentHoverBrush"    Color="{StaticResource AccentHoverColor}"/>
-        <SolidColorBrush x:Key="AccentPressedBrush"  Color="{StaticResource AccentPressedColor}"/>
+        <SolidColorBrush x:Key="AppBg"            Color="Transparent"/>
+        <SolidColorBrush x:Key="SidebarBg"        Color="#F3F3F3"/>
+        <SolidColorBrush x:Key="ContentBg"        Color="#FAFAFA"/>
+        <SolidColorBrush x:Key="CardBg"           Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="CardStroke"       Color="#E5E5E5"/>
+        <SolidColorBrush x:Key="HoverBg"          Color="#EFEFEF"/>
+        <SolidColorBrush x:Key="PressedBg"        Color="#E3E3E3"/>
+        <SolidColorBrush x:Key="NavSelectedBg"    Color="#E5F1FB"/>
+        <SolidColorBrush x:Key="NavSelectedStroke" Color="#0067C0"/>
+        <SolidColorBrush x:Key="TextPrimary"      Color="#1F1F1F"/>
+        <SolidColorBrush x:Key="TextSecondary"    Color="#5C5C5C"/>
+        <SolidColorBrush x:Key="TextMuted"        Color="#8B8B8B"/>
+        <SolidColorBrush x:Key="Accent"           Color="#0067C0"/>
+        <SolidColorBrush x:Key="AccentHover"      Color="#1A77CC"/>
+        <SolidColorBrush x:Key="AccentPressed"    Color="#005AA0"/>
+        <SolidColorBrush x:Key="WarnBg"           Color="#FFF4CE"/>
+        <SolidColorBrush x:Key="WarnText"         Color="#5B4500"/>
+        <SolidColorBrush x:Key="ErrBg"            Color="#FDE7E9"/>
+        <SolidColorBrush x:Key="ErrText"          Color="#8E1726"/>
 
-        <!-- Section header style -->
+        <!-- Typography styles -->
         <Style x:Key="SectionTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#E8EAED"/>
-            <Setter Property="Margin" Value="0,8,0,8"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
-
-        <!-- Subtle paragraph text -->
+        <Style x:Key="SectionSubtitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
         <Style x:Key="Caption" TargetType="TextBlock">
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Foreground" Value="#9A9DA3"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
         </Style>
-
-        <!-- Row label -->
         <Style x:Key="RowLabel" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="#CFD2D6"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Width" Value="100"/>
         </Style>
 
         <!--
-          Card surface (the visual chunks).  Subtle drop shadow gives
-          the dark surface a sense of layering against the slightly
-          darker app background, which previously read as a flat
-          grey-on-grey wall.  CornerRadius bumped 10 -> 12 for
-          softer corners closer to Windows 11 Fluent.
+          Card surface — Win11 Fluent: white in light mode, dark grey in
+          dark mode, 8px corner radius, 1px stroke. No drop shadow: with
+          Mica behind the window, shadows clash with the system blur.
         -->
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource SurfaceStrokeBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource CardBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="Padding" Value="18"/>
-            <Setter Property="Margin" Value="0,0,0,14"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="14" ShadowDepth="2"
-                                      Opacity="0.30" Color="Black"/>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Margin" Value="0,0,0,12"/>
         </Style>
 
-        <!-- Compact, square-ish ComboBox so per-format rows line up -->
         <Style x:Key="StyleCombo" TargetType="ComboBox">
-            <Setter Property="MinWidth" Value="140"/>
+            <Setter Property="MinWidth" Value="160"/>
             <Setter Property="Margin" Value="0,3,0,3"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="8,4"/>
         </Style>
 
         <!--
-          Primary CTA. Renders as a filled accent pill that brightens
-          on hover and darkens on press, so the click target feels
-          alive instead of static. The control template wraps the
-          ContentPresenter in a Border whose Background is bound to a
-          property we flip in the triggers below.
+          Primary CTA pill — accent fill, white text, 4px Win11 corner radius.
         -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource Accent}"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="14,7"/>
@@ -111,7 +122,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bg"
-                                CornerRadius="6"
+                                CornerRadius="4"
                                 Background="{TemplateBinding Background}"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center"
@@ -120,11 +131,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="bg" Property="Background"
-                                        Value="{StaticResource AccentHoverBrush}"/>
+                                        Value="{DynamicResource AccentHover}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="bg" Property="Background"
-                                        Value="{StaticResource AccentPressedBrush}"/>
+                                        Value="{DynamicResource AccentPressed}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="bg" Property="Opacity" Value="0.45"/>
@@ -136,15 +147,14 @@
         </Style>
 
         <!--
-          Secondary button — quieter, used for "Reload" / "Open
-          GitHub" / "Open plugin folder" etc. Picks up the surface
-          stroke instead of an accent fill so the page reads with
-          one clear primary CTA per card.
+          Secondary button — light-gray surface, dark text, 4px radius.
+          This is the implicit Button style so plain <Button>s look
+          modern without per-instance Style="…".
         -->
         <Style x:Key="SecondaryButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#E8EAED"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="{DynamicResource CardBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="12,6"/>
             <Setter Property="FontWeight" Value="Medium"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -152,9 +162,9 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bg"
-                                CornerRadius="6"
+                                CornerRadius="4"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="{StaticResource SurfaceStrokeBrush}"
+                                BorderBrush="{DynamicResource CardStroke}"
                                 BorderThickness="1"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center"
@@ -163,11 +173,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="bg" Property="Background"
-                                        Value="{StaticResource SurfaceHoverBrush}"/>
+                                        Value="{DynamicResource HoverBg}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="bg" Property="Background"
-                                        Value="{StaticResource SurfaceStrokeBrush}"/>
+                                        Value="{DynamicResource PressedBg}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="bg" Property="Opacity" Value="0.45"/>
@@ -177,618 +187,759 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}"/>
 
         <!--
-          Style applied to <Button> when no explicit Style is set, so
-          every plain <Button> in the page picks up the SecondaryButton
-          treatment automatically. Replaces the chunky WPF default chrome
-          that was making the UI feel "shitty and not dynamic".
+          Win11-style CheckBox — small rounded-square indicator, accent fill
+          when checked. Replaces WPF's chunky default that doesn't match the
+          rest of Fluent design.
         -->
-        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}"/>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="box"
+                                    Width="18" Height="18"
+                                    CornerRadius="3"
+                                    Background="{DynamicResource CardBg}"
+                                    BorderBrush="{DynamicResource TextMuted}"
+                                    BorderThickness="1"
+                                    VerticalAlignment="Center">
+                                <Path x:Name="tick"
+                                      Data="M 4 9 L 8 13 L 14 6"
+                                      Stroke="White"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Margin="10,0,0,0"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="box" Property="Background"
+                                        Value="{DynamicResource Accent}"/>
+                                <Setter TargetName="box" Property="BorderBrush"
+                                        Value="{DynamicResource Accent}"/>
+                                <Setter TargetName="tick" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="box" Property="BorderBrush"
+                                        Value="{DynamicResource Accent}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--
+          Slimmer Slider — smaller thumb, accent fill, suppresses mouse-wheel
+          (which previously made the slider so jumpy users couldn't pick a
+          value reliably). SmallChange/LargeChange are tuned wider in
+          MainWindow_Loaded based on per-slider range.
+        -->
+        <Style TargetType="Slider">
+            <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+            <Setter Property="Background" Value="{DynamicResource CardStroke}"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="IsMoveToPointEnabled" Value="False"/>
+        </Style>
+
+        <!--
+          TextBox — Win11 outline style with rounded corners.
+        -->
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource CardBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!--
+          ComboBox — adopts Card surface so dropdowns blend with cards.
+        -->
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{DynamicResource CardBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,4"/>
+        </Style>
+
+        <!--
+          Sidebar nav item — Mac-System-Settings vibe. Selected item gets a
+          subtle accent-tinted background and a vertical accent stripe on
+          the left. Hover gets a faint surface tint.
+        -->
+        <Style x:Key="NavItem" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="6,1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="bg"
+                                CornerRadius="5"
+                                Background="Transparent"
+                                Padding="{TemplateBinding Padding}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="3"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="stripe"
+                                        Grid.Column="0"
+                                        Background="Transparent"
+                                        CornerRadius="2"
+                                        Margin="0,4"
+                                        Width="3"
+                                        HorizontalAlignment="Left"/>
+                                <ContentPresenter Grid.Column="1"
+                                                  Margin="8,0,0,0"
+                                                  VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background"
+                                        Value="{DynamicResource HoverBg}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bg" Property="Background"
+                                        Value="{DynamicResource NavSelectedBg}"/>
+                                <Setter TargetName="stripe" Property="Background"
+                                        Value="{DynamicResource NavSelectedStroke}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
+    <!--
+      Root: 2-column Grid. Left = 220px sidebar, right = content + footer.
+      Window background is set to AppBg (transparent on Win11 for Mica;
+      ContentBg fallback on Win10).
+    -->
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!--
-          Header strip. A horizontal band with an accent-tinted gradient
-          and the embedded app icon to the left of the title - gives the
-          app a recognisable "wrapper" so users coming from the Start
-          Menu shortcut land on something visually anchored instead of a
-          flat grey wall of cards. The icon image is pinned to 36x36 so
-          it stays crisp at all DPIs (the .ico file holds 16/32/48/64/
-          128/256 entries; WPF picks the nearest).
-        -->
-        <Border Grid.Row="0" Padding="20,14"
-                BorderBrush="#23262D" BorderThickness="0,0,0,1">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Offset="0"   Color="#13151A"/>
-                    <GradientStop Offset="0.5" Color="#16181E"/>
-                    <GradientStop Offset="1"   Color="#1A1D26"/>
-                </LinearGradientBrush>
-            </Border.Background>
-            <StackPanel Orientation="Horizontal">
-                <Image Source="pack://application:,,,/Resources/AppIcon.ico"
-                       Width="36" Height="36"
-                       RenderOptions.BitmapScalingMode="HighQuality"
-                       Margin="0,0,14,0"
-                       VerticalAlignment="Center"/>
-                <StackPanel VerticalAlignment="Center">
+        <!-- =================== SIDEBAR =================== -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SidebarBg}"
+                BorderBrush="{DynamicResource CardStroke}"
+                BorderThickness="0,0,1,0">
+            <DockPanel>
+                <!-- Header: logo + name + version -->
+                <StackPanel DockPanel.Dock="Top" Margin="16,18,16,12">
+                    <Image Source="pack://application:,,,/Resources/AppIcon.ico"
+                           Width="56" Height="56"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           HorizontalAlignment="Left"
+                           SnapsToDevicePixels="True"
+                           UseLayoutRounding="True"/>
                     <TextBlock Text="QuickLookProtein2"
-                               FontSize="22" FontWeight="Bold"
-                               Foreground="#FFFFFF"/>
-                    <TextBlock Text="3D molecular preview for Windows Explorer"
-                               FontSize="12" Foreground="#9A9DA3" Margin="0,2,0,0"/>
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               Margin="0,10,0,0"/>
+                    <TextBlock x:Name="VersionLabel"
+                               Text="Version"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextMuted}"
+                               Margin="0,2,0,0"/>
                 </StackPanel>
-            </StackPanel>
+
+                <!-- Nav list. SelectionChanged routes to ShowTab() in code-behind. -->
+                <ListBox x:Name="NavList"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         SelectionChanged="NavList_SelectionChanged"
+                         ItemContainerStyle="{StaticResource NavItem}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBoxItem Tag="General" IsSelected="True">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="General" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="FileFormats">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE8A5;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="File Formats" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="Appearance">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE790;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Appearance" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="Rendering">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7F4;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Rendering" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="Toolbar">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE71D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Toolbar" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="InfoOverlay">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE946;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Info Overlay" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="Thumbnails">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE8B9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Thumbnails" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="Update">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE777;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Software Update" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                    <ListBoxItem Tag="About">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE946;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="About" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ListBoxItem>
+                </ListBox>
+            </DockPanel>
         </Border>
 
-        <!-- Scrollable body -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled" Padding="18,18">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="14"/>
-                    <ColumnDefinition Width="320"/>
-                </Grid.ColumnDefinitions>
+        <!-- =================== CONTENT =================== -->
+        <Grid Grid.Column="1" Background="{DynamicResource ContentBg}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-                <!-- LEFT COLUMN: per-format atom style + rendering + appearance -->
-                <StackPanel Grid.Column="0">
+            <ScrollViewer Grid.Row="0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="28,22,28,12">
+                <Grid>
+                    <!-- ====== GENERAL TAB ====== -->
+                    <StackPanel x:Name="GeneralTab">
+                        <TextBlock Text="General" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="Live preview, Explorer integration, and the size QuickLook opens at."
+                                   Style="{StaticResource SectionSubtitle}"/>
 
-                    <!-- Live preview tiles. Mirrors the macOS app's
-                         tile grid: a single WebView2 hosting 3Dmol.js
-                         (same renderer the QL plugin uses), with a
-                         row of format buttons that swap in different
-                         sample files. Settings changes apply on the
-                         next "Reload" click so users can sanity-check
-                         how their preferences affect a real preview. -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Text="Live preview"
-                                           Style="{StaticResource SectionTitle}"/>
-                                <Button Grid.Column="1"
-                                        Content="Reload"
-                                        Padding="10,4" Margin="0,8,0,0"
-                                        Cursor="Hand"
-                                        Click="ReloadPreview_Click"/>
-                            </Grid>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Click a file format to render one of the bundled samples right here. Uses the same 3Dmol.js the Space-bar preview uses, with the settings you have above."/>
-
-                            <!-- Tile row: one button per format -->
-                            <WrapPanel x:Name="FormatTilesWrap" Margin="0,4,0,8"/>
-
-                            <!-- The live viewport -->
-                            <Border Background="#0E0E10"
-                                    BorderBrush="#2A2E36" BorderThickness="1"
-                                    CornerRadius="8" Height="320">
-                                <wv2:WebView2 x:Name="PreviewWebView"/>
-                            </Border>
-
-                            <TextBlock x:Name="PreviewCaption"
-                                       Style="{StaticResource Caption}"
-                                       Text="Loading..." Margin="0,6,0,0"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Per-format atom style -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Atom display style"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="How each file format renders by default. Cartoon for proteins, sticks for small molecules, spheres for crystals - or whatever you prefer. Settings apply immediately to the next Space-bar preview."/>
-
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition/><RowDefinition/><RowDefinition/>
-                                    <RowDefinition/><RowDefinition/><RowDefinition/>
-                                </Grid.RowDefinitions>
-
-                                <!-- Column 1 -->
-                                <StackPanel Grid.Column="0" Grid.Row="0" Orientation="Horizontal">
-                                    <TextBlock Text="PDB:"  Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="PdbStyleCombo"  Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="0" Grid.Row="1" Orientation="Horizontal">
-                                    <TextBlock Text="CIF:"  Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="CifStyleCombo"  Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="0" Grid.Row="2" Orientation="Horizontal">
-                                    <TextBlock Text="SDF:"  Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="SdfStyleCombo"  Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="0" Grid.Row="3" Orientation="Horizontal">
-                                    <TextBlock Text="MOL:"  Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="MolStyleCombo"  Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="0" Grid.Row="4" Orientation="Horizontal">
-                                    <TextBlock Text="MOL2:" Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="Mol2StyleCombo" Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="0" Grid.Row="5" Orientation="Horizontal">
-                                    <TextBlock Text="XYZ:"  Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="XyzStyleCombo"  Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-
-                                <!-- Column 2 -->
-                                <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
-                                    <TextBlock Text="GRO:"   Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="GroStyleCombo"   Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Grid.Row="1" Orientation="Horizontal">
-                                    <TextBlock Text="CUBE:"  Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="CubeStyleCombo"  Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Grid.Row="2" Orientation="Horizontal">
-                                    <TextBlock Text="PQR:"   Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="PqrStyleCombo"   Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Grid.Row="3" Orientation="Horizontal">
-                                    <TextBlock Text="VASP:"  Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="VaspStyleCombo"  Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Grid.Row="4" Orientation="Horizontal">
-                                    <TextBlock Text="CDJSON:" Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="CdjsonStyleCombo" Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2" Grid.Row="5" Orientation="Horizontal">
-                                    <TextBlock Text="MMTF:"  Style="{StaticResource RowLabel}"/>
-                                    <ComboBox  x:Name="MmtfStyleCombo"  Style="{StaticResource StyleCombo}"/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Appearance -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Appearance"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Global color scheme, rotation, and starting zoom. Background is applied behind the molecule in every preview."/>
-
-                            <Grid Margin="0,4,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="120"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Color scheme:" VerticalAlignment="Center"/>
-                                <ComboBox  Grid.Row="0" Grid.Column="1" x:Name="ColorSchemeCombo"
-                                           HorizontalAlignment="Left" MinWidth="200" Margin="0,4"/>
-
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Rotation:" VerticalAlignment="Center"/>
-                                <ComboBox  Grid.Row="1" Grid.Column="1" x:Name="RotationCombo"
-                                           HorizontalAlignment="Left" MinWidth="200" Margin="0,4"/>
-
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Default zoom:" VerticalAlignment="Center"/>
-                                <ComboBox  Grid.Row="2" Grid.Column="1" x:Name="ZoomCombo"
-                                           HorizontalAlignment="Left" MinWidth="200" Margin="0,4"/>
-
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Background:" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal">
-                                    <Border x:Name="BgSwatch" Width="32" Height="20"
-                                            BorderBrush="#404550" BorderThickness="1"
-                                            CornerRadius="3" Margin="0,4,8,4"
-                                            Background="Black"/>
-                                    <Button x:Name="BgPickButton" Content="Choose color..."
-                                            Padding="10,4" Margin="0,4"
-                                            Cursor="Hand"
-                                            Click="BgPickButton_Click"/>
-                                    <Button x:Name="BgResetButton" Content="Transparent"
-                                            Padding="10,4" Margin="6,4,0,4"
-                                            Cursor="Hand"
-                                            Click="BgResetButton_Click"/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Rendering options -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Rendering options"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <CheckBox x:Name="AutoStyleHeteroCheck"
-                                      Content="Smart protein + ligand styling"
-                                      ToolTip="When a file has both a polymer and a ligand, render the polymer with the chosen style and ligands as sticks."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="ShowSurfaceCheck"
-                                      Content="Show molecular surface"
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="HideHydrogensCheck"
-                                      Content="Hide hydrogens"
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="ShowUnitCellCheck"
-                                      Content="Show unit cell (CIF)"
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="ShowInfoOverlayCheck"
-                                      Content="Show info overlay"
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="ShowControlsInPreviewCheck"
-                                      Content="Show interactive controls"
-                                      ToolTip="Adds a small bottom-right toolbar in every Quick Look preview with one-click buttons for Stick / Line / Sphere / Cartoon style, Surface, Color SS, Label alpha-C, and Recenter."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="OutlineShadingCheck"
-                                      Content="Outline shading"
-                                      ToolTip="Adds a thin dark border around every atom/bond. Makes the preview pop on light backgrounds."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="AmbientOcclusionCheck"
-                                      Content="Ambient occlusion"
-                                      ToolTip="CSS vignette over the WebGL canvas that deepens edges, giving a low-cost pseudo-AO effect. Auto-disabled for stick/line previews of small molecules so atoms don't get washed out."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="AutoOrientCheck"
-                                      Content="Auto-orient (longest axis horizontal)"
-                                      ToolTip="Rotate the molecule so its longest principal axis is horizontal. Useful for screenshots; gives every preview a deterministic canonical pose."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="CubeIsosurfaceCheck"
-                                      Content="Cube isosurface"
-                                      ToolTip="Render Gaussian Cube files as +/- isovalue isosurfaces (blue/red) instead of bare atoms. Useful for orbital / electron-density plots."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="BioAssemblyCheck"
-                                      Content="Biological assembly"
-                                      ToolTip="Expand PDB / CIF files into their full biological assembly using REMARK 350 (PDB) or _pdbx_struct_oper_list (CIF) transformations. Off: show only the asymmetric unit."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="CryoEMRenderCheck"
-                                      Content="Cryo-EM density isosurface"
-                                      ToolTip="Render .ccp4 / .mrc / .map files as a volumetric isosurface. (macOS-only for now; Windows still falls back to QL-Win's default viewer for these files.)"
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="ShowShareButtonCheck"
-                                      Content="Share button in preview"
-                                      ToolTip="Adds a Share button to the toolbar that captures the current rendering as PNG and presents the system Sharing picker."
-                                      Margin="0,4"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Toolbar buttons - per-button visibility. -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Toolbar buttons"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Hide any individual button from the bottom-right toolbar. Useful for smaller previews."/>
-                            <CheckBox x:Name="CtlShowStickCheck"    Content="Stick"    Margin="0,4"/>
-                            <CheckBox x:Name="CtlShowLineCheck"     Content="Line"     Margin="0,4"/>
-                            <CheckBox x:Name="CtlShowSphereCheck"   Content="Sphere"   Margin="0,4"/>
-                            <CheckBox x:Name="CtlShowCartoonCheck"  Content="Cartoon"  Margin="0,4"/>
-                            <CheckBox x:Name="CtlShowSurfaceCheck"  Content="Surface"  Margin="0,4"/>
-                            <CheckBox x:Name="CtlShowColorSSCheck"  Content="Color SS" Margin="0,4"/>
-                            <CheckBox x:Name="CtlShowLabelCACheck"  Content="Label alpha-C" Margin="0,4"/>
-                            <CheckBox x:Name="CtlShowRecenterCheck" Content="Recenter" Margin="0,4"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Info overlay fields. Each piece of the
-                         "filename · atoms · chains · format" pill is
-                         a separate toggle. Disabled visually when
-                         the master "Show info overlay" toggle above
-                         is off, but the user can still flip these in
-                         advance. Mirrors the macOS settings panel. -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Info overlay fields"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Which bits of information appear in the info pill at the top-left of every preview. Gated on the 'Show info overlay' toggle above."/>
-                            <CheckBox x:Name="InfoFileNameCheck"        Content="File name"          Margin="0,4"/>
-                            <CheckBox x:Name="InfoAtomCountCheck"       Content="Atom count"         Margin="0,4"/>
-                            <CheckBox x:Name="InfoChainCountCheck"      Content="Chain count"        Margin="0,4"/>
-                            <CheckBox x:Name="InfoResidueCountCheck"    Content="Residue count"      Margin="0,4"/>
-                            <CheckBox x:Name="InfoElementBreakdownCheck"
-                                      Content="Element breakdown"
-                                      ToolTip="Top four most abundant elements with counts, e.g. 'C:120 N:36 O:30 H:24'."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="InfoMolWeightCheck"
-                                      Content="Molecular weight"
-                                      ToolTip="Sum of standard atomic masses (Da / kDa above 1000)."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="InfoBondCountCheck"       Content="Bond count"         Margin="0,4"/>
-                            <CheckBox x:Name="InfoPDBTitleCheck"
-                                      Content="PDB title"
-                                      ToolTip="First TITLE record from the PDB header. Only meaningful for .pdb / .ent files."
-                                      Margin="0,4"/>
-                            <CheckBox x:Name="InfoFormatCheck"          Content="File format"        Margin="0,4"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!--
-                      Window-size card (1.7.75+). User-tunable initial
-                      size of the QuickLook preview popover. QL-Win
-                      uses ContextObject.PreferredSize as the initial
-                      window size; the user can drag-resize the
-                      QuickLook window after it appears and QL-Win
-                      persists that across subsequent previews. So
-                      these values are the "first time you Space-bar
-                      this file" size only - after that, your last
-                      resize wins.
-                    -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Preview window"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Initial size of the QuickLook preview popover when you press Space on a structure file. Drag-resize the preview itself for ad-hoc adjustments — QL-Win remembers your last size across files."/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="14"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <!-- Width row -->
-                                <TextBlock Grid.Row="0" Grid.Column="0"
-                                           Text="Width:"
-                                           VerticalAlignment="Center"
-                                           Foreground="#CFD2D6"/>
-                                <Slider   Grid.Row="0" Grid.Column="2"
-                                          x:Name="PreviewWidthSlider"
-                                          Minimum="240" Maximum="2400"
-                                          TickFrequency="80"
-                                          IsSnapToTickEnabled="False"
-                                          Margin="0,6"/>
-                                <TextBox  Grid.Row="0" Grid.Column="4"
-                                          x:Name="PreviewWidthBox"
-                                          Width="64" Margin="0,6"
-                                          HorizontalContentAlignment="Right"
-                                          ToolTip="Width in pixels (240 - 2400)"/>
-
-                                <!-- Height row -->
-                                <TextBlock Grid.Row="1" Grid.Column="0"
-                                           Text="Height:"
-                                           VerticalAlignment="Center"
-                                           Foreground="#CFD2D6"/>
-                                <Slider   Grid.Row="1" Grid.Column="2"
-                                          x:Name="PreviewHeightSlider"
-                                          Minimum="180" Maximum="2400"
-                                          TickFrequency="60"
-                                          IsSnapToTickEnabled="False"
-                                          Margin="0,6"/>
-                                <TextBox  Grid.Row="1" Grid.Column="4"
-                                          x:Name="PreviewHeightBox"
-                                          Width="64" Margin="0,6"
-                                          HorizontalContentAlignment="Right"
-                                          ToolTip="Height in pixels (180 - 2400)"/>
-                            </Grid>
-
-                            <!-- Quick presets - one-click jumps. Pure
-                                 convenience; the user can always type
-                                 a precise value into the text boxes. -->
-                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                <Button Content="Compact (480 x 360)"
-                                        Margin="0,0,6,0"
-                                        Click="PreviewSize_Compact_Click"/>
-                                <Button Content="Default (560 x 420)"
-                                        Margin="0,0,6,0"
-                                        Click="PreviewSize_Default_Click"/>
-                                <Button Content="Large (960 x 720)"
-                                        Click="PreviewSize_Large_Click"/>
+                        <!-- Live preview card -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Live preview" Style="{StaticResource CardTitle}"/>
+                                    <Button Grid.Column="1" Content="Reload" Padding="10,4" Click="ReloadPreview_Click"/>
+                                </Grid>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Click a file format to render one of the bundled samples right here. Uses the same 3Dmol.js the Space-bar preview uses, with the settings you have above."/>
+                                <WrapPanel x:Name="FormatTilesWrap" Margin="0,4,0,8"/>
+                                <Border Background="#0E0E10"
+                                        BorderBrush="{DynamicResource CardStroke}"
+                                        BorderThickness="1"
+                                        CornerRadius="6" Height="320">
+                                    <wv2:WebView2 x:Name="PreviewWebView"/>
+                                </Border>
+                                <TextBlock x:Name="PreviewCaption"
+                                           Style="{StaticResource Caption}"
+                                           Text="Loading..." Margin="0,6,0,0"/>
                             </StackPanel>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
+                        </Border>
 
-                <!-- RIGHT COLUMN: About + Tips -->
-                <StackPanel Grid.Column="2">
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="About"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock x:Name="VersionLabel"
-                                       Text="Version"
-                                       Foreground="#CFD2D6"
-                                       Margin="0,0,0,8"/>
-                            <!-- Original author gets first-and-bold credit;
-                                 the "2" rebrand is an extension, not a
-                                 replacement. Mirrors the macOS About card. -->
-                            <TextBlock Style="{StaticResource Caption}"
-                                       TextWrapping="Wrap">
-                                <Run Text="Originally built by "/>
-                                <Run FontWeight="SemiBold" Foreground="#E8EAED" Text="Jethro Hemmann"/>
-                                <Run Text=" (2021-2022) — the original QuickLookProtein."/>
-                            </TextBlock>
-                            <Button Content="Original repo (JethroHemmann/QuickLookProtein)"
-                                    HorizontalAlignment="Left"
-                                    Padding="10,4" Margin="0,2,0,6"
-                                    Cursor="Hand"
-                                    Click="OriginalRepoButton_Click"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Extended by Ariorad Moniri (2026) as QuickLookProtein2 — multi-format support, smart protein+ligand styling, molecular surfaces, Windows port, Sparkle auto-update."/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Rendering by 3Dmol.js (Rego &amp; Koes, 2015)."/>
-                            <Button Content="This fork (ArioMoniri/QuickLookProtein)"
-                                    HorizontalAlignment="Left"
-                                    Padding="10,4" Margin="0,6,0,0"
-                                    Cursor="Hand"
-                                    Click="GithubButton_Click"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Tips"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Press SPACE on a .pdb / .cif / .mol2 / .xyz / etc. file in Explorer to preview it via QuickLook."/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Folders in Icon / Tile / Gallery view show CPK or cartoon-ribbon thumbnails of every supported file."/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Settings here apply on the NEXT preview - no need to restart QuickLook."/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Trouble?"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="If thumbnails don't refresh, right-click the QuickLook tray icon, choose Exit, then relaunch QuickLook from the Start Menu. Or sign out and back in to clear Explorer's icon cache."/>
-                            <Button Content="Open plugin folder"
-                                    HorizontalAlignment="Left"
-                                    Padding="10,4" Margin="0,6,0,0"
-                                    Cursor="Hand"
-                                    Click="OpenPluginFolderButton_Click"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!--
-                      Updates card (1.7.77+). In-process auto-updater
-                      using GitHub's /releases/latest endpoint. macOS
-                      gets this via Sparkle; Windows previously
-                      required the user to manually re-download the
-                      Setup.exe. The "Check for updates" button works
-                      regardless of the auto-check toggle. When an
-                      update is available, "Install update" downloads
-                      QuickLookProtein-Setup.exe from the latest
-                      release and runs it; Setup.exe replaces the
-                      installed files and re-launches QuickLook.
-                    -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Software Update"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock x:Name="UpdateStatusLabel"
-                                       Style="{StaticResource Caption}"
-                                       Text="Checking installed version..."/>
-                            <TextBlock x:Name="UpdateNotesLabel"
-                                       Style="{StaticResource Caption}"
-                                       Foreground="#9A9DA3"
-                                       TextWrapping="Wrap"
-                                       MaxHeight="160"
-                                       Visibility="Collapsed"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
-                                <Button x:Name="CheckForUpdatesButton"
-                                        Content="Check for updates"
-                                        Padding="10,4" Margin="0,0,6,0"
-                                        Cursor="Hand"
-                                        Click="CheckForUpdates_Click"/>
-                                <Button x:Name="InstallUpdateButton"
-                                        Content="Install update"
-                                        Style="{StaticResource PrimaryButton}"
-                                        Padding="14,7" Margin="0,0,6,0"
-                                        Visibility="Collapsed"
-                                        Click="InstallUpdate_Click"/>
-                                <Button x:Name="OpenReleasePageButton"
-                                        Content="Open release page"
-                                        Padding="10,4" Margin="0,0,6,0"
-                                        Visibility="Collapsed"
-                                        Click="OpenReleasePage_Click"/>
-                                <Button x:Name="OpenUpdateLogButton"
-                                        Content="Open update log"
-                                        Padding="10,4"
-                                        ToolTip="Open the rolling log written by every update check / install attempt. Useful when an install silently fails."
-                                        Click="OpenUpdateLog_Click"/>
+                        <!-- Preview window size card -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Preview window size" Style="{StaticResource CardTitle}"/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Initial size of the QuickLook preview popover when you press Space on a structure file. Drag-resize the preview itself for ad-hoc adjustments — QL-Win remembers your last size across files."/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Width:" VerticalAlignment="Center"/>
+                                    <Slider Grid.Row="0" Grid.Column="2"
+                                            x:Name="PreviewWidthSlider"
+                                            Minimum="240" Maximum="2400"
+                                            SmallChange="20" LargeChange="80"
+                                            TickFrequency="80"
+                                            IsSnapToTickEnabled="False"
+                                            Margin="0,6"/>
+                                    <TextBox Grid.Row="0" Grid.Column="4"
+                                             x:Name="PreviewWidthBox"
+                                             Width="72" Margin="0,6"
+                                             HorizontalContentAlignment="Right"
+                                             ToolTip="Width in pixels (240 - 2400)"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Height:" VerticalAlignment="Center"/>
+                                    <Slider Grid.Row="1" Grid.Column="2"
+                                            x:Name="PreviewHeightSlider"
+                                            Minimum="180" Maximum="2400"
+                                            SmallChange="20" LargeChange="80"
+                                            TickFrequency="60"
+                                            IsSnapToTickEnabled="False"
+                                            Margin="0,6"/>
+                                    <TextBox Grid.Row="1" Grid.Column="4"
+                                             x:Name="PreviewHeightBox"
+                                             Width="72" Margin="0,6"
+                                             HorizontalContentAlignment="Right"
+                                             ToolTip="Height in pixels (180 - 2400)"/>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Button Content="Compact (480 × 360)" Margin="0,0,6,0" Click="PreviewSize_Compact_Click"/>
+                                    <Button Content="Default (560 × 420)" Margin="0,0,6,0" Click="PreviewSize_Default_Click"/>
+                                    <Button Content="Large (960 × 720)" Click="PreviewSize_Large_Click"/>
+                                </StackPanel>
                             </StackPanel>
-                            <CheckBox x:Name="AutoCheckUpdatesCheck"
-                                      Content="Check for updates automatically when this window opens"
-                                      Margin="0,4"/>
-                        </StackPanel>
-                    </Border>
+                        </Border>
 
-                    <!--
-                      Startup card (1.7.76+).  Mirrors QL-Win's own
-                      tray-menu "Run at startup" toggle, but writes
-                      directly to HKCU\Software\Microsoft\Windows\
-                      CurrentVersion\Run\QuickLook so users don't
-                      have to dig through QL-Win's menus.  Reads at
-                      load time so the checkbox reflects current
-                      state even if QL-Win itself flipped it.
-                    -->
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Startup"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="Whether QuickLook (the host app that loads our plugin) launches automatically when you sign in to Windows.  Without this, Space-bar previews only work after you manually launch QuickLook from the Start Menu."/>
-                            <CheckBox x:Name="LaunchAtStartupCheck"
-                                      Content="Launch QuickLook at sign-in"
-                                      Margin="0,4"/>
-                        </StackPanel>
-                    </Border>
+                        <!-- Startup card -->
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Startup" Style="{StaticResource CardTitle}"/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Whether QuickLook (the host app that loads our plugin) launches automatically when you sign in to Windows. Without this, Space-bar previews only work after you manually launch QuickLook from the Start Menu."/>
+                                <CheckBox x:Name="LaunchAtStartupCheck"
+                                          Content="Launch QuickLook at sign-in"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
 
-                    <Border Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Diagnostics"
-                                       Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Style="{StaticResource Caption}"
-                                       Text="If Space-bar still shows a file as plain text, the plugin didn't load. Open the logs below and check for TypeLoadException or missing-dependency errors."/>
-                            <Button Content="Open plugin log"
-                                    HorizontalAlignment="Left"
-                                    Padding="10,4" Margin="0,2"
-                                    Cursor="Hand"
-                                    Click="OpenPluginLog_Click"/>
-                            <Button Content="Open QuickLook log"
-                                    HorizontalAlignment="Left"
-                                    Padding="10,4" Margin="0,2"
-                                    Cursor="Hand"
-                                    Click="OpenQuickLookLog_Click"/>
-                            <Button Content="Restart QuickLook tray"
-                                    HorizontalAlignment="Left"
-                                    Padding="10,4" Margin="0,2"
-                                    Cursor="Hand"
-                                    Click="RestartQuickLookTray_Click"/>
-                            <!--
-                              Refresh thumbnails (1.7.76+). For users
-                              whose Explorer didn't pick up the new
-                              IThumbnailProvider after install (white
-                              icons in Icon/Tile/Gallery view).  Does
-                              the same SHChangeNotify(SHCNE_ASSOCCHANGED)
-                              broadcast install.ps1 does, plus
-                              ie4uinit -ClearIconCache, plus a forced
-                              explorer.exe restart as a last resort.
-                            -->
-                            <Button Content="Refresh thumbnails"
-                                    HorizontalAlignment="Left"
-                                    Padding="10,4" Margin="0,2"
-                                    Cursor="Hand"
-                                    ToolTip="Force Explorer to re-query thumbnail handlers for our extensions. Run this if .pdb / .cif files in Icon view show as blank/white icons after install."
-                                    Click="RefreshThumbnails_Click"/>
-                        </StackPanel>
-                    </Border>
+                    <!-- ====== FILE FORMATS TAB ====== -->
+                    <StackPanel x:Name="FileFormatsTab" Visibility="Collapsed">
+                        <TextBlock Text="File Formats" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="Atom display style per file format — cartoon for proteins, sticks for small molecules, spheres for crystals."
+                                   Style="{StaticResource SectionSubtitle}"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Atom display style" Style="{StaticResource CardTitle}"/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Settings apply immediately to the next Space-bar preview."/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition/><RowDefinition/><RowDefinition/>
+                                        <RowDefinition/><RowDefinition/><RowDefinition/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Column="0" Grid.Row="0" Orientation="Horizontal">
+                                        <TextBlock Text="PDB:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="PdbStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="1" Orientation="Horizontal">
+                                        <TextBlock Text="CIF:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="CifStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="2" Orientation="Horizontal">
+                                        <TextBlock Text="SDF:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="SdfStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="3" Orientation="Horizontal">
+                                        <TextBlock Text="MOL:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="MolStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="4" Orientation="Horizontal">
+                                        <TextBlock Text="MOL2:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="Mol2StyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="5" Orientation="Horizontal">
+                                        <TextBlock Text="XYZ:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="XyzStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
+                                        <TextBlock Text="GRO:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="GroStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="1" Orientation="Horizontal">
+                                        <TextBlock Text="CUBE:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="CubeStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="2" Orientation="Horizontal">
+                                        <TextBlock Text="PQR:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="PqrStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="3" Orientation="Horizontal">
+                                        <TextBlock Text="VASP:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="VaspStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="4" Orientation="Horizontal">
+                                        <TextBlock Text="CDJSON:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="CdjsonStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="5" Orientation="Horizontal">
+                                        <TextBlock Text="MMTF:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="MmtfStyleCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ====== APPEARANCE TAB ====== -->
+                    <StackPanel x:Name="AppearanceTab" Visibility="Collapsed">
+                        <TextBlock Text="Appearance" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="Global color scheme, rotation, starting zoom, and background colour applied behind the molecule."
+                                   Style="{StaticResource SectionSubtitle}"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Color scheme:" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Row="0" Grid.Column="1" x:Name="ColorSchemeCombo"
+                                              HorizontalAlignment="Left" MinWidth="220" Margin="0,4"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Rotation:" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Row="1" Grid.Column="1" x:Name="RotationCombo"
+                                              HorizontalAlignment="Left" MinWidth="220" Margin="0,4"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Default zoom:" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Row="2" Grid.Column="1" x:Name="ZoomCombo"
+                                              HorizontalAlignment="Left" MinWidth="220" Margin="0,4"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Background:" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal">
+                                        <Border x:Name="BgSwatch" Width="32" Height="20"
+                                                BorderBrush="{DynamicResource CardStroke}" BorderThickness="1"
+                                                CornerRadius="3" Margin="0,4,8,4"
+                                                Background="Black"/>
+                                        <Button x:Name="BgPickButton" Content="Choose color..." Padding="10,4" Margin="0,4" Click="BgPickButton_Click"/>
+                                        <Button x:Name="BgResetButton" Content="Transparent" Padding="10,4" Margin="6,4,0,4" Click="BgResetButton_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ====== RENDERING TAB ====== -->
+                    <StackPanel x:Name="RenderingTab" Visibility="Collapsed">
+                        <TextBlock Text="Rendering" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="Visualisation features applied on every Quick Look preview."
+                                   Style="{StaticResource SectionSubtitle}"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Rendering options" Style="{StaticResource CardTitle}"/>
+                                <CheckBox x:Name="AutoStyleHeteroCheck" Content="Smart protein + ligand styling"
+                                          ToolTip="When a file has both a polymer and a ligand, render the polymer with the chosen style and ligands as sticks."/>
+                                <CheckBox x:Name="ShowSurfaceCheck" Content="Show molecular surface"/>
+                                <CheckBox x:Name="HideHydrogensCheck" Content="Hide hydrogens"/>
+                                <CheckBox x:Name="ShowUnitCellCheck" Content="Show unit cell (CIF)"/>
+                                <CheckBox x:Name="ShowInfoOverlayCheck" Content="Show info overlay"/>
+                                <CheckBox x:Name="ShowControlsInPreviewCheck" Content="Show interactive controls"
+                                          ToolTip="Adds a small bottom-right toolbar in every Quick Look preview with one-click buttons for Stick / Line / Sphere / Cartoon style, Surface, Color SS, Label alpha-C, and Recenter."/>
+                                <CheckBox x:Name="OutlineShadingCheck" Content="Outline shading"
+                                          ToolTip="Adds a thin dark border around every atom/bond. Makes the preview pop on light backgrounds."/>
+                                <CheckBox x:Name="AmbientOcclusionCheck" Content="Ambient occlusion"
+                                          ToolTip="CSS vignette over the WebGL canvas that deepens edges, giving a low-cost pseudo-AO effect. Auto-disabled for stick/line previews of small molecules so atoms don't get washed out."/>
+                                <CheckBox x:Name="AutoOrientCheck" Content="Auto-orient (longest axis horizontal)"
+                                          ToolTip="Rotate the molecule so its longest principal axis is horizontal. Useful for screenshots; gives every preview a deterministic canonical pose."/>
+                                <CheckBox x:Name="CubeIsosurfaceCheck" Content="Cube isosurface"
+                                          ToolTip="Render Gaussian Cube files as +/- isovalue isosurfaces (blue/red) instead of bare atoms. Useful for orbital / electron-density plots."/>
+                                <CheckBox x:Name="BioAssemblyCheck" Content="Biological assembly"
+                                          ToolTip="Expand PDB / CIF files into their full biological assembly using REMARK 350 (PDB) or _pdbx_struct_oper_list (CIF) transformations. Off: show only the asymmetric unit."/>
+                                <CheckBox x:Name="CryoEMRenderCheck" Content="Cryo-EM density isosurface"
+                                          ToolTip="Render .ccp4 / .mrc / .map files as a volumetric isosurface. (macOS-only for now; Windows still falls back to QL-Win's default viewer for these files.)"/>
+                                <CheckBox x:Name="ShowShareButtonCheck" Content="Share button in preview"
+                                          ToolTip="Adds a Share button to the toolbar that captures the current rendering as PNG and presents the system Sharing picker."/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ====== TOOLBAR TAB ====== -->
+                    <StackPanel x:Name="ToolbarTab" Visibility="Collapsed">
+                        <TextBlock Text="Toolbar" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="Per-button visibility for the bottom-right toolbar in every preview."
+                                   Style="{StaticResource SectionSubtitle}"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Toolbar buttons" Style="{StaticResource CardTitle}"/>
+                                <CheckBox x:Name="CtlShowStickCheck" Content="Stick"/>
+                                <CheckBox x:Name="CtlShowLineCheck" Content="Line"/>
+                                <CheckBox x:Name="CtlShowSphereCheck" Content="Sphere"/>
+                                <CheckBox x:Name="CtlShowCartoonCheck" Content="Cartoon"/>
+                                <CheckBox x:Name="CtlShowSurfaceCheck" Content="Surface"/>
+                                <CheckBox x:Name="CtlShowColorSSCheck" Content="Color SS"/>
+                                <CheckBox x:Name="CtlShowLabelCACheck" Content="Label alpha-C"/>
+                                <CheckBox x:Name="CtlShowRecenterCheck" Content="Recenter"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ====== INFO OVERLAY TAB ====== -->
+                    <StackPanel x:Name="InfoOverlayTab" Visibility="Collapsed">
+                        <TextBlock Text="Info Overlay" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="Which bits of information appear in the info pill at the top-left of every preview. Gated on the master 'Show info overlay' toggle under Rendering."
+                                   Style="{StaticResource SectionSubtitle}"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Info overlay fields" Style="{StaticResource CardTitle}"/>
+                                <CheckBox x:Name="InfoFileNameCheck" Content="File name"/>
+                                <CheckBox x:Name="InfoAtomCountCheck" Content="Atom count"/>
+                                <CheckBox x:Name="InfoChainCountCheck" Content="Chain count"/>
+                                <CheckBox x:Name="InfoResidueCountCheck" Content="Residue count"/>
+                                <CheckBox x:Name="InfoElementBreakdownCheck" Content="Element breakdown"
+                                          ToolTip="Top four most abundant elements with counts, e.g. 'C:120 N:36 O:30 H:24'."/>
+                                <CheckBox x:Name="InfoMolWeightCheck" Content="Molecular weight"
+                                          ToolTip="Sum of standard atomic masses (Da / kDa above 1000)."/>
+                                <CheckBox x:Name="InfoBondCountCheck" Content="Bond count"/>
+                                <CheckBox x:Name="InfoPDBTitleCheck" Content="PDB title"
+                                          ToolTip="First TITLE record from the PDB header. Only meaningful for .pdb / .ent files."/>
+                                <CheckBox x:Name="InfoFormatCheck" Content="File format"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ====== THUMBNAILS TAB (NEW) ====== -->
+                    <StackPanel x:Name="ThumbnailsTab" Visibility="Collapsed">
+                        <TextBlock Text="Thumbnails" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="Style applied to thumbnails in Icon / Tile / Gallery view. 'Auto' uses cartoon-ribbon for proteins (multiple CA atoms) and CPK for small molecules."
+                                   Style="{StaticResource SectionSubtitle}"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Thumbnail style per format" Style="{StaticResource CardTitle}"/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Changes apply after the next thumbnail re-fetch. Use the 'Refresh thumbnails' button under About → Diagnostics to force Explorer to redraw."/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition/><RowDefinition/><RowDefinition/>
+                                        <RowDefinition/><RowDefinition/><RowDefinition/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Column="0" Grid.Row="0" Orientation="Horizontal">
+                                        <TextBlock Text="PDB:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbPdbCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="1" Orientation="Horizontal">
+                                        <TextBlock Text="CIF:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbCifCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="2" Orientation="Horizontal">
+                                        <TextBlock Text="SDF:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbSdfCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="3" Orientation="Horizontal">
+                                        <TextBlock Text="MOL:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbMolCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="4" Orientation="Horizontal">
+                                        <TextBlock Text="MOL2:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbMol2Combo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="0" Grid.Row="5" Orientation="Horizontal">
+                                        <TextBlock Text="XYZ:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbXyzCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
+                                        <TextBlock Text="GRO:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbGroCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="1" Orientation="Horizontal">
+                                        <TextBlock Text="CUBE:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbCubeCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="2" Orientation="Horizontal">
+                                        <TextBlock Text="PQR:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbPqrCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="3" Orientation="Horizontal">
+                                        <TextBlock Text="VASP:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbVaspCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="4" Orientation="Horizontal">
+                                        <TextBlock Text="CDJSON:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbCdjsonCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Grid.Row="5" Orientation="Horizontal">
+                                        <TextBlock Text="MMTF:" Style="{StaticResource RowLabel}"/>
+                                        <ComboBox x:Name="ThumbMmtfCombo" Style="{StaticResource StyleCombo}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                    <Button Content="Reset to Auto"
+                                            Click="ThumbStyle_ResetAll_Click"
+                                            Padding="10,4" Margin="0,0,6,0"/>
+                                    <Button Content="Refresh thumbnails now"
+                                            Click="RefreshThumbnails_Click"
+                                            Padding="10,4"
+                                            ToolTip="Force Explorer to re-query thumbnail handlers for our extensions. Run this if .pdb / .cif files in Icon view show as blank/white icons after install."/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ====== SOFTWARE UPDATE TAB ====== -->
+                    <StackPanel x:Name="UpdateTab" Visibility="Collapsed">
+                        <TextBlock Text="Software Update" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="In-app updater. Pings GitHub's releases endpoint, downloads QuickLookProtein-Setup.exe, and re-runs Setup.exe to upgrade in place."
+                                   Style="{StaticResource SectionSubtitle}"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock x:Name="UpdateStatusLabel"
+                                           Style="{StaticResource Caption}"
+                                           Text="Checking installed version..."/>
+                                <TextBlock x:Name="UpdateNotesLabel"
+                                           Style="{StaticResource Caption}"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           TextWrapping="Wrap"
+                                           MaxHeight="220"
+                                           Visibility="Collapsed"/>
+                                <WrapPanel Margin="0,4,0,4">
+                                    <Button x:Name="CheckForUpdatesButton"
+                                            Content="Check for updates"
+                                            Padding="10,4" Margin="0,0,6,6"
+                                            Click="CheckForUpdates_Click"/>
+                                    <Button x:Name="InstallUpdateButton"
+                                            Content="Install update"
+                                            Style="{StaticResource PrimaryButton}"
+                                            Padding="14,7" Margin="0,0,6,6"
+                                            Visibility="Collapsed"
+                                            Click="InstallUpdate_Click"/>
+                                    <Button x:Name="OpenReleasePageButton"
+                                            Content="Open release page"
+                                            Padding="10,4" Margin="0,0,6,6"
+                                            Visibility="Collapsed"
+                                            Click="OpenReleasePage_Click"/>
+                                    <Button x:Name="OpenUpdateLogButton"
+                                            Content="Open update log"
+                                            Padding="10,4" Margin="0,0,0,6"
+                                            ToolTip="Open the rolling log written by every update check / install attempt. Useful when an install silently fails."
+                                            Click="OpenUpdateLog_Click"/>
+                                </WrapPanel>
+                                <CheckBox x:Name="AutoCheckUpdatesCheck"
+                                          Content="Check for updates automatically when this window opens"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ====== ABOUT TAB ====== -->
+                    <StackPanel x:Name="AboutTab" Visibility="Collapsed">
+                        <TextBlock Text="About" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="Credits, tips, and diagnostics."
+                                   Style="{StaticResource SectionSubtitle}"/>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="QuickLookProtein2" Style="{StaticResource CardTitle}"/>
+                                <TextBlock x:Name="VersionLabelAbout"
+                                           Text="Version"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap">
+                                    <Run Text="Originally built by "/>
+                                    <Run FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Text="Jethro Hemmann"/>
+                                    <Run Text=" (2021-2022) — the original QuickLookProtein."/>
+                                </TextBlock>
+                                <Button Content="Original repo (JethroHemmann/QuickLookProtein)"
+                                        HorizontalAlignment="Left"
+                                        Padding="10,4" Margin="0,2,0,6"
+                                        Click="OriginalRepoButton_Click"/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Extended by Ariorad Moniri (2026) as QuickLookProtein2 — multi-format support, smart protein+ligand styling, molecular surfaces, Windows port, in-app updater."/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Rendering by 3Dmol.js (Rego &amp; Koes, 2015)."/>
+                                <Button Content="This fork (ArioMoniri/QuickLookProtein)"
+                                        HorizontalAlignment="Left"
+                                        Padding="10,4" Margin="0,6,0,0"
+                                        Click="GithubButton_Click"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Tips" Style="{StaticResource CardTitle}"/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Press SPACE on a .pdb / .cif / .mol2 / .xyz / etc. file in Explorer to preview it via QuickLook."/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Folders in Icon / Tile / Gallery view show CPK or cartoon-ribbon thumbnails of every supported file."/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="Settings here apply on the NEXT preview — no need to restart QuickLook."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Diagnostics" Style="{StaticResource CardTitle}"/>
+                                <TextBlock Style="{StaticResource Caption}"
+                                           Text="If Space-bar still shows a file as plain text, the plugin didn't load. Open the logs below and check for TypeLoadException or missing-dependency errors."/>
+                                <WrapPanel>
+                                    <Button Content="Open plugin folder" Padding="10,4" Margin="0,2,6,2" Click="OpenPluginFolderButton_Click"/>
+                                    <Button Content="Open plugin log" Padding="10,4" Margin="0,2,6,2" Click="OpenPluginLog_Click"/>
+                                    <Button Content="Open QuickLook log" Padding="10,4" Margin="0,2,6,2" Click="OpenQuickLookLog_Click"/>
+                                    <Button Content="Restart QuickLook tray" Padding="10,4" Margin="0,2,6,2" Click="RestartQuickLookTray_Click"/>
+                                    <Button Content="Refresh thumbnails" Padding="10,4" Margin="0,2,0,2"
+                                            ToolTip="Force Explorer to re-query thumbnail handlers for our extensions. Run this if .pdb / .cif files in Icon view show as blank/white icons after install."
+                                            Click="RefreshThumbnails_Click"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Footer -->
+            <Border Grid.Row="1"
+                    Background="{DynamicResource SidebarBg}"
+                    Padding="20,12"
+                    BorderBrush="{DynamicResource CardStroke}"
+                    BorderThickness="0,1,0,0">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock x:Name="StatusLabel"
+                               Text="Changes save instantly."
+                               Foreground="{DynamicResource TextMuted}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,16,0"/>
+                    <Button Content="Close" Style="{StaticResource PrimaryButton}"
+                            Width="100" Click="CloseButton_Click"/>
                 </StackPanel>
-            </Grid>
-        </ScrollViewer>
-
-        <!-- Footer -->
-        <Border Grid.Row="2" Background="#13151A" Padding="18,12"
-                BorderBrush="#23262D" BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <TextBlock x:Name="StatusLabel"
-                           Text="Changes save instantly."
-                           Foreground="#9A9DA3" VerticalAlignment="Center"
-                           Margin="0,0,16,0"/>
-                <Button Content="Close" Style="{StaticResource PrimaryButton}"
-                        Width="100" Click="CloseButton_Click"/>
-            </StackPanel>
-        </Border>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

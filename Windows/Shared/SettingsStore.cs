@@ -65,6 +65,22 @@ public enum DefaultZoom
 }
 
 /// <summary>
+/// Per-format style for the Explorer-pane *thumbnail* (the small bitmap
+/// in Icon / Tile / Gallery view), independent of the in-Quick-Look
+/// atom-display style. "Auto" preserves the v1.7.x heuristic:
+/// cartoon-ribbon for files with >=3 CA atoms (proteins), CPK spheres
+/// for everything else.
+/// </summary>
+public enum ThumbnailStyle
+{
+    Auto,
+    Cartoon,
+    CPK,
+    Stick,
+    Sphere,
+}
+
+/// <summary>
 /// Read / write the user's preview preferences from
 /// <c>HKCU\Software\QuickLookProtein\Settings</c>. Static-only - the
 /// registry is the source of truth; there's no in-memory cache, so
@@ -104,6 +120,16 @@ public static class SettingsStore
     public static void SetAtomStyleVASP(AtomStyle v)   => WriteEnum("AtomStyleVASP",   v);
     public static void SetAtomStyleCDJSON(AtomStyle v) => WriteEnum("AtomStyleCDJSON", v);
     public static void SetAtomStyleMMTF(AtomStyle v)   => WriteEnum("AtomStyleMMTF",   v);
+
+    // ---- Per-format thumbnail style (v1.7.81+) ---------------------------
+    // Independent of the Quick Look atom-display style above. Default is
+    // Auto, which preserves the protein-vs-small-molecule heuristic that
+    // shipped from v1.7.x.
+
+    public static ThumbnailStyle GetThumbStyle(string ext, ThumbnailStyle fallback = ThumbnailStyle.Auto)
+        => ReadEnum("ThumbStyle" + ext.ToUpperInvariant(), fallback);
+    public static void SetThumbStyle(string ext, ThumbnailStyle v)
+        => WriteEnum("ThumbStyle" + ext.ToUpperInvariant(), v);
 
     public static AtomStyle GetAtomStyle(string extension) => extension switch
     {

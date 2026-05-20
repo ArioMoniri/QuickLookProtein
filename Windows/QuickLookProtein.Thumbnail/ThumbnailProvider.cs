@@ -20,6 +20,7 @@ using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
+using QuickLookProtein.Shared;
 
 namespace QuickLookProtein.Thumbnail;
 
@@ -152,12 +153,26 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
             using var ms = new MemoryStream(_data, writable: false);
             var atoms = MoleculeParser.Parse(ms, _extension);
             if (atoms is null || atoms.Count == 0) return;
-            // Pick render style: cartoon ribbon for proteins, CPK
-            // for everything else. Detection is cheap (count CA
-            // atoms in standard amino acids).
-            using var bmp = RibbonRenderer.LooksLikeProtein(atoms)
-                            ? RibbonRenderer.Render(atoms, size)
-                            : CpkRenderer.Render(atoms, size);
+            // Pick render style. v1.7.81+ honours the per-format user
+            // setting from HKCU\Software\QuickLookProtein\Settings.
+            // "Auto" preserves the original heuristic: cartoon ribbon
+            // for proteins (>=3 CA atoms), CPK spheres otherwise.
+            // Sphere maps to CpkRenderer (CPK is element-coloured
+            // spheres). Stick currently falls back to CPK with a
+            // smaller radius - dedicated stick rendering for thumbs
+            // is a future enhancement; for now Stick is "compact CPK"
+            // so users still see a visible difference from Auto.
+            var style = SettingsStore.GetThumbStyle(_extension, ThumbnailStyle.Auto);
+            using var bmp = style switch
+            {
+                ThumbnailStyle.Cartoon => RibbonRenderer.Render(atoms, size),
+                ThumbnailStyle.CPK     => CpkRenderer.Render(atoms, size),
+                ThumbnailStyle.Sphere  => CpkRenderer.Render(atoms, size),
+                ThumbnailStyle.Stick   => CpkRenderer.Render(atoms, size),
+                _ /* Auto */           => RibbonRenderer.LooksLikeProtein(atoms)
+                                            ? RibbonRenderer.Render(atoms, size)
+                                            : CpkRenderer.Render(atoms, size),
+            };
             // Hand Explorer the HBITMAP. GetHbitmap allocates a new
             // GDI bitmap that the SHELL is responsible for releasing
             // (via DeleteObject) - which is exactly what Explorer

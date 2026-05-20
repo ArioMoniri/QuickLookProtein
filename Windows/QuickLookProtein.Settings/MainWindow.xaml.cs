@@ -27,6 +27,13 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // SourceInitialized fires after the HWND exists but before the
+        // first paint — exactly when DwmSetWindowAttribute will take
+        // effect for backdrop / dark-mode title-bar tinting.
+        SourceInitialized += (_, _) =>
+        {
+            try { ApplySystemBackdrop(); } catch (Exception ex) { Debug.WriteLine("Mica setup: " + ex); }
+        };
         Loaded += MainWindow_Loaded;
     }
 
@@ -36,6 +43,9 @@ public partial class MainWindow : Window
         // the WebView2 bootstrap doesn't tear down the whole window
         // before the user gets to see *any* settings. The status bar
         // surfaces what failed; the rest of the UI stays usable.
+        try { ApplyTheme();         } catch (Exception ex) { Debug.WriteLine("ApplyTheme: " + ex); }
+        try { HookSystemThemeChange(); } catch (Exception ex) { Debug.WriteLine("Theme watcher: " + ex); }
+        try { ConfigureSliders();   } catch (Exception ex) { Debug.WriteLine("ConfigureSliders: " + ex); }
         try { SetVersionLabel();    } catch (Exception ex) { ReportStartupError("version label", ex); }
         try { PopulateAllCombos();  } catch (Exception ex) { ReportStartupError("populating options", ex); }
         try { LoadCurrentSettings();} catch (Exception ex) { ReportStartupError("loading saved settings", ex); }
@@ -75,7 +85,11 @@ public partial class MainWindow : Window
     {
         var asm = Assembly.GetExecutingAssembly();
         var v = asm.GetName().Version;
-        VersionLabel.Text = $"Version {v?.Major}.{v?.Minor}.{v?.Build}";
+        var s = $"Version {v?.Major}.{v?.Minor}.{v?.Build}";
+        // Sidebar label (compact) + About-tab label (matches the
+        // "Version 1.7.x" style the Mac About card uses).
+        VersionLabel.Text = s;
+        if (VersionLabelAbout != null) VersionLabelAbout.Text = s;
     }
 
     private void PopulateAllCombos()
@@ -99,6 +113,21 @@ public partial class MainWindow : Window
             RotationCombo.Items.Add(s);
         foreach (var s in Enum.GetValues(typeof(DefaultZoom)))
             ZoomCombo.Items.Add(s);
+
+        // Thumbnail-style combos (v1.7.81). Same set of options for
+        // every format — registry stores per-format choice independent
+        // of the in-Quick-Look atom-display style above.
+        var thumbCombos = new[]
+        {
+            ThumbPdbCombo, ThumbCifCombo, ThumbSdfCombo, ThumbMolCombo,
+            ThumbMol2Combo, ThumbXyzCombo, ThumbGroCombo, ThumbCubeCombo,
+            ThumbPqrCombo, ThumbVaspCombo, ThumbCdjsonCombo, ThumbMmtfCombo,
+        };
+        foreach (var c in thumbCombos)
+        {
+            foreach (var s in Enum.GetValues(typeof(ThumbnailStyle)))
+                c.Items.Add(s);
+        }
     }
 
     private void LoadCurrentSettings()
@@ -178,6 +207,21 @@ public partial class MainWindow : Window
         InfoFormatCheck.IsChecked           = SettingsStore.GetInfoShowFormat();
 
         UpdateBgSwatchFromStore();
+
+        // Per-format thumbnail style (v1.7.81). Defaults to Auto so
+        // existing users see no behaviour change on first run.
+        ThumbPdbCombo.SelectedItem    = SettingsStore.GetThumbStyle("pdb");
+        ThumbCifCombo.SelectedItem    = SettingsStore.GetThumbStyle("cif");
+        ThumbSdfCombo.SelectedItem    = SettingsStore.GetThumbStyle("sdf");
+        ThumbMolCombo.SelectedItem    = SettingsStore.GetThumbStyle("mol");
+        ThumbMol2Combo.SelectedItem   = SettingsStore.GetThumbStyle("mol2");
+        ThumbXyzCombo.SelectedItem    = SettingsStore.GetThumbStyle("xyz");
+        ThumbGroCombo.SelectedItem    = SettingsStore.GetThumbStyle("gro");
+        ThumbCubeCombo.SelectedItem   = SettingsStore.GetThumbStyle("cube");
+        ThumbPqrCombo.SelectedItem    = SettingsStore.GetThumbStyle("pqr");
+        ThumbVaspCombo.SelectedItem   = SettingsStore.GetThumbStyle("vasp");
+        ThumbCdjsonCombo.SelectedItem = SettingsStore.GetThumbStyle("cdjson");
+        ThumbMmtfCombo.SelectedItem   = SettingsStore.GetThumbStyle("mmtf");
     }
 
     private void WireChangeHandlers()
@@ -194,6 +238,23 @@ public partial class MainWindow : Window
         VaspStyleCombo.SelectionChanged   += (_, _) => Save(() => SettingsStore.SetAtomStyleVASP((AtomStyle)VaspStyleCombo.SelectedItem));
         CdjsonStyleCombo.SelectionChanged += (_, _) => Save(() => SettingsStore.SetAtomStyleCDJSON((AtomStyle)CdjsonStyleCombo.SelectedItem));
         MmtfStyleCombo.SelectionChanged   += (_, _) => Save(() => SettingsStore.SetAtomStyleMMTF((AtomStyle)MmtfStyleCombo.SelectedItem));
+
+        // Thumbnail-style combos (v1.7.81). Each one writes back to
+        // HKCU\...\ThumbStyleXXX. The thumbnail provider reads on
+        // every GetThumbnail call so the next Explorer redraw picks
+        // up the change without needing to restart Explorer.
+        ThumbPdbCombo.SelectionChanged    += (_, _) => Save(() => SettingsStore.SetThumbStyle("pdb",    (ThumbnailStyle)ThumbPdbCombo.SelectedItem));
+        ThumbCifCombo.SelectionChanged    += (_, _) => Save(() => SettingsStore.SetThumbStyle("cif",    (ThumbnailStyle)ThumbCifCombo.SelectedItem));
+        ThumbSdfCombo.SelectionChanged    += (_, _) => Save(() => SettingsStore.SetThumbStyle("sdf",    (ThumbnailStyle)ThumbSdfCombo.SelectedItem));
+        ThumbMolCombo.SelectionChanged    += (_, _) => Save(() => SettingsStore.SetThumbStyle("mol",    (ThumbnailStyle)ThumbMolCombo.SelectedItem));
+        ThumbMol2Combo.SelectionChanged   += (_, _) => Save(() => SettingsStore.SetThumbStyle("mol2",   (ThumbnailStyle)ThumbMol2Combo.SelectedItem));
+        ThumbXyzCombo.SelectionChanged    += (_, _) => Save(() => SettingsStore.SetThumbStyle("xyz",    (ThumbnailStyle)ThumbXyzCombo.SelectedItem));
+        ThumbGroCombo.SelectionChanged    += (_, _) => Save(() => SettingsStore.SetThumbStyle("gro",    (ThumbnailStyle)ThumbGroCombo.SelectedItem));
+        ThumbCubeCombo.SelectionChanged   += (_, _) => Save(() => SettingsStore.SetThumbStyle("cube",   (ThumbnailStyle)ThumbCubeCombo.SelectedItem));
+        ThumbPqrCombo.SelectionChanged    += (_, _) => Save(() => SettingsStore.SetThumbStyle("pqr",    (ThumbnailStyle)ThumbPqrCombo.SelectedItem));
+        ThumbVaspCombo.SelectionChanged   += (_, _) => Save(() => SettingsStore.SetThumbStyle("vasp",   (ThumbnailStyle)ThumbVaspCombo.SelectedItem));
+        ThumbCdjsonCombo.SelectionChanged += (_, _) => Save(() => SettingsStore.SetThumbStyle("cdjson", (ThumbnailStyle)ThumbCdjsonCombo.SelectedItem));
+        ThumbMmtfCombo.SelectionChanged   += (_, _) => Save(() => SettingsStore.SetThumbStyle("mmtf",   (ThumbnailStyle)ThumbMmtfCombo.SelectedItem));
 
         ColorSchemeCombo.SelectionChanged += (_, _) => Save(() => SettingsStore.SetColorScheme((ColorScheme)ColorSchemeCombo.SelectedItem));
         RotationCombo.SelectionChanged    += (_, _) => Save(() => SettingsStore.SetRotationSpeed((RotationSpeed)RotationCombo.SelectedItem));

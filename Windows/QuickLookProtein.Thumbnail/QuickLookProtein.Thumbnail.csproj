@@ -48,4 +48,17 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
+
+  <!--
+    Link Shared\SettingsStore.cs into the thumbnail provider so the
+    GetThumbnail dispatch can honour the user's per-format ThumbStyle
+    (v1.7.81+). File-link rather than ProjectReference matches how
+    the Settings + Plugin projects already consume Shared - keeps the
+    build graph flat and avoids dragging in heavier deps.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Shared\SettingsStore.cs">
+      <Link>Shared\SettingsStore.cs</Link>
+    </Compile>
+  </ItemGroup>
 </Project>

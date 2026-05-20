@@ -4,6 +4,35 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.81] — 2026-05-20
+
+### 🪟 Windows — Settings app redesign (sidebar nav, system-following theme, Mica)
+
+The Windows Settings app shipped through v1.7.80 as a single vertical-scroll wall of dark cards. v1.7.81 rebuilds it from the chrome down to feel native on Windows 11 and match the macOS app's structure.
+
+**Sidebar nav** — Mac-System-Settings layout. The old single-scroll page is now split into nine tabs (General · File Formats · Appearance · Rendering · Toolbar · Info Overlay · Thumbnails · Software Update · About) with a 220 px left-rail `ListBox` driving visibility. Adding a new section is one XAML entry + one line in `AllTabs()`.
+
+**System-following light / dark theme.** Every theme-sensitive brush is a `DynamicResource`; `ApplyTheme()` mutates the `SolidColorBrush.Color` of each entry in place when the system theme flips, so the whole window repaints without us walking the visual tree. Theme is read from `HKCU\…\Themes\Personalize\AppsUseLightTheme` on load and on every `SystemEvents.UserPreferenceChanged` broadcast (the WM_SETTINGCHANGE that fires when the user toggles Settings → Personalisation → Colours). Colour values follow Windows 11's Fluent palette so the window blends with native chrome.
+
+**Mica backdrop on Windows 11.** `ApplySystemBackdrop()` calls `DwmSetWindowAttribute` with `DWMWA_SYSTEMBACKDROP_TYPE = 2` (Mica) on Win11 22H2+, falling back to the pre-22H2 `DWMWA_MICA_EFFECT = 1029` flag on 21H2. The `AppBg` brush is transparent so the DWM-painted backdrop shows through the title bar + any padding; sidebar and content paint their own surfaces. Dark title bar enabled via `DWMWA_USE_IMMERSIVE_DARK_MODE = 20` so the caption strip matches the rest of the window in dark mode. Win10 silently uses the AppBg solid colour (Mica is a no-op there).
+
+**Higher-quality logo.** The sidebar logo now renders at 56×56 with `RenderOptions.BitmapScalingMode="HighQuality"` and `UseLayoutRounding="True"`. The `.ico` has 256 px frames; WPF picks the nearest and downsamples cleanly instead of stretching the 16/32 px frames it grabbed by default.
+
+**Better Fluent controls.** Win11 4 px-radius pill buttons; new accent-filled CheckBox template (rounded square + white tick) replacing WPF's chunky default; Slider with `IsMoveToPointEnabled="False"` so a stray click on the track no longer jumps the thumb to the cursor.
+
+**Slider mouse-wheel suppression.** Mouse-wheel-over-slider was the source of the "sensitivity too high" complaint — a single wheel notch moved the preview-window-size slider 80 px because `SmallChange × Δ/120` ≈ 80 on the wide 240–2400 range. `ConfigureSliders()` now eats `PreviewMouseWheel` on both sliders entirely; users can still drag the thumb, type into the text box, or click the Compact / Default / Large presets.
+
+### 🪟 Windows — per-format thumbnail style picker
+
+New **Thumbnails** tab matches the Mac app's per-format style settings:
+
+- `ThumbnailStyle` enum added to `Shared\SettingsStore.cs` with Auto / Cartoon / CPK / Sphere / Stick values.
+- `ThumbnailProvider.GetThumbnail` now reads `HKCU\…\Settings\ThumbStyle<EXT>` via the new `SettingsStore.GetThumbStyle(ext)` helper. **Auto** preserves the original heuristic (cartoon ribbon for files with ≥3 CA atoms, CPK otherwise) so existing users see no behaviour change on first run.
+- Twelve per-format ComboBoxes (PDB · CIF · SDF · MOL · MOL2 · XYZ · GRO · CUBE · PQR · VASP · CDJSON · MMTF) plus a "Reset to Auto" button and a "Refresh thumbnails now" shortcut.
+- The `Shared\SettingsStore.cs` file is now `Compile`-linked into `QuickLookProtein.Thumbnail.csproj` so the provider can read the same registry hive the Settings app writes.
+
+Sphere maps to `CpkRenderer` (CPK is element-coloured spheres); Stick currently falls back to CPK until a dedicated stick-radius renderer lands.
+
 ## [1.7.80] — 2026-05-20
 
 ### 🐞 Both OSes — diagnostic logging for the updater path
