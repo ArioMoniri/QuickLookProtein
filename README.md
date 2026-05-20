@@ -8,7 +8,7 @@
 [![Swift 5](https://img.shields.io/badge/Swift-5-orange?logo=swift)](https://swift.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Rendered by 3Dmol.js](https://img.shields.io/badge/rendered%20by-3Dmol.js-purple)](https://3dmol.csb.pitt.edu)
-[![Latest release](https://img.shields.io/github/v/release/ArioMoniri/QuickLookProtein?display_name=tag)](https://github.com/ArioMoniri/QuickLookProtein/releases)
+[![Latest release](https://img.shields.io/github/v/release/ArioMoniri/QuickLookProtein?display_name=tag&sort=semver&cacheSeconds=300&label=release)](https://github.com/ArioMoniri/QuickLookProtein/releases/latest)
 [![Homebrew Cask](https://img.shields.io/badge/Homebrew-quicklookprotein-yellow?logo=homebrew)](Casks/quicklookprotein.rb)
 
 ### 📥 Download
