@@ -6,6 +6,22 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.86</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.86</link>
+      <pubDate>Wed, 20 May 2026 08:56:14 +0000</pubDate>
+      <sparkle:version>1.7.86</sparkle:version>
+      <sparkle:shortVersionString>1.7.86</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows — make broken-registration recovery a single click&lt;/h3&gt;
+&lt;p&gt;v1.7.85 added the Repair button under About → Diagnostics, but users hitting white thumbnails were arriving at the Thumbnails tab first, picking &amp;quot;Auto&amp;quot; or &amp;quot;Cartoon&amp;quot; from a dropdown, seeing nothing happen, and assuming the dropdown was broken (it wasn&amp;#x27;t — the writes saved, but the DLL still wasn&amp;#x27;t loaded so the visible result was identical). v1.7.86 makes the broken state obvious *on the same tab the user lands on* and the fix one click away:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Registration-status banner&lt;/strong&gt; at the top of the Thumbnails tab. Hidden when the CLSID&amp;#x27;s &lt;code&gt;InProcServer32&lt;/code&gt; is present in HKCU; visible (warning-yellow, accent-stroked) with a &amp;quot;Repair now&amp;quot; button when it&amp;#x27;s missing. Checked on window load and re-evaluated after every successful repair. Stops users from fiddling with a dropdown that can&amp;#x27;t affect anything until registration is fixed.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&amp;quot;Repair now&amp;quot; inline in the self-test dialog.&lt;/strong&gt; When &lt;strong&gt;Test thumbnail provider&lt;/strong&gt; finds step 1 or step 2 MISSING, the result MessageBox is now Yes/No: Yes runs &lt;code&gt;RepairThumbnailRegistration&lt;/code&gt; and re-runs the test so the user sees the post-repair OK state before closing. Cuts the recovery flow from four clicks (Test → see error → close → find Repair button → click → re-test) to two (Test → Yes).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.86"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.86/QuickLookProtein-1.7.86.zip" sparkle:edSignature="UCeIdZB+C2jnu3b7micvc8JEMQHbyjvaLTrg+4uMliaF562h3Nz5fUAr2n+LX7xFCmwBK7bSzLQX5mIvoEw5DA==" length="4549960" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.84</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.84</link>
       <pubDate>Wed, 20 May 2026 08:23:38 +0000</pubDate>
