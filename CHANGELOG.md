@@ -4,6 +4,20 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.82] — 2026-05-20
+
+### 🪟 Windows — Settings polish + the *real* version-string bug
+
+v1.7.81 had a hidden bug that turned every "Check for updates" click into a guaranteed 403: the Settings exe reported its own version as `1.0.0.0`, the updater compared that against GitHub's tagged release, decided "yes, new release exists", and beat the anonymous /releases/latest endpoint until it tripped the 60-req/IP/hour limit. v1.7.82 fixes the root cause and several smaller UI issues spotted in the same screenshot.
+
+- **Version string now reads `FileVersion`, not `AssemblyVersion`.** The csproj intentionally pins `AssemblyVersion=1.0.0.0` so WPF binding redirects stay stable across marketing bumps; only `FileVersion` / `InformationalVersion` carry the real version. `UpdateChecker.CurrentVersion` and `MainWindow.SetVersionLabel` now route through `FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location)` so the sidebar, About card, and "Installed version:" line all show the actual installed version (1.7.82 in this build).
+- **Specific 403 / rate-limit handling.** `CheckAsync` now reads the status code + `X-RateLimit-Reset` header and throws a typed `RateLimitedException`. The Settings UI catches that specifically and surfaces *"GitHub's anonymous API limit (60 checks/hour) is exhausted on your IP. Try again after 14:23, or click 'Open release page' to see the latest version manually."* instead of the generic *Couldn't reach GitHub* message. The `Open release page` button is also revealed even when there's no `_pendingUpdate`, so users always have a manual escape.
+- **Sidebar logo at 256-px decode.** The `.ico` holds 16/32/48/64/128/256 frames; WPF's default `Image.Source="pack://…/AppIcon.ico"` picks the first frame (16 px) and upscales — hence the pixelated look. v1.7.82 uses an explicit `BitmapImage UriSource=… DecodePixelWidth="256"` so WPF selects the 256-px PNG-encoded frame and downsamples cleanly to 56.
+- **Default window size 820 × 660** (was 980 × 780). Matches the compact Mac System-Settings footprint the user showed in the reference; min-size also dropped to 720 × 580.
+- **Win11-style ScrollBar template.** The default WPF chrome (arrow buttons, square thumb, chunky track) was replaced with a Fluent-style 10-px thin track + rounded thumb that ramps opacity 0.55 → 0.85 → 1.0 on hover and drag. Applied as the implicit `ScrollBar` style so every scrollable surface in the window picks it up.
+- **WebView2 / footer overlap.** The Live Preview's WebView2 (HWND-hosted) was rendering on top of the WPF footer due to the long-standing WPF airspace problem. v1.7.82 drops the WebView2 height from 320 → 260 px, sets `ClipToBounds="True"` on its containing `Border`, and adds 24 px of bottom padding to the ScrollViewer so even during scroll the live-preview tile stays well clear of the Close-button bar.
+- **Thumbnail provider gets the same diagnostic logger.** New `LogPath` → `%LocalAppData%\QuickLookProtein\thumbnail.log` (1 MB rotation). `Initialize` logs bytes-read + sniffed extension; `GetThumbnail` logs requested size, parsed atom count, the rendered HBITMAP dimensions, and any caught exception with full type + stack. New **"Open thumbnail log"** button in About → Diagnostics so when thumbnails are "still white after refresh" the user can see which step failed (DLL not loaded → empty file; parse error → WARN line; render error → ERR + stack).
+
 ## [1.7.81] — 2026-05-20
 
 ### 🍎 macOS — System-following / Light / Dark theme picker

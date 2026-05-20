@@ -67,6 +67,58 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
     private byte[]? _data;
     private string  _extension = "";
 
+    // ============================================================
+    // File logger (v1.7.82). Shell extensions run inside Explorer's
+    // thumbcache process where Debug.WriteLine goes nowhere
+    // observable. The "thumbnails still white after refresh" bug
+    // was undebuggable through v1.7.81 because every failure mode
+    // (DLL not loaded / parse error / render error / Auto-style
+    // mis-routing) collapses into the same outcome: Explorer paints
+    // the generic icon.
+    //
+    // We write to %LocalAppData%\QuickLookProtein\thumbnail.log
+    // with 1 MB rotation, matching the UpdateChecker logger. The
+    // Settings app's About → Diagnostics card gets an "Open
+    // thumbnail log" button (v1.7.82+) so users can ship the file
+    // when reporting "thumbnails still white".
+    private static readonly object _logLock = new object();
+    public static string LogPath
+    {
+        get
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "QuickLookProtein");
+            try { Directory.CreateDirectory(dir); } catch { }
+            return Path.Combine(dir, "thumbnail.log");
+        }
+    }
+
+    private static void Log(string level, string message)
+    {
+        try
+        {
+            lock (_logLock)
+            {
+                var fi = new FileInfo(LogPath);
+                if (fi.Exists && fi.Length > 1024 * 1024)
+                {
+                    try { File.WriteAllText(LogPath, ""); } catch { }
+                }
+                var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level}] {message}\r\n";
+                File.AppendAllText(LogPath, line);
+            }
+        }
+        catch { /* swallowing here is correct: a shell extension must
+                  not throw out of any code path Explorer can observe */ }
+    }
+
+    private static void LogException(string context, Exception ex)
+    {
+        Log("ERR", $"{context}: {ex.GetType().Name}: {ex.Message}");
+        Log("ERR", ex.ToString());
+    }
+
     /// <summary>
     /// Explorer calls this with the file's contents as an IStream.
     /// We read it all into memory once - molecule files are small
@@ -129,6 +181,7 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
         // from the stream contents instead - cheaper than registering
         // a different CLSID per extension.
         _extension = SniffFormat(_data);
+        Log("INFO", $"Initialize: read {_data?.Length ?? 0} bytes, sniffed extension='{_extension}'");
     }
 
     /// <summary>
@@ -145,14 +198,24 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
         // We sidestep the GDI+ alpha-HBITMAP roundtrip headaches by
         // not advertising alpha here.
         pdwAlpha = WTS_ALPHATYPE.WTSAT_RGB;
-        if (_data is null || _data.Length == 0) return;
+        if (_data is null || _data.Length == 0)
+        {
+            Log("WARN", $"GetThumbnail: no _data (cx={cx}, ext='{_extension}')");
+            return;
+        }
 
         try
         {
             int size = (int)Math.Max(16, Math.Min(cx, 1024));
+            Log("INFO", $"GetThumbnail: cx={cx} size={size} ext='{_extension}'");
             using var ms = new MemoryStream(_data, writable: false);
             var atoms = MoleculeParser.Parse(ms, _extension);
-            if (atoms is null || atoms.Count == 0) return;
+            if (atoms is null || atoms.Count == 0)
+            {
+                Log("WARN", $"GetThumbnail: MoleculeParser returned {(atoms is null ? "null" : "0 atoms")} for ext='{_extension}'");
+                return;
+            }
+            Log("INFO", $"GetThumbnail: parsed {atoms.Count} atoms");
             // Pick render style. v1.7.81+ honours the per-format user
             // setting from HKCU\Software\QuickLookProtein\Settings.
             // "Auto" preserves the original heuristic: cartoon ribbon
@@ -178,15 +241,19 @@ public sealed class MoleculeThumbnailProvider : IThumbnailProvider, IInitializeW
             // (via DeleteObject) - which is exactly what Explorer
             // does internally, so this lifetime matches the contract.
             hBitmap = bmp.GetHbitmap();
+            Log("INFO", $"GetThumbnail: OK, style={style}, returning {bmp.Width}x{bmp.Height} HBITMAP");
         }
-        catch
+        catch (Exception ex)
         {
             // Never throw out of a thumbnail provider - Explorer
             // catches the exception and shows a generic icon, but it
             // also blacklists the file extension for the rest of the
             // session, which is much worse than just returning a
             // null thumbnail and falling back to the generic icon
-            // for this one file.
+            // for this one file. We DO log the failure to the
+            // rotating thumbnail.log so the user can see what
+            // happened.
+            LogException("GetThumbnail failed", ex);
             hBitmap = IntPtr.Zero;
         }
     }

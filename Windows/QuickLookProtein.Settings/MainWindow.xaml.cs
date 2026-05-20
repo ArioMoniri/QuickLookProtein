@@ -83,11 +83,15 @@ public partial class MainWindow : Window
 
     private void SetVersionLabel()
     {
-        var asm = Assembly.GetExecutingAssembly();
-        var v = asm.GetName().Version;
-        var s = $"Version {v?.Major}.{v?.Minor}.{v?.Build}";
-        // Sidebar label (compact) + About-tab label (matches the
-        // "Version 1.7.x" style the Mac About card uses).
+        // Reads from FileVersionInfo, NOT Assembly.GetName().Version —
+        // the csproj pins AssemblyVersion=1.0.0.0 to keep WPF binding
+        // redirects stable across marketing bumps, so GetName().Version
+        // would always show 1.0.0. UpdateChecker.CurrentVersion has the
+        // same caveat; both code-paths route through the same helper
+        // so the sidebar label, About-tab label, and Software Update
+        // "Installed version" line never disagree.
+        var v = UpdateChecker.CurrentVersion;
+        var s = $"Version {v.Major}.{v.Minor}.{v.Build}";
         VersionLabel.Text = s;
         if (VersionLabelAbout != null) VersionLabelAbout.Text = s;
     }
@@ -922,6 +926,24 @@ public partial class MainWindow : Window
                 }
             }
         }
+        catch (RateLimitedException rle)
+        {
+            // GitHub 403 with the actual reset time embedded in the
+            // message. Surface it verbatim + reveal the Open release
+            // page button so the user has a manual escape.
+            UpdateStatusLabel.Text = rle.Message;
+            OpenReleasePageButton.Visibility = Visibility.Visible;
+            // Synthesise a pseudo-pendingUpdate so the existing
+            // OpenReleasePage_Click handler has a URL to launch.
+            _pendingUpdate = new UpdateInfo
+            {
+                Latest      = new Version(0, 0, 0),
+                TagName     = "latest",
+                ReleaseUrl  = "https://github.com/ArioMoniri/QuickLookProtein/releases/latest",
+                SetupExeUrl = "",
+                ReleaseNotes = "",
+            };
+        }
         catch (Exception ex)
         {
             UpdateStatusLabel.Text = "Update check failed: " + ex.Message;
@@ -971,6 +993,42 @@ public partial class MainWindow : Window
     // The log captures actual exception detail (HResult, message, stack)
     // for any failed check or install — the previous behaviour swallowed
     // those errors and only surfaced a generic MessageBox.
+    // v1.7.82: open the rolling log written by the Explorer thumbnail
+    // provider (QuickLookProtein.Thumbnail.MoleculeThumbnailProvider).
+    // Path is duplicated rather than referenced so the Settings app
+    // doesn't drag System.Drawing into its dependency closure.
+    private void OpenThumbnailLog_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "QuickLookProtein");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, "thumbnail.log");
+            if (!File.Exists(path))
+            {
+                File.WriteAllText(path,
+                    "QuickLookProtein thumbnail provider log\r\n" +
+                    "Empty file usually means Explorer never loaded the thumbnail DLL.\r\n" +
+                    "To populate it: open a folder containing .pdb / .cif / .sdf / etc.,\r\n" +
+                    "switch the folder to Icon / Tile / Gallery view, then re-open this log.\r\n");
+            }
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                "Could not open the thumbnail log:\n\n" + ex.Message,
+                "QuickLookProtein",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void OpenUpdateLog_Click(object sender, RoutedEventArgs e)
     {
         try

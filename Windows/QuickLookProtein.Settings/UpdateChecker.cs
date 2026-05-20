@@ -38,6 +38,7 @@ using Microsoft.Win32;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -46,6 +47,16 @@ using System.Threading.Tasks;
 using System.Windows;
 
 namespace QuickLookProtein.Settings;
+
+/// <summary>Thrown by <see cref="UpdateChecker.CheckAsync"/> when
+/// GitHub returns 403 with rate-limit headers. The MainWindow click
+/// handler catches it specifically so the UI can surface the actual
+/// reset time rather than the generic "Couldn't reach GitHub"
+/// message used for other network failures.</summary>
+public class RateLimitedException : Exception
+{
+    public RateLimitedException(string message) : base(message) { }
+}
 
 public sealed class UpdateInfo
 {
@@ -145,13 +156,41 @@ internal static class UpdateChecker
 
     /// <summary>Current Settings.exe version stamped by the release
     /// workflow's /p:FileVersion=… flag. Falls back to 0.0.0 for
-    /// local dev builds (the csproj defaults FileVersion to 0.0.0).</summary>
+    /// local dev builds (the csproj defaults FileVersion to 0.0.0).
+    ///
+    /// IMPORTANT: this reads <see cref="FileVersionInfo"/>, not
+    /// <c>Assembly.GetName().Version</c>. The csproj pins
+    /// <c>AssemblyVersion=1.0.0.0</c> on purpose so WPF binding
+    /// redirects don't break across marketing-version bumps; only
+    /// FileVersion / InformationalVersion get the real marketing
+    /// number. v1.7.77-1.7.81 incorrectly read GetName().Version and
+    /// always reported 1.0.0.0 → every install thought it was on a
+    /// dev build, so "Check for updates" always claimed a newer
+    /// release existed (or 403'd against the GitHub rate limiter
+    /// from runaway re-checks).</summary>
     public static Version CurrentVersion
     {
         get
         {
             try
             {
+                var path = Assembly.GetExecutingAssembly().Location;
+                if (!string.IsNullOrEmpty(path))
+                {
+                    var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(path);
+                    // FileVersion is the stamped marketing version
+                    // (e.g. "1.7.81.0"); InformationalVersion is the
+                    // string passed to /p:InformationalVersion which
+                    // can be "1.7.81" without the .0 suffix. Prefer
+                    // FileVersion since it's always 4-part and
+                    // Version.Parse-friendly.
+                    if (!string.IsNullOrEmpty(fvi.FileVersion) &&
+                        Version.TryParse(fvi.FileVersion, out var parsed))
+                    {
+                        return parsed;
+                    }
+                }
+                // Last resort: AssemblyVersion (pinned 1.0.0.0).
                 var v = Assembly.GetExecutingAssembly().GetName().Version;
                 return v ?? new Version(0, 0, 0, 0);
             }
@@ -183,7 +222,33 @@ internal static class UpdateChecker
             http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
             http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
-            var json = await http.GetStringAsync(ApiUrl).ConfigureAwait(false);
+            // Use GetAsync (not GetStringAsync) so we can read the
+            // status code and headers on 403 — GitHub's anonymous
+            // /releases/latest endpoint enforces a 60-req/IP/hour
+            // limit and returns 403 with a X-RateLimit-Reset epoch
+            // header. v1.7.81 hit the limit because the runtime read
+            // AssemblyVersion=1.0.0.0 instead of the FileVersion, so
+            // every install thought it was on a dev build and the
+            // "newer release exists" path kept beating up the API
+            // on every Settings launch.
+            using var resp = await http.GetAsync(ApiUrl).ConfigureAwait(false);
+            if ((int)resp.StatusCode == 403)
+            {
+                var reset = resp.Headers.TryGetValues("X-RateLimit-Reset", out var rv)
+                    ? rv.FirstOrDefault() : null;
+                string resetStr = "later";
+                if (long.TryParse(reset, out var epoch))
+                {
+                    var dt = DateTimeOffset.FromUnixTimeSeconds(epoch).ToLocalTime();
+                    resetStr = dt.ToString("HH:mm");
+                }
+                Log("WARN", $"GitHub API rate-limit hit; resets at {resetStr}");
+                throw new RateLimitedException(
+                    $"GitHub's anonymous API limit (60 checks/hour) is exhausted on your IP. " +
+                    $"Try again after {resetStr}, or click 'Open release page' to see the latest version manually.");
+            }
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
             Log("INFO", $"GitHub /releases/latest -> {json.Length} bytes");
 
             // Parse the small subset we need without pulling in a JSON
@@ -222,6 +287,13 @@ internal static class UpdateChecker
                 SetupExeUrl = setupUrl ?? "",
                 ReleaseNotes = TruncateMarkdown(body ?? "", 500),
             };
+        }
+        catch (RateLimitedException)
+        {
+            // Let the UI handler surface the actual reset-time message
+            // rather than collapsing to "Couldn't reach GitHub". Already
+            // logged via the WARN inside the 403 branch.
+            throw;
         }
         catch (Exception ex)
         {
