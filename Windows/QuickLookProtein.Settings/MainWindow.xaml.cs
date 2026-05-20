@@ -7,9 +7,11 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Microsoft.Win32;
 using QuickLookProtein.Shared;
 
 namespace QuickLookProtein.Settings;
@@ -133,6 +135,12 @@ public partial class MainWindow : Window
         CtlShowLabelCACheck.IsChecked  = SettingsStore.GetCtlShowLabelCA();
         CtlShowRecenterCheck.IsChecked = SettingsStore.GetCtlShowRecenter();
 
+        // Launch-at-startup checkbox reflects current HKCU\...\Run
+        // state.  Reads at load time so the checkbox is correct
+        // even if QL-Win's own tray menu (or another tool) flipped
+        // the registry between Settings-app sessions.
+        LaunchAtStartupCheck.IsChecked = IsLaunchAtStartupEnabled();
+
         // Preview window size — populate slider + text box. The
         // text-box-changed handler updates the slider and vice versa
         // (both wired in WireChangeHandlers below).
@@ -206,6 +214,24 @@ public partial class MainWindow : Window
         InfoBondCountCheck.Click        += (_, _) => Save(() => SettingsStore.SetInfoShowBondCount(InfoBondCountCheck.IsChecked == true));
         InfoPDBTitleCheck.Click         += (_, _) => Save(() => SettingsStore.SetInfoShowPDBTitle(InfoPDBTitleCheck.IsChecked == true));
         InfoFormatCheck.Click           += (_, _) => Save(() => SettingsStore.SetInfoShowFormat(InfoFormatCheck.IsChecked == true));
+
+        LaunchAtStartupCheck.Click += (_, _) =>
+        {
+            if (_suppressWrites) return;
+            try
+            {
+                SetLaunchAtStartup(LaunchAtStartupCheck.IsChecked == true);
+                StatusLabel.Text = LaunchAtStartupCheck.IsChecked == true
+                    ? "QuickLook will launch at sign-in."
+                    : "QuickLook will NOT launch at sign-in. Start it manually after each boot.";
+            }
+            catch (Exception ex)
+            {
+                StatusLabel.Text = "Failed to update startup: " + ex.Message;
+                // Reflect actual state if the write failed.
+                LaunchAtStartupCheck.IsChecked = IsLaunchAtStartupEnabled();
+            }
+        };
 
         // Preview-window-size wiring. The slider and text box stay in
         // sync via a guard flag so the slider->box->slider feedback
@@ -687,4 +713,116 @@ public partial class MainWindow : Window
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    // ---- Launch-at-startup (1.7.76+) ---------------------------------
+    //
+    // Per-user autorun via HKCU\Software\Microsoft\Windows\CurrentVersion\Run.
+    // Value name "QuickLook" matches what QL-Win's own installer writes,
+    // so toggling here flips the same entry QL-Win's tray menu does -
+    // no two competing autorun records.
+
+    private const string RunRoot  = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string RunValue = "QuickLook";
+
+    private static string? FindQuickLookExe()
+    {
+        var candidates = new[]
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                         "Programs", "QuickLook", "QuickLook.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                         "QuickLook", "QuickLook.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                         "QuickLook", "QuickLook.exe"),
+        };
+        foreach (var p in candidates) if (File.Exists(p)) return p;
+        return null;
+    }
+
+    private static bool IsLaunchAtStartupEnabled()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunRoot, writable: false);
+            return key?.GetValue(RunValue) is string s && !string.IsNullOrWhiteSpace(s);
+        }
+        catch { return false; }
+    }
+
+    private static void SetLaunchAtStartup(bool enabled)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(RunRoot, writable: true)
+            ?? throw new InvalidOperationException("Could not open HKCU\\...\\Run for writing");
+        if (enabled)
+        {
+            var exe = FindQuickLookExe()
+                ?? throw new FileNotFoundException("QuickLook.exe not found in any standard install path; reinstall QuickLookProtein-Setup.exe.");
+            // Quote the path so paths with spaces work.
+            key.SetValue(RunValue, "\"" + exe + "\"", RegistryValueKind.String);
+        }
+        else
+        {
+            key.DeleteValue(RunValue, throwOnMissingValue: false);
+        }
+    }
+
+    // ---- Refresh thumbnails (1.7.76+) --------------------------------
+    //
+    // P/Invokes the same SHChangeNotify broadcast install.ps1 does,
+    // plus ie4uinit -ClearIconCache. If neither nudge revives stale
+    // thumbnails the user can click the button again with the
+    // Shift key held to force a full explorer.exe restart.
+
+    [DllImport("shell32.dll", CharSet = CharSet.Auto)]
+    private static extern void SHChangeNotify(int wEventId, int uFlags, IntPtr dwItem1, IntPtr dwItem2);
+
+    private const int SHCNE_ASSOCCHANGED = 0x08000000;
+    private const int SHCNF_IDLIST       = 0x0000;
+
+    private void RefreshThumbnails_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            // 1. Broadcast: shell re-walks association handlers.
+            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+
+            // 2. Clear the icon cache so old bitmaps don't paper over
+            //    the new handler results.
+            var ie4uinit = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "ie4uinit.exe");
+            if (File.Exists(ie4uinit))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = ie4uinit,
+                    Arguments = "-ClearIconCache",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                })?.WaitForExit(3000);
+            }
+
+            // 3. If the user held Shift while clicking, do the
+            //    nuclear option: restart explorer.exe. Documented in
+            //    the button's tooltip + the README's Diagnostics
+            //    section so it's discoverable but not a surprise.
+            var shift = (System.Windows.Input.Keyboard.Modifiers
+                         & System.Windows.Input.ModifierKeys.Shift) != 0;
+            if (shift)
+            {
+                foreach (var p in Process.GetProcessesByName("explorer"))
+                {
+                    try { p.Kill(); } catch { }
+                }
+                // Windows auto-restarts explorer.exe from the shell
+                // watchdog after a brief delay; no need to launch.
+            }
+
+            StatusLabel.Text = shift
+                ? "Thumbnails refresh requested + explorer.exe restarted."
+                : "Thumbnails refresh requested. Switch Explorer to Icon view to see changes; Shift+click this for a full Explorer restart.";
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = "Refresh failed: " + ex.Message;
+        }
+    }
 }

@@ -133,8 +133,15 @@ function Install-QuickLookHost {
     # the install itself - we counter that below with a polling
     # spinner so the user can see we're still alive.
     Write-Host "  Launching silent installer (this can take 30-60 seconds)..."
+    # /TASKS=startup registers QL-Win to launch at sign-in.  Previous
+    # releases had this line documented in the comment-block above
+    # but missing from -ArgumentList; users who installed via our
+    # Setup.exe had to manually enable startup via the QL-Win tray
+    # menu after every reboot.  Fixed in 1.7.76 by passing it
+    # explicitly.  The Settings app's new "Launch at startup"
+    # toggle lets users flip this later without re-running Setup.exe.
     $proc = Start-Process -FilePath $installer `
-        -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS" `
+        -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/TASKS=startup" `
         -PassThru
 
     # When the script runs under Setup.exe (cmd is hidden, stdout
@@ -589,15 +596,39 @@ function Register-ThumbnailHandler {
 
     Write-Host "  Registered $($extensions.Count) extensions to CLSID $clsid."
 
-    # 3) Nudge Explorer to invalidate cached thumbnails for those
-    #    extensions. ClearIconCache is the documented way; a hard
-    #    Explorer restart is the only fully reliable way but we
-    #    don't want to do that without asking - it's disruptive.
+    # 3) Nudge Explorer to invalidate cached thumbnails AND re-walk
+    #    file-extension handler registrations.
+    #
+    # ClearIconCache alone is the documented "purge the cached
+    # thumbnail bitmaps" call, but Windows Explorer ALSO caches the
+    # mapping <ext> -> CLSID at startup; without SHChangeNotify
+    # broadcasting SHCNE_ASSOCCHANGED, Explorer keeps serving stale
+    # thumbnails (the user sees blank/white icons until they restart
+    # explorer.exe manually).  Adding the broadcast is the
+    # equivalent of "right-click the desktop -> Refresh" from a
+    # shell-extension installer's point of view, and matches what
+    # well-behaved Inno Setup scripts do via their built-in
+    # ChangesAssociations directive.
     try {
         & "$env:WinDir\system32\ie4uinit.exe" "-ClearIconCache" 2>$null | Out-Null
-        Write-Host "  Cleared Explorer icon cache (existing files may take a moment to refresh)."
+        Write-Host "  Cleared Explorer icon cache."
     } catch {
         Write-Host "  (Icon cache clear failed - thumbnails will refresh as Explorer revisits files.)"
+    }
+    try {
+        # SHChangeNotify(SHCNE_ASSOCCHANGED=0x08000000,
+        #                SHCNF_IDLIST=0x0000, NULL, NULL)
+        # Tells the shell that file associations changed; Explorer
+        # re-reads our registered thumbnail handler for the
+        # extensions we just touched, without any process kill.
+        Add-Type -Namespace QLP -Name ShellNotify -MemberDefinition @"
+            [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet=System.Runtime.InteropServices.CharSet.Auto)]
+            public static extern void SHChangeNotify(int wEventId, int uFlags, System.IntPtr dwItem1, System.IntPtr dwItem2);
+"@ -ErrorAction SilentlyContinue
+        [QLP.ShellNotify]::SHChangeNotify(0x08000000, 0x0000, [IntPtr]::Zero, [IntPtr]::Zero)
+        Write-Host "  Broadcast SHCNE_ASSOCCHANGED to Explorer (thumbnails should refresh shortly)."
+    } catch {
+        Write-Host "  (SHChangeNotify broadcast failed - run 'Refresh thumbnails' in Settings app to retry.)"
     }
 }
 
@@ -716,16 +747,20 @@ Write-Host "Done." -ForegroundColor Green
 Write-Host "Hit <Space> on a .pdb / .cif / .sdf / .mol / .mol2 / .xyz / .gro / .cube / .pqr / .vasp / .cdjson / .mmtf file in Explorer."
 Write-Host ""
 
-# Launch the Settings app on a fresh install so the user immediately
-# sees the control panel and the file-format preview tiles. Upgrades
-# stay quiet so a `gh release download` -> re-run doesn't keep
-# popping windows.
-if ($wasFirstInstall) {
-    $settingsExe = Join-Path $env:LocalAppData "QuickLookProtein\Settings\QuickLookProtein.Settings.exe"
-    if (Test-Path $settingsExe) {
-        Write-Host "Opening QuickLookProtein Settings..."
-        try { Start-Process -FilePath $settingsExe } catch {
-            Write-Host "  Could not launch Settings: $($_.Exception.Message)"
-        }
+# Launch the Settings app every time install.ps1 succeeds. Previously
+# we only opened it on a fresh install (-not Test-Path on the Settings
+# exe), but users running the upgrade path then had no visible signal
+# that the install actually finished - they had to dig through the
+# Start Menu to find the Settings shortcut. Opening the window on
+# every install also surfaces the "Refresh thumbnails" and
+# "Launch at startup" controls that landed in 1.7.76, so users
+# discover them organically. Headless invocations can opt out by
+# setting QLP_SKIP_LAUNCH=1 (e.g. CI runners that install into a
+# throwaway profile and don't want a GUI to pop).
+$settingsExe = Join-Path $env:LocalAppData "QuickLookProtein\Settings\QuickLookProtein.Settings.exe"
+if ((Test-Path $settingsExe) -and -not $env:QLP_SKIP_LAUNCH) {
+    Write-Host "Opening QuickLookProtein2 Settings..."
+    try { Start-Process -FilePath $settingsExe } catch {
+        Write-Host "  Could not launch Settings: $($_.Exception.Message)"
     }
 }

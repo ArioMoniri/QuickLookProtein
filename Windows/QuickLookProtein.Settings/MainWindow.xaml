@@ -660,6 +660,27 @@
                         </StackPanel>
                     </Border>
 
+                    <!--
+                      Startup card (1.7.76+).  Mirrors QL-Win's own
+                      tray-menu "Run at startup" toggle, but writes
+                      directly to HKCU\Software\Microsoft\Windows\
+                      CurrentVersion\Run\QuickLook so users don't
+                      have to dig through QL-Win's menus.  Reads at
+                      load time so the checkbox reflects current
+                      state even if QL-Win itself flipped it.
+                    -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Startup"
+                                       Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Style="{StaticResource Caption}"
+                                       Text="Whether QuickLook (the host app that loads our plugin) launches automatically when you sign in to Windows.  Without this, Space-bar previews only work after you manually launch QuickLook from the Start Menu."/>
+                            <CheckBox x:Name="LaunchAtStartupCheck"
+                                      Content="Launch QuickLook at sign-in"
+                                      Margin="0,4"/>
+                        </StackPanel>
+                    </Border>
+
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <TextBlock Text="Diagnostics"
@@ -681,6 +702,22 @@
                                     Padding="10,4" Margin="0,2"
                                     Cursor="Hand"
                                     Click="RestartQuickLookTray_Click"/>
+                            <!--
+                              Refresh thumbnails (1.7.76+). For users
+                              whose Explorer didn't pick up the new
+                              IThumbnailProvider after install (white
+                              icons in Icon/Tile/Gallery view).  Does
+                              the same SHChangeNotify(SHCNE_ASSOCCHANGED)
+                              broadcast install.ps1 does, plus
+                              ie4uinit -ClearIconCache, plus a forced
+                              explorer.exe restart as a last resort.
+                            -->
+                            <Button Content="Refresh thumbnails"
+                                    HorizontalAlignment="Left"
+                                    Padding="10,4" Margin="0,2"
+                                    Cursor="Hand"
+                                    ToolTip="Force Explorer to re-query thumbnail handlers for our extensions. Run this if .pdb / .cif files in Icon view show as blank/white icons after install."
+                                    Click="RefreshThumbnails_Click"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>

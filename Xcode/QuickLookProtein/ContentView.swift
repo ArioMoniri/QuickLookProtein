@@ -794,6 +794,29 @@ struct ContentView: View {
                         .frame(width: 160)
                     }
                     RowDivider()
+                    // Open-at-Login toggle (1.7.76+). On macOS 13+
+                    // this flips SMAppService.mainApp.register() /
+                    // .unregister(); on macOS 11/12 the toggle row
+                    // shows a deep-link button instead because the
+                    // sandboxed app can't query LSSharedFileList.
+                    FormRow(label: "Open at login") {
+                        if LoginItemController.shared.isAutomaticToggleSupported {
+                            Toggle("", isOn: Binding(
+                                get: { LoginItemController.shared.isEnabled },
+                                set: { LoginItemController.shared.setEnabled($0) }
+                            ))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .help("Launch QuickLookProtein2 automatically when you sign in.")
+                        } else {
+                            Button("Open Login Items…") {
+                                LoginItemController.shared.openSystemSettingsLoginItems()
+                            }
+                            .help("macOS 11 and 12 don't expose a programmatic toggle. Open the Login Items pane in System Settings and add QuickLookProtein2 there.")
+                        }
+                    }
+
+                    RowDivider()
                     // QL preview popover starting size (1.7.75+).
                     // macOS Quick Look honours this on the FIRST
                     // preview of each UTI; after the user drag-

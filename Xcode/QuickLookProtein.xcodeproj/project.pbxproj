@@ -37,6 +37,7 @@
 		4BED22A32821CD6D003F66A0 /* 3Dmol.js in Resources */ = {isa = PBXBuildFile; fileRef = 4BED22A22821CD6D003F66A0 /* 3Dmol.js */; };
 		4BED22A42821CD6D003F66A0 /* 3Dmol.js in Resources */ = {isa = PBXBuildFile; fileRef = 4BED22A22821CD6D003F66A0 /* 3Dmol.js */; };
 		A1AR10AA1A2B3C4D00000001 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AR10AA1A2B3C4D00000002 /* Updater.swift */; };
+		A1AR10AA1A2B3C4D00000003 /* LoginItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AR10AA1A2B3C4D00000004 /* LoginItem.swift */; };
 		A1BE7Z1E2A2B3C4D00000001 /* benzene.xyz in Resources */ = {isa = PBXBuildFile; fileRef = A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */; };
 		A1CAF1E01A2B3C4D00000001 /* caffeine.mol2 in Resources */ = {isa = PBXBuildFile; fileRef = A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */; };
 		A1CDJ1E7A2B3C4D00000001 /* methane.cdjson in Resources */ = {isa = PBXBuildFile; fileRef = A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */; };
@@ -116,6 +117,7 @@
 		4BE18E05281F3D0200034BE4 /* 6oc6.pdb */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = 6oc6.pdb; sourceTree = "<group>"; };
 		4BED22A22821CD6D003F66A0 /* 3Dmol.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = 3Dmol.js; sourceTree = "<group>"; };
 		A1AR10AA1A2B3C4D00000002 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
+		A1AR10AA1A2B3C4D00000004 /* LoginItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginItem.swift; sourceTree = "<group>"; };
 		A1BE7Z1E2A2B3C4D00000002 /* benzene.xyz */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = benzene.xyz; sourceTree = "<group>"; };
 		A1CAF1E01A2B3C4D00000002 /* caffeine.mol2 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = caffeine.mol2; sourceTree = "<group>"; };
 		A1CDJ1E7A2B3C4D00000002 /* methane.cdjson */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = methane.cdjson; sourceTree = "<group>"; };
@@ -252,6 +254,7 @@
 				4B0888B626D64B54009492C5 /* Assets */,
 				4B0FDF7E26C9A31F00C94DDE /* QuickLookProteinApp.swift */,
 				A1AR10AA1A2B3C4D00000002 /* Updater.swift */,
+				A1AR10AA1A2B3C4D00000004 /* LoginItem.swift */,
 				4B0FDF8026C9A31F00C94DDE /* ContentView.swift */,
 				4B0FDF8226C9A32100C94DDE /* Assets.xcassets */,
 				4B0FDF8726C9A32100C94DDE /* Info.plist */,
@@ -517,6 +520,7 @@
 				4B0FDF8126C9A31F00C94DDE /* ContentView.swift in Sources */,
 				4B0FDF7F26C9A31F00C94DDE /* QuickLookProteinApp.swift in Sources */,
 				A1AR10AA1A2B3C4D00000001 /* Updater.swift in Sources */,
+				A1AR10AA1A2B3C4D00000003 /* LoginItem.swift in Sources */,
 				4B99E5C526E4FD7200B44AD9 /* VersionCheck.swift in Sources */,
 				4B450AC326D2D6D1007F0A39 /* SharedFunctions.swift in Sources */,
 				MM010001AAAA00000000A001 /* MoleculeModel.swift in Sources */,
@@ -594,7 +598,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.75;
+				MARKETING_VERSION = 1.7.76;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLThumbnail;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -633,7 +637,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.75;
+				MARKETING_VERSION = 1.7.76;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLThumbnail;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -671,7 +675,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.75;
+				MARKETING_VERSION = 1.7.76;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLActions;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -710,7 +714,7 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.75;
+				MARKETING_VERSION = 1.7.76;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLActions;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -862,7 +866,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.75;
+				MARKETING_VERSION = 1.7.76;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -890,7 +894,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
-				MARKETING_VERSION = 1.7.75;
+				MARKETING_VERSION = 1.7.76;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -913,7 +917,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.75;
+				MARKETING_VERSION = 1.7.76;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -937,7 +941,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.75;
+				MARKETING_VERSION = 1.7.76;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ariomoniri.QuickLookProtein.QLExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

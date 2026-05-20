@@ -228,6 +228,19 @@ Both Settings apps expose a **Preview size** control that drives the initial geo
 
 **TL;DR:** if the preview window feels too big or too small, change it in the Settings app once. Both platforms let you drag-resize the popover from any corner for ad-hoc adjustments.
 
+#### Launch at sign-in (1.7.76+)
+
+| Platform | Where to change it | What it actually does |
+|---|---|---|
+| 🍎 macOS | **Settings → Appearance → Open at login** (toggle) | On macOS 13+, calls `SMAppService.mainApp.register()` / `.unregister()` so the app is in your Login Items list. On macOS 11/12, the row shows an **Open Login Items…** button that deep-links into System Settings (Apple's sandboxed API doesn't expose a programmatic toggle on those versions). |
+| 🪟 Windows | **Settings → Startup → Launch QuickLook at sign-in** (checkbox) | Writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\QuickLook` pointing at the installed `QuickLook.exe`. Identical key QL-Win's own tray menu writes to — flipping here flips its view of the same setting. |
+
+`QuickLookProtein-Setup.exe` enables launch-at-startup by default (it now passes `/TASKS=startup` to QL-Win's installer). Untick the Settings checkbox if you'd rather start QuickLook manually.
+
+#### "My thumbnails are white after install" (Windows, 1.7.76+)
+
+Explorer caches the `<extension> → IThumbnailProvider CLSID` mapping at startup. After a fresh install of a thumbnail handler it doesn't re-query our entry until either (a) `SHChangeNotify(SHCNE_ASSOCCHANGED)` is broadcast or (b) `explorer.exe` restarts. `install.ps1` now broadcasts that signal at the end of the thumbnail-handler registration step, but for users whose Explorer didn't pick it up (RDP sessions, fast-user-switching, etc.) the Settings app exposes a **Refresh thumbnails** button under Diagnostics. **Shift-click** that button to do a nuclear `explorer.exe` kill (the shell auto-respawns) for cases where SHChangeNotify alone isn't enough.
+
 ---
 
 ## 📦 Installation

@@ -4,6 +4,33 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.76] — 2026-05-20
+
+### 🪟 Windows — first-run experience and thumbnail cache refresh
+
+User reported `.pdb` files showed blank/white thumbnails in Icon view after install, even though the diagnostic showed our `IThumbnailProvider` was correctly registered under `HKCU\Software\Classes\.pdb\ShellEx`. Cause: `install.ps1` cleared the icon cache (`ie4uinit -ClearIconCache`) but didn't tell Explorer that file *associations* had changed, so it kept serving its in-memory CLSID->handler mapping without re-querying our new entry.
+
+- **`install.ps1` now broadcasts `SHChangeNotify(SHCNE_ASSOCCHANGED)`** after the thumbnail-handler registration. Explorer re-reads associations and re-asks our handler for visible folders without any process kill. Same broadcast a well-behaved Inno Setup script triggers via the `ChangesAssociations` directive.
+- **New "Refresh thumbnails" button** in Settings → Diagnostics. Runs the same broadcast + ClearIconCache from the user's session for cases where the install-time broadcast didn't propagate (RDP sessions, fast-user-switch scenarios). Shift-click does a nuclear-option `explorer.exe` kill (the shell auto-respawns) for the rare cases where SHChangeNotify isn't enough.
+
+### 🪟 Windows — launch-at-startup
+
+- **Fixed code-comment mismatch in `install.ps1`**: the comment block claimed we passed `/TASKS=startup` to QL-Win's Inno Setup installer, but the actual `-ArgumentList` didn't include it. Users were finding QL-Win disabled after every reboot and had to manually re-enable startup from QL-Win's tray menu. Added the missing arg.
+- **New "Startup" card in the Settings app** with a "Launch QuickLook at sign-in" checkbox. Reads + writes `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\QuickLook` (same key QL-Win's tray menu uses) so flipping it here flips QL-Win's view of the same setting. The value points at the installed `QuickLook.exe` (Local/Programs/QuickLook, Program Files, or Program Files (x86); whichever exists).
+
+### 🪟 Windows — Settings app launches after every install (not just first)
+
+- Previously gated on `-not (Test-Path Settings.exe)` so only the FIRST install opened the Settings window. Upgrades stayed silent, which left users wondering whether the upgrade had finished. Now the Settings window opens after every install run unless `QLP_SKIP_LAUNCH=1` is set (for headless CI installs into throwaway profiles). This also surfaces the new Startup / Preview-size / Refresh-thumbnails controls to existing users without them needing to dig through the Start Menu.
+
+### 🍎 macOS — Open at login toggle
+
+- **New `Xcode/QuickLookProtein/LoginItem.swift`** wraps `SMAppService.mainApp` (macOS 13+) so the Settings UI can flip "launch QuickLookProtein2 at sign-in" without diving into System Settings. The toggle in Settings → Appearance reads the runtime state via `SMAppService.mainApp.status` so it stays in sync if the user flips it elsewhere.
+- **macOS 11/12 fallback**: those versions don't expose a sandboxed programmatic toggle; the Settings row instead shows an "Open Login Items…" button that deep-links into `System Settings → General → Login Items` so the user can add the app there with one click. The deep-link URL has been stable since Big Sur even though the pane moved between "System Preferences" and "System Settings" in macOS 13.
+
+### Both — README
+
+The Settings section's matrix now includes Launch-at-startup behaviour per OS alongside Preview-size. Diagnostics section gains a "white thumbnails after install" entry pointing at the new Refresh button.
+
 ## [1.7.75] — 2026-05-20
 
 ### 🪟 + 🍎 User-tunable Quick Look preview window size
