@@ -12,6 +12,8 @@ A multi-format Quick Look extension for macOS and a QL-Win plugin for Windows. R
 
 ![Quick Look preview in action — Space-bar on a .pdb file in Finder](Screenshots/QuickLook.gif)
 
+<sub>([Higher-quality MP4 version](Screenshots/QuickLook.mp4) — 5.4 MB. The GIF above auto-plays inline on GitHub.)</sub>
+
 <p align="center">
   <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.dmg"><img src="docs/download-macos.svg" alt="Download for macOS" height="64"></a>
   &nbsp;
