@@ -6,6 +6,26 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.91</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.91</link>
+      <pubDate>Wed, 20 May 2026 11:02:26 +0000</pubDate>
+      <sparkle:version>1.7.91</sparkle:version>
+      <sparkle:shortVersionString>1.7.91</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🍎 macOS — dedicated Diagnostics tab in the sidebar&lt;/h3&gt;
+&lt;p&gt;Through v1.7.90 the diagnostic surfaces were scattered: extension log viewers + self-test under About → Software Update card, &amp;quot;Reset Quick Look cache&amp;quot; + &amp;quot;Quick Look not updating?&amp;quot; tile at the bottom of the Software Update tab. Users hitting &amp;quot;Quick Look isn&amp;#x27;t refreshing&amp;quot; had to know to look in two unrelated places.&lt;/p&gt;
+&lt;p&gt;v1.7.91 consolidates everything under a new &lt;strong&gt;Diagnostics&lt;/strong&gt; sidebar entry (stethoscope icon, under the System group with Software Update and About):&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Extension logs&lt;/strong&gt; card — Show Updater / QL preview / Thumbnail / Quick Actions log buttons + Reveal logs folder in Finder.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Self-test&lt;/strong&gt; card — Run diagnostic self-test (5-step check from v1.7.90) + Reveal app bundle, with the inline result block.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;macOS Quick Look cache&lt;/strong&gt; card — Reset Quick Look cache (moved from Software Update → Maintenance).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Quick Look not updating?&lt;/strong&gt; expanding troubleshooting tile (moved from the bottom of Software Update).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Software Update tab is now strictly about updates (status hero, Check for Updates, Download from GitHub, auto-check toggle, frequency picker, the lastCheckStatus line). About tab is strictly credits + formats + version.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.91"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.91/QuickLookProtein-1.7.91.zip" sparkle:edSignature="4+3IuvZJK69pJSXBpm1QSKdcmU6lrv31Xrji46hBEFLKa1ZrkOlkgKT6cNHQn9IUirXPCTFA3SnjwLKf7PpkDg==" length="4575342" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.90</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.90</link>
       <pubDate>Wed, 20 May 2026 10:38:18 +0000</pubDate>
