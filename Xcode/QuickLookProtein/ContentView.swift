@@ -383,6 +383,10 @@ struct ContentView: View {
     /// custom DisclosureGroup so the *entire* header row (icon + title +
     /// subtitle + chevron) is the tap target, not just the chevron.
     @State private var troubleshootingExpanded: Bool = false
+    // v1.7.84+ diagnostic-log viewer. Set to a non-nil value to open
+    // the LogViewerSheet; the sheet runs `log show --predicate ...`
+    // against the corresponding subsystem and presents the result.
+    @State private var diagnosticLogTarget: DiagnosticLogTarget?
 
     var body: some View {
         ZStack {
@@ -414,6 +418,12 @@ struct ContentView: View {
         // this through every selection background, switch tint, and
         // Picker chevron beneath.
         .accentColor(Color(red: 0.76, green: 0.10, blue: 0.36))
+        // v1.7.84+: diagnostic log viewer sheet. Item-binding fires when
+        // any of the extension-log buttons sets diagnosticLogTarget.
+        .sheet(item: $diagnosticLogTarget) { target in
+            LogViewerSheet(target: target,
+                           onDismiss: { diagnosticLogTarget = nil })
+        }
         // App appearance override (v1.7.81+). System → nil so SwiftUI
         // continues to follow the macOS-wide Appearance setting (the
         // default behaviour for the entire app's history). Light/Dark
@@ -1876,9 +1886,58 @@ struct ContentView: View {
                         .help("Open the rolling update log written by Sparkle's delegate. Every check / install / abort lands here with the underlying NSError - useful for diagnosing repeated Update Error dialogs.")
                     }
                     .padding(.top, 6)
+
+                    // v1.7.84+ extension log viewers. Each button
+                    // shells out to `log show --predicate
+                    // 'subsystem == "..."'` and presents the unified-
+                    // logging output in a copy/save-able sheet. The
+                    // QuickLook preview, thumbnail, and Quick Action
+                    // extensions run in their own PluginKit processes
+                    // where stdout / NSLog never bubble up; os_log to
+                    // a subsystem is the only place their state
+                    // transitions land, and `log show` is the only
+                    // way to retrieve them — gnarly enough that
+                    // bug-report-quality logs were effectively
+                    // unobtainable from non-developers before this.
+                    Divider().padding(.vertical, 4)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Extension logs")
+                            .font(.callout)
+                            .fontWeight(.semibold)
+                        Text("Quick Look extensions run in their own processes; their logs only live in unified logging. Open a viewer below to see the last hour of each extension's output.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        // Two-up grid so the buttons stay compact.
+                        FlowDiagnosticButtons(onTap: { target in
+                            diagnosticLogTarget = target
+                        })
+                        // "Reveal logs folder" jumps Finder to the App
+                        // Group Library/Logs/QuickLookProtein so users
+                        // can grab updater.log + any future file logs
+                        // we add in one shot.
+                        Button(action: revealLogsFolder) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "folder")
+                                Text("Reveal logs folder in Finder")
+                            }
+                        }
+                        .buttonStyle(SecondaryPillButtonStyle())
+                        .help("Open ~/Library/Group Containers/<group>/Library/Logs/QuickLookProtein in Finder.")
+                    }
+                    .padding(.top, 4)
                 }
             }
         }
+    }
+
+    /// Reveal-in-Finder for the App-Group Logs directory. Uses the
+    /// updater's URL helper (with its sandbox fallback) so we
+    /// open the same folder users see in `Open update log`.
+    private func revealLogsFolder() {
+        let dir = Updater.updateLogURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        NSWorkspace.shared.activateFileViewerSelecting([dir])
     }
 
     /// Middle card — original author + extender credits, repo link, and a tip
@@ -2422,5 +2481,221 @@ struct WebView: NSViewRepresentable {
         guard context.coordinator.lastLoadedHTML != html else { return }
         context.coordinator.lastLoadedHTML = html
         view.loadHTMLString(html, baseURL: baseUrl)
+    }
+}
+
+// MARK: - Diagnostic log viewer (v1.7.84+)
+//
+// Quick Look extensions on macOS run inside PluginKit-spawned child
+// processes where stdout/NSLog never bubble up. The only way to make
+// their logs retrievable from a sandboxed UI is to write them to a
+// file under the shared App Group container — same trick the
+// Updater already uses for updater.log. Each extension drops a
+// minimal `DiagLog` helper that writes `<component>.log` to the
+// container; the main app just opens those files.
+//
+// We deliberately do NOT shell out to `/usr/bin/log show` here —
+// the sandbox blocks /var/db/diagnostics access, so `log show`
+// would silently return empty. File-based logging via App Group
+// works inside the sandbox without extra entitlements.
+//
+// Files live at:
+//   ~/Library/Group Containers/<group>/Library/Logs/QuickLookProtein/
+//     ├── updater.log     (Updater.swift, since 1.7.80)
+//     ├── qlpreview.log   (QLExtension/PreviewViewController.swift)
+//     ├── qlthumbnail.log (QLThumbnail/ThumbnailProvider.swift)
+//     └── qlactions.log   (QLActions/ActionRequestHandler.swift)
+
+enum DiagnosticLogTarget: String, CaseIterable, Identifiable {
+    case updater     = "Updater"
+    case preview     = "Quick Look preview"
+    case thumbnail   = "Thumbnail"
+    case quickAction = "Quick Actions"
+
+    var id: String { rawValue }
+
+    /// File name written by the corresponding component's DiagLog.
+    var filename: String {
+        switch self {
+        case .updater:     return "updater.log"
+        case .preview:     return "qlpreview.log"
+        case .thumbnail:   return "qlthumbnail.log"
+        case .quickAction: return "qlactions.log"
+        }
+    }
+
+    /// Resolved log URL inside the App Group container's
+    /// Library/Logs/QuickLookProtein dir, with the same fallback
+    /// chain Updater.updateLogURL uses (~/Library/Logs/QuickLookProtein
+    /// when the App Group isn't provisioned).
+    var fileURL: URL {
+        Updater.updateLogURL.deletingLastPathComponent().appendingPathComponent(filename)
+    }
+
+    var systemImage: String {
+        switch self {
+        case .updater:     return "arrow.down.app"
+        case .preview:     return "eye"
+        case .thumbnail:   return "photo"
+        case .quickAction: return "bolt.circle"
+        }
+    }
+}
+
+/// Compact 2-column grid of diagnostic-log buttons. Pulled out into
+/// its own view so the parent's body stays readable; tap routes
+/// the chosen target back to the parent via the closure.
+private struct FlowDiagnosticButtons: View {
+    let onTap: (DiagnosticLogTarget) -> Void
+
+    var body: some View {
+        let columns = [GridItem(.flexible(), spacing: 8),
+                       GridItem(.flexible(), spacing: 8)]
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            ForEach(DiagnosticLogTarget.allCases) { target in
+                Button(action: { onTap(target) }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: target.systemImage)
+                        Text("Show \(target.rawValue) log")
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(SecondaryPillButtonStyle())
+                .help("Runs `log show --predicate 'subsystem == \"\(target.subsystem)\"' --last 1h` and shows the output.")
+            }
+        }
+    }
+}
+
+/// Sheet that reads the corresponding log file from the App Group
+/// container and presents the contents. Refresh re-reads; Copy
+/// puts the buffer on the pasteboard; Save spawns an NSSavePanel;
+/// Reveal opens Finder pointed at the file.
+struct LogViewerSheet: View {
+    let target: DiagnosticLogTarget
+    let onDismiss: () -> Void
+
+    @State private var output: String = "Loading…"
+    @State private var isLoading: Bool = false
+    /// Show only the tail (~last 200 lines) by default — log files
+    /// can grow to MB-scale and the full contents make the sheet
+    /// scroll feel sluggish. "Show full file" toggles this off.
+    @State private var tailOnly: Bool = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(target.rawValue) log")
+                        .font(.headline)
+                    Text(target.fileURL.path)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                }
+                Spacer()
+                Toggle("Tail only", isOn: $tailOnly)
+                    .toggleStyle(SwitchToggleStyle())
+                    .onChange(of: tailOnly) { _ in load() }
+                Button("Done") { onDismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(NSColor.textBackgroundColor))
+                ScrollView([.horizontal, .vertical]) {
+                    Group {
+                        if #available(macOS 12.0, *) {
+                            Text(output)
+                                .font(.system(size: 11, design: .monospaced))
+                                .textSelection(.enabled)
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            Text(output)
+                                .font(.system(size: 11, design: .monospaced))
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+            .frame(minHeight: 360)
+
+            HStack {
+                if isLoading {
+                    ProgressView().controlSize(.small)
+                    Text("Reading…").font(.caption).foregroundColor(.secondary)
+                }
+                Spacer()
+                Button("Reveal") {
+                    NSWorkspace.shared.activateFileViewerSelecting([target.fileURL])
+                }
+                Button("Refresh", action: load)
+                Button("Copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(output, forType: .string)
+                }
+                Button("Save…", action: save)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 720, minHeight: 480)
+        .onAppear { load() }
+    }
+
+    /// Read the log file synchronously off the main queue. Files are
+    /// small (rolling cap planned, currently uncapped — see the
+    /// DiagLog helpers each extension ships). Tail-only mode keeps
+    /// just the last ~200 lines to make repeated Refresh snappy on
+    /// older HDDs and huge log files.
+    private func load() {
+        isLoading = true
+        output = "Loading…"
+        let url = target.fileURL
+        let limitTail = tailOnly
+        DispatchQueue.global(qos: .userInitiated).async {
+            let text: String
+            if let data = try? Data(contentsOf: url),
+               let raw = String(data: data, encoding: .utf8) {
+                if limitTail {
+                    // Last ~200 lines from the end. Splitting on
+                    // newline + slicing avoids building a huge
+                    // intermediate array on multi-MB files.
+                    let lines = raw.split(separator: "\n", omittingEmptySubsequences: false)
+                    let tail = lines.suffix(200).joined(separator: "\n")
+                    text = lines.count > 200
+                        ? "… (showing last 200 of \(lines.count) lines — toggle 'Tail only' off for full file)\n\n" + tail
+                        : raw
+                } else {
+                    text = raw
+                }
+            } else {
+                text = "(\(url.lastPathComponent) does not exist yet)\n\n" +
+                       "This component hasn't written a log entry on this machine.\n" +
+                       "Trigger it by exercising the relevant feature:\n" +
+                       "  • Updater   → click 'Check for Updates'\n" +
+                       "  • Preview   → press Space on a .pdb / .cif file in Finder\n" +
+                       "  • Thumbnail → switch a folder of structure files to Icon view\n" +
+                       "  • Quick Actions → right-click a .pdb file → Quick Actions"
+            }
+            DispatchQueue.main.async {
+                output = text
+                isLoading = false
+            }
+        }
+    }
+
+    private func save() {
+        let panel = NSSavePanel()
+        panel.title = "Save \(target.rawValue) log"
+        panel.nameFieldStringValue = target.filename
+        panel.allowedFileTypes = ["log", "txt"]
+        if panel.runModal() == .OK, let url = panel.url {
+            try? output.write(to: url, atomically: true, encoding: .utf8)
+        }
     }
 }

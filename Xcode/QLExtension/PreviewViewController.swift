@@ -19,6 +19,76 @@ import os.log
 private let qlLog = OSLog(subsystem: "com.ariomoniri.QuickLookProtein.QLExtension",
                           category: "preview")
 
+/// File-based diagnostic logger (v1.7.84+). Mirrors the os_log calls
+/// above into a flat text file under the shared App Group container,
+/// because:
+///
+///   1. `os_log` entries are only readable via `log show` / Console,
+///      both of which a sandboxed Settings UI can't reach
+///      (/var/db/diagnostics access is blocked by the sandbox).
+///   2. Extension processes die between previews, so an
+///      in-memory ring buffer can't be exposed back to the host.
+///
+/// The main app's "Show Quick Look preview log" button reads this
+/// file directly. Same path layout the Updater already uses for
+/// updater.log: ~/Library/Group Containers/<group>/Library/Logs/
+/// QuickLookProtein/qlpreview.log, with a sandbox-local fallback
+/// if the App Group container isn't provisioned.
+private enum DiagLog {
+    static let component = "qlpreview"
+
+    static var fileURL: URL {
+        let fm = FileManager.default
+        let groupID = "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"
+        let containerDir = fm.containerURL(forSecurityApplicationGroupIdentifier: groupID)
+        let dir: URL = containerDir?.appendingPathComponent("Library/Logs/QuickLookProtein", isDirectory: true)
+            ?? fm.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Logs/QuickLookProtein", isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("\(component).log")
+    }
+
+    static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return f
+    }()
+
+    static func write(_ level: String, _ message: String) {
+        let line = "\(formatter.string(from: Date())) [\(level)] \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        let url = fileURL
+        do {
+            let fh: FileHandle
+            if FileManager.default.fileExists(atPath: url.path) {
+                // 2 MB cap with truncate-and-restart. Cheap to
+                // implement, keeps the file from growing unbounded
+                // on developer machines that exercise previews a lot.
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                   let size = attrs[.size] as? NSNumber,
+                   size.intValue > 2 * 1024 * 1024 {
+                    try? Data().write(to: url)
+                }
+                fh = try FileHandle(forWritingTo: url)
+                try fh.seekToEnd()
+            } else {
+                FileManager.default.createFile(atPath: url.path, contents: nil)
+                fh = try FileHandle(forWritingTo: url)
+            }
+            try fh.write(contentsOf: data)
+            try fh.close()
+        } catch {
+            // Logging is best-effort; never fail a preview because
+            // we couldn't write a line.
+        }
+    }
+
+    static func error(_ context: String, _ err: Error) {
+        let ns = err as NSError
+        write("ERR", "\(context): [\(ns.domain) \(ns.code)] \(ns.localizedDescription)")
+    }
+}
+
 /// `@objc(QLPreviewPreviewViewController)` pins this class to an explicit
 /// Obj-C runtime name so PluginKit's `NSClassFromString(NSExtensionPrincipalClass)`
 /// lookup actually finds it. Without the attribute, Swift mangles the class name
@@ -100,10 +170,12 @@ class PreviewViewController: NSViewController,
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
         os_log("preparePreviewOfFile called for %{public}@", log: qlLog, type: .info, url.path)
+        DiagLog.write("INFO", "preparePreviewOfFile: \(url.path)")
         self.currentSourceURL = url
 
         guard let htmlPath = Bundle.main.path(forResource: "3Dmol_viewer", ofType: "html") else {
             os_log("Viewer template missing from bundle", log: qlLog, type: .error)
+            DiagLog.write("ERR", "preparePreviewOfFile: viewer template missing from bundle")
             handler(NSError(domain: "QuickLookProtein", code: 1,
                             userInfo: [NSLocalizedDescriptionKey: "Viewer template missing from bundle"]))
             return
@@ -113,6 +185,7 @@ class PreviewViewController: NSViewController,
         let fileExtension = url.pathExtension.lowercased()
         let dataFormat = Settings.dataFormat(forExtension: fileExtension) ?? "pdb"
         os_log("ext=%{public}@ → format=%{public}@", log: qlLog, type: .info, fileExtension, dataFormat)
+        DiagLog.write("INFO", "ext=\(fileExtension) format=\(dataFormat)")
 
         // Master + per-format disable gates (1.7.48+). Both default ON,
         // so unchanged installs pass straight through. When either gate is
@@ -245,6 +318,7 @@ class PreviewViewController: NSViewController,
             try pngData.write(to: pngURL, options: .atomic)
         } catch {
             os_log("share: could not write temp png: %{public}@", log: qlLog, type: .error, error.localizedDescription)
+            DiagLog.error("share/writePNG", error)
             return
         }
 
@@ -274,6 +348,7 @@ class PreviewViewController: NSViewController,
                     } catch {
                         os_log("share: USDZ export failed: %{public}@",
                                log: qlLog, type: .error, String(describing: error))
+                        DiagLog.error("share/USDZ", error)
                     }
                 }
             } else {

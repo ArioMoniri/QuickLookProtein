@@ -4,6 +4,23 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.84] — 2026-05-20
+
+### 🍎 macOS — diagnostic log viewer for every extension
+
+The Updater already wrote a file log since v1.7.80, but the three Quick Look extensions (preview, thumbnail, Quick Actions) only emitted `os_log` against per-extension subsystems — only retrievable via `log show` or Console.app, both of which a sandboxed Settings UI cannot reach (sandbox blocks `/var/db/diagnostics`). When a preview rendered as a blank document or a thumbnail came back generic, there was no way for a user to ship a useful bug report.
+
+v1.7.84 adds a file-based diagnostic logger to each extension and a viewer in the main app:
+
+- **`DiagLog` helper** in `PreviewViewController.swift`, `ThumbnailProvider.swift`, and `ActionRequestHandler.swift`. Each writes timestamped lines to its own log under  
+  `~/Library/Group Containers/<group>/Library/Logs/QuickLookProtein/`  
+  (sandbox-local `~/Library/Logs/QuickLookProtein/` fallback when the App Group container isn't provisioned). Files: `qlpreview.log`, `qlthumbnail.log`, `qlactions.log`. 2 MB cap with truncate-and-restart so no file grows unbounded.
+- **Entry + catch instrumentation** at the key points: `preparePreviewOfFile`, `provideThumbnail`, `beginRequest`, the merged-PDB writer, the share-temp-PNG writer, the USDZ exporter. Every error path now leaves a forensic trail.
+- **"Extension logs" section in About → Software Update** with one button per component (Updater · Quick Look preview · Thumbnail · Quick Actions). Tapping opens a `LogViewerSheet` that reads the corresponding file, defaults to the last 200 lines (toggle for full file), and exposes Reveal-in-Finder / Refresh / Copy / Save buttons. Identical UX across all four targets.
+- **"Reveal logs folder in Finder"** button as a fast escape hatch — jumps straight to the App Group `Library/Logs/QuickLookProtein` directory so users can grab the whole folder for a bug report in one drag.
+
+We deliberately do *not* shell out to `/usr/bin/log show` from the sandboxed main app — it would silently return empty because the sandbox blocks `/var/db/diagnostics` access. File-based logging via the shared App Group works inside the sandbox without extra entitlements.
+
 ## [1.7.83] — 2026-05-20
 
 ### 🪟 Windows — real PNG logo + thumbnail self-test

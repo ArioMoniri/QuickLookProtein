@@ -22,6 +22,59 @@ import os.log
 private let actionLog = OSLog(subsystem: "com.ariomoniri.QuickLookProtein.QLActions",
                               category: "action")
 
+/// File-based diagnostic logger (v1.7.84+). Mirrors os_log entries
+/// into qlactions.log under the shared App Group container so the
+/// main app's "Show Quick Actions log" button can read them without
+/// needing `log show` access. See QLExtension's DiagLog for the
+/// full rationale.
+private enum DiagLog {
+    static let component = "qlactions"
+
+    static var fileURL: URL {
+        let fm = FileManager.default
+        let groupID = "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"
+        let containerDir = fm.containerURL(forSecurityApplicationGroupIdentifier: groupID)
+        let dir: URL = containerDir?.appendingPathComponent("Library/Logs/QuickLookProtein", isDirectory: true)
+            ?? fm.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Logs/QuickLookProtein", isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("\(component).log")
+    }
+
+    static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return f
+    }()
+
+    static func write(_ level: String, _ message: String) {
+        let line = "\(formatter.string(from: Date())) [\(level)] \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        let url = fileURL
+        do {
+            let fh: FileHandle
+            if FileManager.default.fileExists(atPath: url.path) {
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                   let size = attrs[.size] as? NSNumber, size.intValue > 2 * 1024 * 1024 {
+                    try? Data().write(to: url)
+                }
+                fh = try FileHandle(forWritingTo: url)
+                try fh.seekToEnd()
+            } else {
+                FileManager.default.createFile(atPath: url.path, contents: nil)
+                fh = try FileHandle(forWritingTo: url)
+            }
+            try fh.write(contentsOf: data)
+            try fh.close()
+        } catch {}
+    }
+
+    static func error(_ context: String, _ err: Error) {
+        let ns = err as NSError
+        write("ERR", "\(context): [\(ns.domain) \(ns.code)] \(ns.localizedDescription)")
+    }
+}
+
 /// Render output dimensions. Matches what Quick Look thumbnails ask
 /// for at 1× display density. Users get a 1024 × 1024 PNG next to
 /// every selected file. 1024 px is the sweet spot: Finder Quick Look
@@ -62,6 +115,7 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling {
     func beginRequest(with context: NSExtensionContext) {
         os_log("Quick Action beginRequest, %d items",
                log: actionLog, type: .info, context.inputItems.count)
+        DiagLog.write("INFO", "beginRequest: \(context.inputItems.count) items")
 
         let items = (context.inputItems as? [NSExtensionItem]) ?? []
         var rendered = 0
@@ -188,6 +242,7 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling {
         } catch {
             os_log("merged.pdb write failed: %{public}@",
                    log: actionLog, type: .error, error.localizedDescription)
+            DiagLog.error("writeMergedPDB", error)
             return false
         }
     }

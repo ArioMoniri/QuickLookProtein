@@ -31,6 +31,59 @@ import os.log
 private let thumbLog = OSLog(subsystem: "com.ariomoniri.QuickLookProtein.QLThumbnail",
                              category: "thumbnail")
 
+/// File-based diagnostic logger (v1.7.84+). See QLExtension's
+/// DiagLog comment for rationale — same pattern: write to a
+/// component-named file under the shared App Group container's
+/// Logs directory so the sandboxed main-app UI can read it without
+/// needing /var/db/diagnostics access.
+private enum DiagLog {
+    static let component = "qlthumbnail"
+
+    static var fileURL: URL {
+        let fm = FileManager.default
+        let groupID = "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"
+        let containerDir = fm.containerURL(forSecurityApplicationGroupIdentifier: groupID)
+        let dir: URL = containerDir?.appendingPathComponent("Library/Logs/QuickLookProtein", isDirectory: true)
+            ?? fm.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Logs/QuickLookProtein", isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("\(component).log")
+    }
+
+    static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return f
+    }()
+
+    static func write(_ level: String, _ message: String) {
+        let line = "\(formatter.string(from: Date())) [\(level)] \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        let url = fileURL
+        do {
+            let fh: FileHandle
+            if FileManager.default.fileExists(atPath: url.path) {
+                if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                   let size = attrs[.size] as? NSNumber, size.intValue > 2 * 1024 * 1024 {
+                    try? Data().write(to: url)
+                }
+                fh = try FileHandle(forWritingTo: url)
+                try fh.seekToEnd()
+            } else {
+                FileManager.default.createFile(atPath: url.path, contents: nil)
+                fh = try FileHandle(forWritingTo: url)
+            }
+            try fh.write(contentsOf: data)
+            try fh.close()
+        } catch {}
+    }
+
+    static func error(_ context: String, _ err: Error) {
+        let ns = err as NSError
+        write("ERR", "\(context): [\(ns.domain) \(ns.code)] \(ns.localizedDescription)")
+    }
+}
+
 /// Read a Bool from whichever defaults container the host app actually
 /// wrote it to. Tries the App Group suite first; falls back to
 /// UserDefaults.standard for the case where App Group provisioning failed
@@ -76,6 +129,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
         let size = request.maximumSize
         os_log("provideThumbnail called for %{public}@ (ext=%{public}@, size=%{public}.0fx%{public}.0f)",
                log: thumbLog, type: .info, request.fileURL.path, ext, size.width, size.height)
+        DiagLog.write("INFO", "provideThumbnail: \(request.fileURL.lastPathComponent) ext=\(ext) size=\(Int(size.width))x\(Int(size.height))")
 
         let atoms = Self.parseAtoms(from: request.fileURL, ext: ext)
 
@@ -116,6 +170,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
             } catch {
                 os_log("APNG write failed: %{public}@ — falling back",
                        log: thumbLog, type: .error, error.localizedDescription)
+                DiagLog.error("provideThumbnail/APNG", error)
             }
         }
 
