@@ -2562,7 +2562,7 @@ private struct FlowDiagnosticButtons: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(SecondaryPillButtonStyle())
-                .help("Runs `log show --predicate 'subsystem == \"\(target.subsystem)\"' --last 1h` and shows the output.")
+                .help("Open \(target.filename) from the App Group Library/Logs directory.")
             }
         }
     }
