@@ -6,6 +6,34 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.74</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.74</link>
+      <pubDate>Wed, 20 May 2026 04:02:40 +0000</pubDate>
+      <sparkle:version>1.7.74</sparkle:version>
+      <sparkle:shortVersionString>1.7.74</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows polish round&lt;/h3&gt;
+&lt;p&gt;With the plugin discovery finally working in 1.7.73 (user-verified 3D ball-and-stick render of D16 Ideal Structure in QL-Win), four polish items:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Smaller default preview window&lt;/strong&gt; — &lt;code&gt;Plugin.Prepare&lt;/code&gt; set &lt;code&gt;PreferredSize = new Size(960, 720)&lt;/code&gt; since 1.7.66, which dominated 1080p screens. Dropped to &lt;strong&gt;720×540&lt;/strong&gt; — large enough to read atom labels at default zoom, small enough to feel like a QuickLook *popover* instead of a full window. Users can still resize freely.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;App icon for &lt;code&gt;QuickLookProtein.Settings.exe&lt;/code&gt;&lt;/strong&gt; — built a multi-resolution &lt;code&gt;Resources/AppIcon.ico&lt;/code&gt; (16/32/48/64/128/256 frames, all 32-bit RGBA) from the existing macOS PNG icon set and wired it into the csproj as both &lt;code&gt;&amp;lt;ApplicationIcon&amp;gt;&lt;/code&gt; (drives Windows Explorer + Start Menu + taskbar) and &lt;code&gt;&amp;lt;Resource&amp;gt;&lt;/code&gt; + &lt;code&gt;Window.Icon&lt;/code&gt; (drives the WPF title-bar icon). The blank-document icon previous Setup.exes shipped is gone.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Visual polish on the Settings UI&lt;/strong&gt; — the WPF window picked up:&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;  - A gradient header strip with the embedded app icon to the left of the title.&lt;/p&gt;
+&lt;p&gt;  - A &lt;code&gt;SecondaryButton&lt;/code&gt; style with hover + pressed + disabled states applied automatically to every plain &lt;code&gt;&amp;lt;Button&amp;gt;&lt;/code&gt; via an unkeyed &lt;code&gt;Style TargetType=&amp;quot;Button&amp;quot;&lt;/code&gt; (replaces WPF&amp;#x27;s chunky default chrome).&lt;/p&gt;
+&lt;p&gt;  - &lt;code&gt;DropShadowEffect&lt;/code&gt; on cards so the dark surface reads as layered against the slightly darker app background instead of flat grey-on-grey.&lt;/p&gt;
+&lt;p&gt;  - &lt;code&gt;PrimaryButton&lt;/code&gt; gets matching hover (&lt;code&gt;#557DEA&lt;/code&gt;) + pressed (&lt;code&gt;#2F58C9&lt;/code&gt;) accent variants instead of a static fill.&lt;/p&gt;
+&lt;p&gt;  - Card &lt;code&gt;CornerRadius&lt;/code&gt; 10 → 12 for softer Fluent-style corners.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Header rebrand&lt;/strong&gt; — Settings window header now reads &lt;strong&gt;QuickLookProtein2&lt;/strong&gt; (was still &amp;quot;QuickLookProtein&amp;quot;). Aligns with the rest of the rebrand from 1.7.66.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;No functional changes to the render path. The plugin discovery + AnyCPU + runtimes/ + AssemblyResolve + cctor hardening from 1.7.68–1.7.73 is all retained.&lt;/p&gt;
+&lt;h3&gt;Windows Explorer thumbnails — yes, registered&lt;/h3&gt;
+&lt;p&gt;For anyone who asked: install.ps1 has registered an Explorer thumbnail handler for every supported extension (&lt;code&gt;.pdb&lt;/code&gt; / &lt;code&gt;.cif&lt;/code&gt; / &lt;code&gt;.sdf&lt;/code&gt; / &lt;code&gt;.mol&lt;/code&gt; / &lt;code&gt;.mol2&lt;/code&gt; / &lt;code&gt;.xyz&lt;/code&gt; / &lt;code&gt;.gro&lt;/code&gt; / &lt;code&gt;.cube&lt;/code&gt; / &lt;code&gt;.cub&lt;/code&gt; / &lt;code&gt;.vasp&lt;/code&gt; / &lt;code&gt;.poscar&lt;/code&gt; / &lt;code&gt;.cdjson&lt;/code&gt; / &lt;code&gt;.pqr&lt;/code&gt;) since 1.7.13 — that hasn&amp;#x27;t changed. Switch a folder to &lt;strong&gt;Icon / Tile / Gallery view&lt;/strong&gt; in Explorer and you&amp;#x27;ll see CPK / cartoon-ribbon thumbnails rendered by &lt;code&gt;QuickLookProtein.Thumbnail.dll&lt;/code&gt;. If thumbnails don&amp;#x27;t refresh after a re-install, run &lt;code&gt;ie4uinit -ClearIconCache&lt;/code&gt; (the installer does this automatically, but Explorer caches across sessions).&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.74"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.74/QuickLookProtein-1.7.74.zip" sparkle:edSignature="sBo/OgnJWRMi704Rpa5rPjHekQ/Gir8Gi0cH3Cv88H+SvbgF1TwRIWWmigRS4UaOzpmk1Lcrxg7MvcdxhQ6SCg==" length="4462740" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.73</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.73</link>
       <pubDate>Wed, 20 May 2026 03:27:01 +0000</pubDate>
