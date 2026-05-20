@@ -10,6 +10,8 @@ Press <kbd>Space</kbd> on a protein/molecule file in Finder (or Windows Explorer
 
 A multi-format Quick Look extension for macOS and a QL-Win plugin for Windows. Rendering by [3Dmol.js](https://3dmol.csb.pitt.edu); fork of [Jethro Hemmann's QuickLookProtein](https://github.com/JethroHemmann/QuickLookProtein) with multi-format support, smart styling, thumbnails, and Windows support added.
 
+![Quick Look preview in action — Space-bar on a .pdb file in Finder](Screenshots/QuickLook.gif)
+
 <p align="center">
   <a href="https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.dmg"><img src="docs/download-macos.svg" alt="Download for macOS" height="64"></a>
   &nbsp;
@@ -67,6 +69,12 @@ After install, press <kbd>Space</kbd> on any supported file in Explorer; switch 
 ## Settings
 
 Open the **QuickLookProtein2** app (macOS) or **QuickLookProtein Settings** from the Start Menu (Windows). Both have a sidebar with General · File Formats · Appearance · Rendering · Toolbar · Info Overlay · Thumbnails · Software Update · About — settings save instantly and apply to the next preview, no restart needed.
+
+![Settings app — sidebar nav, live preview, per-format style](Screenshots/Main_app.png)
+
+On macOS, the Quick Look / Thumbnail / Spotlight extensions activate automatically on first launch. You can verify (or toggle individually) in **System Settings → General → Login Items & Extensions → Quick Look**:
+
+![macOS System Settings → Extensions → Quick Look](Screenshots/System_Preferences_Extensions.png)
 
 ## Auto-update
 
