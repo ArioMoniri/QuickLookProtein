@@ -35,16 +35,25 @@ name: Cask bump
 # ---------------------------------------------------------------------------
 
 on:
-  # Fires when release.yml flips the GitHub Release from draft → published.
-  release:
-    types: [published]
-  # Manual re-run path: pick a tag from the Actions UI when a previous run
-  # failed and we don't want to re-tag the repo. The input is consumed below
-  # to override `github.event.release.tag_name` for the dispatch case.
+  # workflow_run trigger fires when release.yml COMPLETES (any conclusion).
+  # We can't use `release: types: [published]` because release.yml creates
+  # the release via the standard GITHUB_TOKEN, and GitHub Actions has a
+  # built-in safety rule: events from GITHUB_TOKEN don't trigger other
+  # workflows (prevents recursion / token-amplification attacks). So the
+  # auto-bump from v1.7.81 ago never fired - we route through workflow_run
+  # instead, which DOES fire for the parent workflow's GITHUB_TOKEN.
+  #
+  # The `conclusion == success` check inside the job gates against
+  # bumping the cask when release.yml itself failed (no DMG to hash).
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  # Manual re-run path for backfilling missed tags or retrying a failed
+  # auto-bump. Input drives the tag/version resolution below.
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to bump the cask against (e.g. v1.7.81). Must already exist as a published GitHub Release with QuickLookProtein-<version>.dmg attached.'
+        description: 'Release tag to bump the cask against (e.g. v1.7.82). Must already exist as a published GitHub Release with QuickLookProtein-<version>.dmg attached.'
         required: true
         type: string
 
@@ -55,6 +64,9 @@ jobs:
   bump:
     name: Patch Casks/quicklookprotein.rb and commit
     runs-on: ubuntu-latest
+    # Skip the job entirely when the upstream Release workflow failed
+    # (workflow_run event only — workflow_dispatch always runs).
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
       # We checkout the *default branch* first so that `git push` knows
       # what HEAD looks like; we resolve the actual target branch (the
@@ -69,12 +81,19 @@ jobs:
         id: resolve
         run: |
           set -euo pipefail
-          # workflow_dispatch passes the tag explicitly; release event
-          # puts it on github.event.release.tag_name.
+          # Three event sources:
+          #   workflow_dispatch  → inputs.tag (manual rerun)
+          #   workflow_run       → github.event.workflow_run.head_branch
+          #                        is the tag name when release.yml was
+          #                        triggered by a tag push (`on: push: tags`).
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             tag="${{ inputs.tag }}"
           else
-            tag="${{ github.event.release.tag_name }}"
+            tag="${{ github.event.workflow_run.head_branch }}"
+          fi
+          if [[ -z "$tag" || "$tag" == "null" ]]; then
+            echo "::error::Could not resolve a tag from event payload"
+            exit 1
           fi
           # Strip the leading v for the cask "version" field (Homebrew
           # convention is bare semver; the tag has the v prefix).
@@ -88,13 +107,17 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ steps.resolve.outputs.tag }}"
-          # `git branch --contains <tag>` lists every branch that has the
-          # tagged commit in its history. We pick the first remote branch
-          # so the workflow follows whichever branch the release was cut
-          # from (today feature/ario-signed, tomorrow main).
-          # Strip the "remotes/origin/" prefix and skip HEAD aliases.
+          # `git branch -r --contains <tag>` lists every remote branch
+          # that has the tagged commit in its history, prefixed with
+          # "  origin/". We strip leading whitespace + the "origin/"
+          # prefix, skip the HEAD alias line, and take the first
+          # entry — that's the branch the release was cut from.
+          # (v1.7.82 attempt #1 stripped "remotes/origin/" which never
+          # matches `git branch -r`'s output and left "origin/..." in
+          # the var, then `git fetch origin origin/feature/..." failed
+          # with "couldn't find remote ref".)
           branch=$(git branch -r --contains "$tag" \
-            | sed 's@^[ *]*@@; s@^remotes/origin/@@' \
+            | sed -E 's@^[[:space:]]*@@; s@^origin/@@' \
             | grep -vE '^HEAD$|->' \
             | head -n1 || true)
           if [[ -z "$branch" ]]; then
@@ -109,6 +132,7 @@ jobs:
           set -euo pipefail
           git fetch origin "${{ steps.branch.outputs.branch }}"
           git checkout "${{ steps.branch.outputs.branch }}"
+          git pull --ff-only origin "${{ steps.branch.outputs.branch }}"
 
       - name: Download release DMG and compute SHA256
         id: digest
