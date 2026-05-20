@@ -24,7 +24,15 @@
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>QuickLookProtein.Settings</AssemblyName>
     <RootNamespace>QuickLookProtein.Settings</RootNamespace>
-    <ApplicationIcon></ApplicationIcon>
+    <!--
+      Embed the multi-resolution AppIcon.ico (built from the macOS
+      app icon's 16/32/48/64/128/256 PNGs) so Windows shows our icon
+      everywhere: taskbar, Start Menu, the title bar of the Settings
+      window, and the Add/Remove Programs entry that install.ps1
+      registers. Prior releases shipped Settings.exe with the default
+      blank Windows app icon.
+    -->
+    <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,6 +42,14 @@
     <Compile Include="..\Shared\SettingsStore.cs">
       <Link>Shared\SettingsStore.cs</Link>
     </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ship the .ico as a Resource so the WPF window can load it
+         at runtime via pack://application:,,, URIs. Without this,
+         the <ApplicationIcon> above only sets the EXE icon - the
+         WPF window's title-bar icon would still be the WPF default. -->
+    <Resource Include="Resources\AppIcon.ico" />
   </ItemGroup>
 
   <ItemGroup>

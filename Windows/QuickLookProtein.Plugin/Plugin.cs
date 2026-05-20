@@ -239,9 +239,12 @@ public sealed class Plugin : IViewer
     public void Prepare(string path, ContextObject context)
     {
         PluginLog.Info($"Prepare({path}) - QL-Win is about to call View()");
-        // Same default size as the macOS preview window so the spacebar
-        // experience feels consistent across platforms. Users can resize.
-        context.PreferredSize = new Size(960, 720);
+        // Default preview window size. Was 960x720 in 1.7.66-1.7.73,
+        // which dominated 1080p screens. 720x540 is roughly half the
+        // viewport on a 1080p laptop - large enough to read atom
+        // labels at default zoom, small enough that the QuickLook
+        // popover doesn't feel like a window. Users can resize freely.
+        context.PreferredSize = new Size(720, 540);
     }
 
     public void View(string path, ContextObject context)

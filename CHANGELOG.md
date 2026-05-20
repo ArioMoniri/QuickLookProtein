@@ -4,6 +4,28 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.74] — 2026-05-20
+
+### 🪟 Windows polish round
+
+With the plugin discovery finally working in 1.7.73 (user-verified 3D ball-and-stick render of D16 Ideal Structure in QL-Win), four polish items:
+
+- **Smaller default preview window** — `Plugin.Prepare` set `PreferredSize = new Size(960, 720)` since 1.7.66, which dominated 1080p screens. Dropped to **720×540** — large enough to read atom labels at default zoom, small enough to feel like a QuickLook *popover* instead of a full window. Users can still resize freely.
+- **App icon for `QuickLookProtein.Settings.exe`** — built a multi-resolution `Resources/AppIcon.ico` (16/32/48/64/128/256 frames, all 32-bit RGBA) from the existing macOS PNG icon set and wired it into the csproj as both `<ApplicationIcon>` (drives Windows Explorer + Start Menu + taskbar) and `<Resource>` + `Window.Icon` (drives the WPF title-bar icon). The blank-document icon previous Setup.exes shipped is gone.
+- **Visual polish on the Settings UI** — the WPF window picked up:
+  - A gradient header strip with the embedded app icon to the left of the title.
+  - A `SecondaryButton` style with hover + pressed + disabled states applied automatically to every plain `<Button>` via an unkeyed `Style TargetType="Button"` (replaces WPF's chunky default chrome).
+  - `DropShadowEffect` on cards so the dark surface reads as layered against the slightly darker app background instead of flat grey-on-grey.
+  - `PrimaryButton` gets matching hover (`#557DEA`) + pressed (`#2F58C9`) accent variants instead of a static fill.
+  - Card `CornerRadius` 10 → 12 for softer Fluent-style corners.
+- **Header rebrand** — Settings window header now reads **QuickLookProtein2** (was still "QuickLookProtein"). Aligns with the rest of the rebrand from 1.7.66.
+
+No functional changes to the render path. The plugin discovery + AnyCPU + runtimes/ + AssemblyResolve + cctor hardening from 1.7.68–1.7.73 is all retained.
+
+### Windows Explorer thumbnails — yes, registered
+
+For anyone who asked: install.ps1 has registered an Explorer thumbnail handler for every supported extension (`.pdb` / `.cif` / `.sdf` / `.mol` / `.mol2` / `.xyz` / `.gro` / `.cube` / `.cub` / `.vasp` / `.poscar` / `.cdjson` / `.pqr`) since 1.7.13 — that hasn't changed. Switch a folder to **Icon / Tile / Gallery view** in Explorer and you'll see CPK / cartoon-ribbon thumbnails rendered by `QuickLookProtein.Thumbnail.dll`. If thumbnails don't refresh after a re-install, run `ie4uinit -ClearIconCache` (the installer does this automatically, but Explorer caches across sessions).
+
 ## [1.7.73] — 2026-05-20
 
 ### 🎯 Windows — **the actual root cause**: wrong plugin folder for QL-Win 4.x

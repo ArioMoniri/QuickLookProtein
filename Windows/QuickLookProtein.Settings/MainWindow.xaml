@@ -8,7 +8,8 @@
         WindowStartupLocation="CenterScreen"
         Background="#16181C"
         FontFamily="Segoe UI Variable, Segoe UI"
-        Foreground="#E8EAED">
+        Foreground="#E8EAED"
+        Icon="pack://application:,,,/Resources/AppIcon.ico">
     <!--
       Settings UI for the Windows side. Mirrors the macOS app's tile
       layout: left panel = per-format atom-display style + global
@@ -19,6 +20,26 @@
       surfaces so the contrast doesn't change with system theme.
     -->
     <Window.Resources>
+        <!--
+          Theme colours.  Keep them as resources so a future light-mode
+          theme can swap by overriding just these.  Naming follows
+          Fluent / WinUI conventions where possible (Surface, Subtle,
+          Accent, …) so the relationship between resources is
+          self-documenting.
+        -->
+        <Color x:Key="SurfaceColor">#1F2228</Color>
+        <Color x:Key="SurfaceHoverColor">#262A31</Color>
+        <Color x:Key="SurfaceStrokeColor">#2A2E36</Color>
+        <Color x:Key="AccentColor">#3D6BE0</Color>
+        <Color x:Key="AccentHoverColor">#557DEA</Color>
+        <Color x:Key="AccentPressedColor">#2F58C9</Color>
+        <SolidColorBrush x:Key="SurfaceBrush"        Color="{StaticResource SurfaceColor}"/>
+        <SolidColorBrush x:Key="SurfaceHoverBrush"   Color="{StaticResource SurfaceHoverColor}"/>
+        <SolidColorBrush x:Key="SurfaceStrokeBrush"  Color="{StaticResource SurfaceStrokeColor}"/>
+        <SolidColorBrush x:Key="AccentBrush"         Color="{StaticResource AccentColor}"/>
+        <SolidColorBrush x:Key="AccentHoverBrush"    Color="{StaticResource AccentHoverColor}"/>
+        <SolidColorBrush x:Key="AccentPressedBrush"  Color="{StaticResource AccentPressedColor}"/>
+
         <!-- Section header style -->
         <Style x:Key="SectionTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16"/>
@@ -43,14 +64,26 @@
             <Setter Property="Width" Value="100"/>
         </Style>
 
-        <!-- Card surface (the visual chunks) -->
+        <!--
+          Card surface (the visual chunks).  Subtle drop shadow gives
+          the dark surface a sense of layering against the slightly
+          darker app background, which previously read as a flat
+          grey-on-grey wall.  CornerRadius bumped 10 -> 12 for
+          softer corners closer to Windows 11 Fluent.
+        -->
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="#1F2228"/>
-            <Setter Property="BorderBrush" Value="#2A2E36"/>
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SurfaceStrokeBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="16"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="18"/>
             <Setter Property="Margin" Value="0,0,0,14"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="14" ShadowDepth="2"
+                                      Opacity="0.30" Color="Black"/>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Compact, square-ish ComboBox so per-format rows line up -->
@@ -60,9 +93,15 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
-        <!-- Bold pill CTA -->
+        <!--
+          Primary CTA. Renders as a filled accent pill that brightens
+          on hover and darkens on press, so the click target feels
+          alive instead of static. The control template wraps the
+          ContentPresenter in a Border whose Background is bound to a
+          property we flip in the triggers below.
+        -->
         <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="#3D6BE0"/>
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="14,7"/>
@@ -71,16 +110,81 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border CornerRadius="6"
+                        <Border x:Name="bg"
+                                CornerRadius="6"
                                 Background="{TemplateBinding Background}"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background"
+                                        Value="{StaticResource AccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bg" Property="Background"
+                                        Value="{StaticResource AccentPressedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!--
+          Secondary button — quieter, used for "Reload" / "Open
+          GitHub" / "Open plugin folder" etc. Picks up the surface
+          stroke instead of an accent fill so the page reads with
+          one clear primary CTA per card.
+        -->
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#E8EAED"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg"
+                                CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{StaticResource SurfaceStrokeBrush}"
+                                BorderThickness="1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background"
+                                        Value="{StaticResource SurfaceHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bg" Property="Background"
+                                        Value="{StaticResource SurfaceStrokeBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bg" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--
+          Style applied to <Button> when no explicit Style is set, so
+          every plain <Button> in the page picks up the SecondaryButton
+          treatment automatically. Replaces the chunky WPF default chrome
+          that was making the UI feel "shitty and not dynamic".
+        -->
+        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}"/>
     </Window.Resources>
 
     <Grid>
@@ -90,15 +194,37 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header strip -->
-        <Border Grid.Row="0" Background="#13151A" Padding="18,14"
+        <!--
+          Header strip. A horizontal band with an accent-tinted gradient
+          and the embedded app icon to the left of the title - gives the
+          app a recognisable "wrapper" so users coming from the Start
+          Menu shortcut land on something visually anchored instead of a
+          flat grey wall of cards. The icon image is pinned to 36x36 so
+          it stays crisp at all DPIs (the .ico file holds 16/32/48/64/
+          128/256 entries; WPF picks the nearest).
+        -->
+        <Border Grid.Row="0" Padding="20,14"
                 BorderBrush="#23262D" BorderThickness="0,0,0,1">
-            <StackPanel>
-                <TextBlock Text="QuickLookProtein"
-                           FontSize="22" FontWeight="Bold"
-                           Foreground="#FFFFFF"/>
-                <TextBlock Text="3D molecular preview for Windows Explorer"
-                           FontSize="12" Foreground="#9A9DA3" Margin="0,4,0,0"/>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Offset="0"   Color="#13151A"/>
+                    <GradientStop Offset="0.5" Color="#16181E"/>
+                    <GradientStop Offset="1"   Color="#1A1D26"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <StackPanel Orientation="Horizontal">
+                <Image Source="pack://application:,,,/Resources/AppIcon.ico"
+                       Width="36" Height="36"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       Margin="0,0,14,0"
+                       VerticalAlignment="Center"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="QuickLookProtein2"
+                               FontSize="22" FontWeight="Bold"
+                               Foreground="#FFFFFF"/>
+                    <TextBlock Text="3D molecular preview for Windows Explorer"
+                               FontSize="12" Foreground="#9A9DA3" Margin="0,2,0,0"/>
+                </StackPanel>
             </StackPanel>
         </Border>
 
