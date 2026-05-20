@@ -6,6 +6,30 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.90</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.90</link>
+      <pubDate>Wed, 20 May 2026 10:38:18 +0000</pubDate>
+      <sparkle:version>1.7.90</sparkle:version>
+      <sparkle:shortVersionString>1.7.90</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🍎 macOS — drop the duplicate Rendering-Engine card + Mac-side diagnostic self-test&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Removed the &amp;quot;RENDERING ENGINE&amp;quot; card&lt;/strong&gt; from the About panel — the same &amp;quot;Rendered by 3Dmol.js (Rego &amp;amp; Koes, 2015)&amp;quot; line was rendered twice (once as a Card, once as the footerCredit caption below). Kept the lower / quieter footerCredit instance.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;New &amp;quot;Run diagnostic self-test&amp;quot; button&lt;/strong&gt; in About → Software Update → Extension logs. Mac analogue of the Windows thumbnail-provider self-test. Walks five checks:&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;  1. All four &lt;code&gt;.appex&lt;/code&gt; bundles (QLExtension / QLThumbnail / QLActions / MDImporter) exist in &lt;code&gt;Contents/PlugIns/&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;  2. App Group container resolves (entitlement provisioned)&lt;/p&gt;
+&lt;p&gt;  3. Sparkle install path is writable — when this fails Sparkle aborts with the generic &amp;quot;An error occurred while launching the installer&amp;quot; modal, and the path is the actionable clue&lt;/p&gt;
+&lt;p&gt;  4. Log directory is writable&lt;/p&gt;
+&lt;p&gt;  5. Sparkle&amp;#x27;s &lt;code&gt;SUPublicEDKey&lt;/code&gt; is set (production key, not placeholder)&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Result is shown inline below the button (monospace, copy-able on macOS 12+) &lt;strong&gt;and&lt;/strong&gt; appended to &lt;code&gt;updater.log&lt;/code&gt; so it can be attached to a bug report.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;New &amp;quot;Reveal app bundle&amp;quot; button&lt;/strong&gt; opens Finder pointed at &lt;code&gt;QuickLookProtein.app&lt;/code&gt;&amp;#x27;s parent so the user can right-click → Show Package Contents and inspect &lt;code&gt;Contents/PlugIns/&lt;/code&gt; for entitlements/signature without dropping to the terminal.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.90"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.90/QuickLookProtein-1.7.90.zip" sparkle:edSignature="40/COFP6Vo9HeiofDz629T5vjUlQBs9XcRQFu1+gns7q3zmLIjt5WqYYcVMt1weg5TmU/I8U1ceqUZ1MscFGAg==" length="4546122" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.89</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.89</link>
       <pubDate>Wed, 20 May 2026 10:29:46 +0000</pubDate>
