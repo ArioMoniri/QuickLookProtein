@@ -6,6 +6,32 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.77</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.77</link>
+      <pubDate>Wed, 20 May 2026 04:39:38 +0000</pubDate>
+      <sparkle:version>1.7.77</sparkle:version>
+      <sparkle:shortVersionString>1.7.77</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows — in-process auto-updater (finally)&lt;/h3&gt;
+&lt;p&gt;The Mac has had Sparkle since the rebrand; Windows has been re-downloading &lt;code&gt;Setup.exe&lt;/code&gt; manually for every release. Fixed.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;New &lt;code&gt;UpdateChecker.cs&lt;/code&gt;&lt;/strong&gt; in the Settings WPF app — managed-only, ~250 lines, no native dependencies (deliberately not pulling in WinSparkle&amp;#x27;s 1.6 MB native DLL when our flow is just &amp;quot;GET releases/latest → compare versions → run Setup.exe&amp;quot;). Hits &lt;code&gt;https://api.github.com/repos/ArioMoniri/QuickLookProtein/releases/latest&lt;/code&gt;, parses &lt;code&gt;tag_name&lt;/code&gt; + &lt;code&gt;html_url&lt;/code&gt; + the assets array, finds &lt;code&gt;QuickLookProtein-Setup.exe&lt;/code&gt;, and compares the version against the running Settings.exe&amp;#x27;s &lt;code&gt;FileVersion&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;New &amp;quot;Software Update&amp;quot; card&lt;/strong&gt; in Settings (right above Startup). Shows the installed version on load. Three buttons: &lt;strong&gt;Check for updates&lt;/strong&gt; (manual, always works), &lt;strong&gt;Install update&lt;/strong&gt; (downloads + runs &lt;code&gt;Setup.exe&lt;/code&gt; + quits Settings so Setup.exe can replace files without an in-use lock), &lt;strong&gt;Open release page&lt;/strong&gt; (browser jump to the GitHub release).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Opt-in auto-check at launch&lt;/strong&gt; via the &amp;quot;Check for updates automatically when this window opens&amp;quot; checkbox. Off by default for the first release of this feature so existing users aren&amp;#x27;t surprised by a network call they didn&amp;#x27;t ask for; on means a fire-and-forget GitHub round-trip every time Settings opens (the UI is never blocked).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Settings.exe FileVersion now stamped&lt;/strong&gt; by the release workflow (&lt;code&gt;dotnet build /p:Version=$ver /p:FileVersion=$ver /p:InformationalVersion=$ver&lt;/code&gt;) — same pattern the Plugin DLL has used since 1.7.70. Local dev builds default to &lt;code&gt;0.0.0&lt;/code&gt; so a stray dev EXE is identifiable.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Force TLS 1.2&lt;/strong&gt; on the HttpClient before hitting GitHub — .NET Framework 4.7.2 sometimes defaults to TLS 1.0 which GitHub&amp;#x27;s API has rejected since 2018.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;No upgrade required&lt;/strong&gt; to switch over: the next release a 1.7.77+ user installs surfaces the Update card automatically; the &amp;quot;Check for updates&amp;quot; button works the moment the Settings window opens.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Update flow on the user&amp;#x27;s machine:&lt;/p&gt;
+&lt;p&gt;1. Settings opens → checks GitHub (if auto-check on) or user clicks &lt;strong&gt;Check for updates&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;2. If a newer release is published, the status line reads &lt;code&gt;Update available: vX.Y.Z (you have …)&lt;/code&gt;, the release notes excerpt populates below it (first 500 chars of the GitHub release body, with markdown stripped to plain-ish text), and &lt;strong&gt;Install update&lt;/strong&gt; appears.&lt;/p&gt;
+&lt;p&gt;3. User clicks &lt;strong&gt;Install update&lt;/strong&gt; → progress bar in the status line as bytes stream to &lt;code&gt;%TEMP%\QuickLookProtein-Setup-vX.Y.Z.exe&lt;/code&gt; → Setup.exe launches → Settings.exe shuts down so Setup.exe can replace it.&lt;/p&gt;
+&lt;p&gt;4. Setup.exe handles the plugin DLL install at the QL-Win 4.x path (since 1.7.73), the auto-thumbnail-refresh broadcast (since 1.7.76), and re-launches the Settings app at the end (since 1.7.76).&lt;/p&gt;
+&lt;p&gt;README&amp;#x27;s Settings-app section gains a &amp;quot;Software Update on Windows&amp;quot; subsection alongside the Mac Sparkle one so users discover the feature.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.77"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.77/QuickLookProtein-1.7.77.zip" sparkle:edSignature="johu0agwU7FnhEOJymyX31zSpCR8aTFKyNZuI28OiAB0lspY/X3DdyQUhD6YRlr7frWbTrxURkLemo3/EIZGDQ==" length="4482503" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.76</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.76</link>
       <pubDate>Wed, 20 May 2026 04:21:05 +0000</pubDate>
