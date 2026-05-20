@@ -6,6 +6,32 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.79</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.79</link>
+      <pubDate>Wed, 20 May 2026 05:12:47 +0000</pubDate>
+      <sparkle:version>1.7.79</sparkle:version>
+      <sparkle:shortVersionString>1.7.79</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows — fix silent-install failure on upgrade-over-running-QL-Win&lt;/h3&gt;
+&lt;p&gt;User reported &lt;code&gt;Setup.exe&lt;/code&gt; ran but &lt;strong&gt;nothing happened&lt;/strong&gt; afterward — Settings app didn&amp;#x27;t appear in Start Menu or Add/Remove Programs, and &lt;code&gt;%TEMP%\QuickLookProtein-install.log&lt;/code&gt; revealed:&lt;/p&gt;
+&lt;p&gt;```&lt;/p&gt;
+&lt;p&gt;==&amp;gt; Installing plugin&lt;/p&gt;
+&lt;p&gt;Remove-Item : Cannot remove item …\WebView2Loader.dll: Access to the path &amp;#x27;WebView2Loader.dll&amp;#x27; is denied.&lt;/p&gt;
+&lt;p&gt;At …\install.ps1:229 char:29&lt;/p&gt;
+&lt;p&gt;+         if (Test-Path $d) { Remove-Item -Recurse -Force $d }&lt;/p&gt;
+&lt;p&gt;```&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Root cause&lt;/strong&gt;: &lt;code&gt;Plugin.cs&lt;/code&gt;&amp;#x27;s static cctor (1.7.71+) calls &lt;code&gt;LoadLibraryW(&amp;quot;WebView2Loader.dll&amp;quot;)&lt;/code&gt; to pin the bitness-matched native loader into QL-Win&amp;#x27;s process. That leaves an open handle on the DLL. When the user re-ran &lt;code&gt;Setup.exe&lt;/code&gt; to upgrade (the common case once auto-update is wired up), &lt;code&gt;install.ps1&lt;/code&gt;&amp;#x27;s wipe-then-reinstall step couldn&amp;#x27;t delete the locked DLL → &lt;code&gt;Remove-Item&lt;/code&gt; threw → &lt;code&gt;$ErrorActionPreference = &amp;quot;Stop&amp;quot;&lt;/code&gt; exited the script immediately → &lt;strong&gt;every subsequent step was skipped&lt;/strong&gt;: Settings.exe never copied, Add/Remove Programs entry never written, Start Menu shortcut never created, app-launch step never fired. Hence &amp;quot;nothing happens&amp;quot;.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Fix&lt;/strong&gt;: &lt;code&gt;install.ps1&lt;/code&gt;&amp;#x27;s &lt;code&gt;Install-Plugin&lt;/code&gt; now stops the running QuickLook process *before* the wipe, then &lt;code&gt;Restart-QuickLookHost&lt;/code&gt; brings it back at the end of the script (existing behaviour). Uses the same &lt;code&gt;Try-StopQuickLook&lt;/code&gt; graceful-then-firm sequence the script already had for &lt;code&gt;Restart-QuickLookHost&lt;/code&gt;, plus a 750 ms breather so the kernel finishes releasing DLL handles before &lt;code&gt;Remove-Item&lt;/code&gt; retries.&lt;/p&gt;
+&lt;p&gt;Every install path is now upgrade-safe regardless of QL-Win running state. Users who hit the silent-install bug on 1.7.66 → 1.7.78 just need to grab v1.7.79&amp;#x27;s Setup.exe; no manual cleanup required.&lt;/p&gt;
+&lt;h3&gt;🍎 macOS — UI polish&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;&amp;quot;Open at login&amp;quot; toggle moved from Appearance to General&lt;/strong&gt; → Quick Look card, sitting next to the master &amp;quot;Enable QuickLookProtein2&amp;quot; toggle. Belongs in General since both control the app&amp;#x27;s baseline behaviour, not viewer appearance. (User feedback: &amp;quot;this button in mac should be under general tab&amp;quot;.)&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Hover tooltips on the About → Supported Formats grid&lt;/strong&gt; so users hovering a truncated entry (e.g. &amp;quot;Crystallographic...&amp;quot; in a narrow four-column layout) see the unabridged name + the file extensions. Tooltip wires through a per-extension lookup so the hover text is always the canonical spelling regardless of the visible truncation.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.79"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.79/QuickLookProtein-1.7.79.zip" sparkle:edSignature="wBcLEgTBWTbU+HRKmN2f9261RjwQuWoDmHz5uJh/J/j87kiaxNqesvnTFMhamWfg1yd8qU2zO1w3hvX6gIAbCQ==" length="4483567" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.78</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.78</link>
       <pubDate>Wed, 20 May 2026 04:50:27 +0000</pubDate>
