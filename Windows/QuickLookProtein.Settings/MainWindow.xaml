@@ -699,9 +699,14 @@
                                         Click="InstallUpdate_Click"/>
                                 <Button x:Name="OpenReleasePageButton"
                                         Content="Open release page"
-                                        Padding="10,4"
+                                        Padding="10,4" Margin="0,0,6,0"
                                         Visibility="Collapsed"
                                         Click="OpenReleasePage_Click"/>
+                                <Button x:Name="OpenUpdateLogButton"
+                                        Content="Open update log"
+                                        Padding="10,4"
+                                        ToolTip="Open the rolling log written by every update check / install attempt. Useful when an install silently fails."
+                                        Click="OpenUpdateLog_Click"/>
                             </StackPanel>
                             <CheckBox x:Name="AutoCheckUpdatesCheck"
                                       Content="Check for updates automatically when this window opens"

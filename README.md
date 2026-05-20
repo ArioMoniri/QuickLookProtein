@@ -63,6 +63,9 @@ The Software Update panel will say **"Auto-updates are unavailable"** with a rea
 
 In all three cases the panel falls back to a prominent **"Download from GitHub"** button instead of trying to update through a broken Sparkle. After installing the new DMG manually once, auto-updates resume normally.
 
+**If you hit "An error occurred while launching the installer"** (Sparkle's generic message during the install step), open **Settings → Software Update → Open update log** to see the actual `NSError` (domain, code, reason, recovery suggestion, full underlying-error chain). The same details are shown inline in the panel from v1.7.80 onward. Log path:
+`~/Library/Group Containers/<group>/Library/Logs/QuickLookProtein/updater.log` (with a fallback to `~/Library/Logs/QuickLookProtein/updater.log`).
+
 </details>
 
 ### 🪟 Windows
@@ -89,6 +92,8 @@ irm https://raw.githubusercontent.com/ArioMoniri/QuickLookProtein/feature/ario-s
 [`QuickLookProtein.qlplugin`](https://github.com/ArioMoniri/QuickLookProtein/releases/latest/download/QuickLookProtein.qlplugin) — bare plugin file. Requires [QuickLook](https://github.com/QL-Win/QuickLook/releases/latest) installed *first*; with QuickLook running in the tray, double-click the `.qlplugin` to register it.
 
 **If Space-bar still shows raw text after install**, open **Start Menu → QuickLookProtein Settings → Diagnostics → Open plugin log**. The plugin writes a trace on every preview attempt; an empty file means QL-Win never even loaded our DLL (check **Open QuickLook log** in the same card for the host-side reason). Restarting the QuickLook tray from the same card is also one click.
+
+**If "Check for updates" or "Install update" fails** (HTTP error, blocked download, denied launch of `Setup.exe`, etc.), open **Settings → Software Update → Open update log** to see the actual exception (HResult, message, full stack). The log lives at `%LocalAppData%\QuickLookProtein\update.log` and rolls over at 1 MB. Available from v1.7.80 onward.
 
 The Windows installer is **unsigned** — SmartScreen warns on first launch. The plugin runs inside QuickLook, not as a standalone exe.
 

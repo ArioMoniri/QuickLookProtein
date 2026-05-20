@@ -1766,6 +1766,47 @@ struct ContentView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
+                    // Last install error (1.7.80+). Populated by
+                    // Updater's didAbortWithError SPUUpdaterDelegate
+                    // method. Shows the actual NSError domain + code
+                    // + reason rather than Sparkle's generic
+                    // "An error occurred while launching the
+                    // installer" modal so users can paste the real
+                    // failure into a bug report.
+                    if let installErr = updater.lastInstallError {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.caption)
+                                Text("Last update attempt failed")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                            }
+                            // .textSelection requires macOS 12+. Gate
+                            // so the build still targets 11.0 cleanly.
+                            Group {
+                                if #available(macOS 12.0, *) {
+                                    Text(installErr)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(4)
+                                        .truncationMode(.middle)
+                                        .textSelection(.enabled)
+                                } else {
+                                    Text(installErr)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(4)
+                                        .truncationMode(.middle)
+                                }
+                            }
+                        }
+                        .padding(8)
+                        .background(Color.orange.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+
                     // Action row — primary CTA on the left, fallback on the right.
                     HStack(spacing: 10) {
                         Button(action: { updater.checkForUpdates() }) {
@@ -1791,6 +1832,21 @@ struct ContentView: View {
                         }
                         .buttonStyle(SecondaryPillButtonStyle())
                         .help("Open the GitHub Releases page and download the latest QuickLookProtein.zip manually.")
+
+                        // Open update log — surfaces the file Updater
+                        // writes every state transition to. Cheap
+                        // diagnostic for users who keep hitting "An
+                        // error occurred while launching the
+                        // installer" so they can paste the actual
+                        // SUError domain + code into a bug report.
+                        Button(action: { updater.openUpdateLog() }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                Text("Open update log")
+                            }
+                        }
+                        .buttonStyle(SecondaryPillButtonStyle())
+                        .help("Open the rolling update log written by Sparkle's delegate. Every check / install / abort lands here with the underlying NSError - useful for diagnosing repeated Update Error dialogs.")
                     }
                     .padding(.top, 6)
                 }

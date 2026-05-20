@@ -4,6 +4,32 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.80] — 2026-05-20
+
+### 🐞 Both OSes — diagnostic logging for the updater path
+
+Multiple users (and the maintainer) have hit silent or generic-message failures during in-app updates — Mac shows "An error occurred while launching the installer" with no further detail; Windows surfaces a `MessageBox` for the HTTP layer but swallowed everything else. The actual `NSError` / `Exception` was never written anywhere a user (or bug report) could retrieve, so each failure became a guessing game.
+
+v1.7.80 wires both updaters into an on-disk log and surfaces the underlying error in the Settings UI itself. Nothing about the update flow changes for the happy path; this is purely defensive instrumentation.
+
+**🍎 macOS — `Updater.swift`**
+
+- `Updater` now implements `SPUUpdaterDelegate`'s `updater(_:didAbortWithError:)`. When Sparkle bails (e.g. installer-launch failures, signature mismatches, host-version comparison aborts) the underlying `NSError` is unwrapped and pretty-printed: domain, code, `localizedDescription`, `localizedFailureReason`, `localizedRecoverySuggestion`, plus any `NSUnderlyingError` chain.
+- New `@Published var lastInstallError: String?` flows that error into `ContentView`'s **Software Update** card — orange-tinted, monospace, `.textSelection(.enabled)` on macOS 12+ so users can copy the text into a bug report.
+- All updater state transitions (`check started / found update / abort / install will-begin / install did-finish`) write timestamped lines to a rolling log at  
+  `~/Library/Group Containers/<group>/Library/Logs/QuickLookProtein/updater.log`  
+  (falls back to `~/Library/Logs/QuickLookProtein/updater.log` when the App Group container can't be resolved, e.g. on first-launch sandboxing).
+- New **"Open update log"** SecondaryPillButton opens the file in the user's default text viewer (Console / TextEdit), falling back to a Finder reveal if `NSWorkspace.open` fails.
+
+**🪟 Windows — `UpdateChecker.cs`**
+
+- New `public static string LogPath` → `%LocalAppData%\QuickLookProtein\update.log`, with 1 MB rotation (`update.log.1` keeps the previous tail) so the file never grows unbounded across years of update checks.
+- `CheckAsync` now logs the start of the check, the GitHub API response size, missing-tag / missing-asset warnings, version-parse failures, and every caught exception (via `LogException`, which writes `HResult`, message, full type name and the stack trace).
+- `DownloadAndInstallAsync` logs the start of the download, the `Content-Length` (or `unknown`), copied bytes on completion, the `Setup.exe` launch attempt, and any HTTP non-2xx response. Each retry/failure path is wrapped in `try / LogException` so the next person who hits a silent failure has the actual exception in hand.
+- New **"Open update log"** button next to "Open release page" in the Software Update card. If the file doesn't exist yet (no check has run on this machine) the handler writes an explanatory header so Notepad doesn't pop a "do you want to create this file?" prompt.
+
+**Why now**: the maintainer hit "An error occurred while launching the installer" three times during this release cycle (1.7.65→1.7.66, 1.7.65→1.7.68, 1.7.78→1.7.79) on a machine running Parallels + AlDente, and `log show --predicate 'subsystem == "org.sparkle-project.Sparkle"'` returned **zero** entries each time — Sparkle aborts synchronously before it logs anything. The delegate hook plus the file logger collectively guarantee that the next time it happens, the exact failure reason is captured both in-app and on disk.
+
 ## [1.7.79] — 2026-05-20
 
 ### 🪟 Windows — fix silent-install failure on upgrade-over-running-QL-Win

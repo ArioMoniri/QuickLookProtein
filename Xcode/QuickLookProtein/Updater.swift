@@ -247,10 +247,67 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
 
     // MARK: SPUUpdaterDelegate (small lifecycle pings the About UI surfaces)
 
+    /// Most recent install-side error (set from `didAbortWithError`), with
+    /// the underlying NSError code + domain so the UI can surface what
+    /// Sparkle's "An error occurred while launching the installer" dialog
+    /// actually means.  Cleared when a check starts so stale errors don't
+    /// linger across cycles.
+    @Published var lastInstallError: String?
+
+    /// Path to the rolling update log written by `logUpdateEvent`. Created
+    /// inside the App Group container so the QL extension can co-write if
+    /// it ever needs to, but realistically only the main app writes here.
+    /// Settings UI exposes this via "Open update log" so users can paste
+    /// the actual failure into a bug report.
+    nonisolated static var updateLogURL: URL {
+        let fm = FileManager.default
+        let groupID = "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"
+        let containerDir = fm.containerURL(forSecurityApplicationGroupIdentifier: groupID)
+        let logDir: URL = containerDir?.appendingPathComponent("Library/Logs/QuickLookProtein", isDirectory: true)
+            // App Group not provisioned in this build - fall back to the
+            // bundle container Logs dir; sandbox always grants the app
+            // write access there.
+            ?? fm.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Logs/QuickLookProtein", isDirectory: true)
+        try? fm.createDirectory(at: logDir, withIntermediateDirectories: true)
+        return logDir.appendingPathComponent("updater.log")
+    }
+
+    /// Best-effort timestamped append.  Never throws.  Used by every
+    /// state-transition in the updater lifecycle so users hitting Sparkle
+    /// failures get a forensic trail to attach to bug reports.
+    nonisolated static func logUpdateEvent(_ level: String, _ message: String) {
+        let line = "\(Self.lastCheckFormatter.string(from: Date())) [\(level)] \(message)\n"
+        guard let data = line.data(using: .utf8) else { return }
+        let url = updateLogURL
+        // Open-for-appending; if missing, create.
+        do {
+            let fh: FileHandle
+            if FileManager.default.fileExists(atPath: url.path) {
+                fh = try FileHandle(forWritingTo: url)
+                try fh.seekToEnd()
+            } else {
+                FileManager.default.createFile(atPath: url.path, contents: nil)
+                fh = try FileHandle(forWritingTo: url)
+            }
+            try fh.write(contentsOf: data)
+            try fh.close()
+        } catch {
+            // Logging is best-effort. We're not going to fail the update
+            // path because we couldn't write a line.
+        }
+    }
+
     nonisolated func updater(_ updater: SPUUpdater,
                              didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
                              error: Error?) {
         let now = Date()
+        if let error = error {
+            Self.logUpdateEvent("ERR",
+                "didFinishUpdateCycleFor: \(Self.describe(error: error))")
+        } else {
+            Self.logUpdateEvent("INFO", "didFinishUpdateCycleFor: OK")
+        }
         Task { @MainActor in
             if let error = error {
                 self.lastCheckStatus = "Update check failed: \(error.localizedDescription)"
@@ -260,7 +317,66 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
         }
     }
 
+    /// Fires when Sparkle aborts the update cycle - this is the hook that
+    /// catches "An error occurred while launching the installer".  Without
+    /// it the stock Sparkle UI shows the modal and the error is lost.
+    /// Here we capture the NSError's code + domain + userInfo so we can
+    /// pin down whether it's an XPC mach-lookup failure, a sandbox denial,
+    /// a code-sign mismatch, or a downloaded-bundle integrity error.
+    nonisolated func updater(_ updater: SPUUpdater,
+                             didAbortWithError error: Error) {
+        let described = Self.describe(error: error)
+        Self.logUpdateEvent("ERR", "didAbortWithError: \(described)")
+        Task { @MainActor in
+            self.lastInstallError = described
+            self.lastCheckStatus = "Update aborted: \(error.localizedDescription)"
+        }
+    }
+
+    /// Pretty-print an NSError into a single line covering everything an
+    /// upstream bug report would want: domain, code, localizedDescription,
+    /// failureReason, recoverySuggestion, and any nested underlyingError.
+    /// Sparkle's SUError codes map to constants in
+    /// `SUErrorCode` (e.g. 4 = SUInstallationCancelledError,
+    /// 5 = SUInstallationAuthorizeLaterError, 10 = SUInstallationError,
+    /// 11 = SUInstallationWriteNoPermissionError, 51 = SULaunchToolError).
+    nonisolated private static func describe(error: Error) -> String {
+        let ns = error as NSError
+        var parts: [String] = []
+        parts.append("domain=\(ns.domain)")
+        parts.append("code=\(ns.code)")
+        parts.append("desc=\"\(ns.localizedDescription)\"")
+        if let reason = ns.localizedFailureReason {
+            parts.append("reason=\"\(reason)\"")
+        }
+        if let suggestion = ns.localizedRecoverySuggestion {
+            parts.append("suggestion=\"\(suggestion)\"")
+        }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
+            parts.append("underlying={domain=\(underlying.domain) code=\(underlying.code) desc=\"\(underlying.localizedDescription)\"}")
+        }
+        return parts.joined(separator: " ")
+    }
+
     nonisolated func updaterMayCheck(forUpdates updater: SPUUpdater) -> Bool { true }
+
+    /// Bring the update log up in the user's default text editor so they
+    /// can copy-paste the failure into a bug report.  Falls back to
+    /// revealing the file in Finder if Preview/TextEdit refuse to open
+    /// it (the file is written sandboxed so its parent-folder ACL may
+    /// be restrictive).
+    func openUpdateLog() {
+        let url = Self.updateLogURL
+        // Ensure the file exists so the open call doesn't silently
+        // no-op on a fresh install that hasn't logged anything yet.
+        if !FileManager.default.fileExists(atPath: url.path) {
+            Self.logUpdateEvent("INFO",
+                "Update log initialised; first explicit open by user.")
+        }
+        if !NSWorkspace.shared.open(url) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
 }
 
 #else

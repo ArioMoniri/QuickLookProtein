@@ -906,6 +906,42 @@ public partial class MainWindow : Window
         OpenUrl(_pendingUpdate.ReleaseUrl);
     }
 
+    // v1.7.80: opens the rolling update log written by UpdateChecker.
+    // The log captures actual exception detail (HResult, message, stack)
+    // for any failed check or install — the previous behaviour swallowed
+    // those errors and only surfaced a generic MessageBox.
+    private void OpenUpdateLog_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var path = UpdateChecker.LogPath;
+            if (!File.Exists(path))
+            {
+                // Ensure the file exists so notepad doesn't pop "do you
+                // want to create this file?" — write an explanatory
+                // header instead.
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path,
+                    "QuickLookProtein update log\r\n" +
+                    "This file is empty because no update check has been run yet on this machine.\r\n" +
+                    "Click \"Check for updates\" in the Settings window to populate it.\r\n");
+            }
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                "Could not open the update log:\n\n" + ex.Message +
+                "\n\nThe log file lives at:\n" + UpdateChecker.LogPath,
+                "QuickLookProtein",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void RefreshThumbnails_Click(object sender, RoutedEventArgs e)
     {
         try

@@ -58,6 +58,56 @@ public sealed class UpdateInfo
 
 internal static class UpdateChecker
 {
+    // Rolling update log (1.7.80+).  Every state transition in the
+    // updater flow appends a line here so users hitting failures can
+    // surface the actual exception (network 4xx vs. SHA mismatch vs.
+    // file-in-use during install) instead of the generic status-line
+    // message. Settings UI exposes an "Open update log" button next
+    // to "Check for updates".
+    public static string LogPath
+    {
+        get
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "QuickLookProtein");
+            try { Directory.CreateDirectory(dir); } catch { /* best-effort */ }
+            return Path.Combine(dir, "update.log");
+        }
+    }
+
+    private static readonly object _logLock = new();
+    public static void Log(string level, string message)
+    {
+        try
+        {
+            var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level}] {message}\r\n";
+            lock (_logLock)
+            {
+                // Rotate at 1 MB so a long-running Settings session
+                // can't fill the disk with our trace.
+                try
+                {
+                    var fi = new FileInfo(LogPath);
+                    if (fi.Exists && fi.Length > 1024 * 1024) File.WriteAllText(LogPath, "");
+                }
+                catch { /* benign */ }
+                File.AppendAllText(LogPath, line);
+            }
+        }
+        catch
+        {
+            // Logging must never throw - the updater's own
+            // correctness is more important than the trace.
+        }
+    }
+
+    public static void LogException(string context, Exception ex)
+    {
+        Log("ERR", $"{context}: {ex.GetType().Name}: {ex.Message}");
+        try { Log("ERR", ex.ToString()); } catch { }
+    }
+
     private const string RepoOwner = "ArioMoniri";
     private const string RepoName  = "QuickLookProtein";
     private const string SetupAssetName = "QuickLookProtein-Setup.exe";
@@ -115,6 +165,7 @@ internal static class UpdateChecker
     /// caller treats null as "couldn't check, no notification".</summary>
     public static async Task<UpdateInfo?> CheckAsync()
     {
+        Log("INFO", $"CheckAsync start (current={CurrentVersion})");
         try
         {
             // Force TLS 1.2 - GitHub API requires it and .NET 4.7.2
@@ -133,6 +184,7 @@ internal static class UpdateChecker
             http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
             var json = await http.GetStringAsync(ApiUrl).ConfigureAwait(false);
+            Log("INFO", $"GitHub /releases/latest -> {json.Length} bytes");
 
             // Parse the small subset we need without pulling in a JSON
             // library. The shape is stable: tag_name, html_url, body,
@@ -143,16 +195,25 @@ internal static class UpdateChecker
             var url = ExtractJsonScalar(json, "html_url");
             var body = ExtractJsonScalar(json, "body");
             if (string.IsNullOrEmpty(tag) || string.IsNullOrEmpty(url))
+            {
+                Log("WARN", "Couldn't extract tag_name/html_url from GitHub response");
                 return null;
+            }
 
             // tag_name is e.g. "v1.7.77" - strip the leading v.
             var verStr = tag!.TrimStart('v', 'V');
             if (!TryParseVersion(verStr, out var latest))
+            {
+                Log("WARN", $"TryParseVersion failed for '{verStr}'");
                 return null;
+            }
 
             // Find the Setup.exe asset URL inside the assets array.
             var setupUrl = ExtractAssetUrl(json, SetupAssetName);
+            if (string.IsNullOrEmpty(setupUrl))
+                Log("WARN", $"No '{SetupAssetName}' asset in release {tag}");
 
+            Log("INFO", $"CheckAsync OK: latest={latest} tag={tag} setupUrl={(string.IsNullOrEmpty(setupUrl) ? "(missing)" : "ok")}");
             return new UpdateInfo
             {
                 Latest = latest,
@@ -164,7 +225,7 @@ internal static class UpdateChecker
         }
         catch (Exception ex)
         {
-            Debug.WriteLine("UpdateChecker.CheckAsync failed: " + ex.Message);
+            LogException("CheckAsync failed", ex);
             return null;
         }
     }
@@ -182,8 +243,12 @@ internal static class UpdateChecker
     /// to for diagnostic purposes; throws on network / IO failure.</summary>
     public static async Task<string> DownloadAndInstallAsync(UpdateInfo info, IProgress<double>? progress = null)
     {
+        Log("INFO", $"DownloadAndInstallAsync start: tag={info.TagName} url={info.SetupExeUrl}");
         if (string.IsNullOrEmpty(info.SetupExeUrl))
+        {
+            Log("ERR", "DownloadAndInstallAsync: empty SetupExeUrl");
             throw new InvalidOperationException("No Setup.exe asset URL in the release");
+        }
 
         var tempPath = Path.Combine(Path.GetTempPath(),
             $"QuickLookProtein-Setup-{info.TagName}.exe");
@@ -191,40 +256,63 @@ internal static class UpdateChecker
         try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; }
         catch { }
 
-        using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) })
+        try
         {
-            http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
-
-            using var resp = await http.GetAsync(info.SetupExeUrl,
-                HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-            resp.EnsureSuccessStatusCode();
-
-            var total = resp.Content.Headers.ContentLength ?? -1L;
-            using var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            using var src = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
-
-            var buf = new byte[64 * 1024];
-            long copied = 0;
-            int n;
-            while ((n = await src.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false)) > 0)
+            using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) })
             {
-                await fs.WriteAsync(buf, 0, n).ConfigureAwait(false);
-                copied += n;
-                if (total > 0 && progress != null)
+                http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+
+                using var resp = await http.GetAsync(info.SetupExeUrl,
+                    HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode)
                 {
-                    progress.Report((double)copied / total);
+                    Log("ERR", $"Download GET returned HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}");
                 }
+                resp.EnsureSuccessStatusCode();
+
+                var total = resp.Content.Headers.ContentLength ?? -1L;
+                Log("INFO", $"Streaming {total} bytes to {tempPath}");
+                using var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                using var src = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
+
+                var buf = new byte[64 * 1024];
+                long copied = 0;
+                int n;
+                while ((n = await src.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false)) > 0)
+                {
+                    await fs.WriteAsync(buf, 0, n).ConfigureAwait(false);
+                    copied += n;
+                    if (total > 0 && progress != null)
+                    {
+                        progress.Report((double)copied / total);
+                    }
+                }
+                Log("INFO", $"Download complete: copied={copied} bytes");
             }
+        }
+        catch (Exception ex)
+        {
+            LogException("Download failed", ex);
+            throw;
         }
 
         // Launch the installer and quit ourselves so Setup.exe can
         // replace Settings.exe without a sharing-violation. Setup.exe
         // also re-launches the Settings app at the end of its run.
-        Process.Start(new ProcessStartInfo
+        Log("INFO", $"Launching {tempPath}");
+        try
         {
-            FileName = tempPath,
-            UseShellExecute = true,   // gives Windows a chance to handle UAC if it triggers
-        });
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = tempPath,
+                UseShellExecute = true,   // gives Windows a chance to handle UAC if it triggers
+            });
+        }
+        catch (Exception ex)
+        {
+            LogException("Setup.exe launch failed", ex);
+            throw;
+        }
 
         await Application.Current.Dispatcher.InvokeAsync(() =>
         {
