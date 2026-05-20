@@ -19,6 +19,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -31,6 +32,22 @@ public partial class MoleculePanel : UserControl, IDisposable
     /// Anything in <c>Resources/</c> becomes reachable at
     /// <c>https://VIRTUAL_HOST/&lt;filename&gt;</c>.
     private const string VirtualHost = "quicklookprotein.local";
+
+    /// v1.7.89+ separate virtual host for the per-load preview HTML
+    /// file. We can't use VirtualHost above because that maps to
+    /// Resources/ (read-only, shipped with the plugin) — the preview
+    /// HTML is per-load and lives under %LocalAppData%. Keeping them
+    /// on different hostnames also means cross-origin requests from
+    /// the preview page to 3Dmol.js go through WebView2's vhost
+    /// handler (which sets permissive CORS headers), not through a
+    /// data: / about: origin where the rules are murkier.
+    private const string PreviewVirtualHost = "quicklookprotein-preview.local";
+
+    /// v1.7.89+ path of the most recently navigated preview HTML.
+    /// We delete it on the next load (or in Dispose) so the preview
+    /// dir doesn't grow unbounded — one file per Space-bar press
+    /// would otherwise leak forever.
+    private string? _previewTempPath;
 
     /// v1.7.88+ disposed-state guard. QL-Win disposes the IViewer
     /// (and therefore us) the moment the user advances to the next
@@ -130,6 +147,23 @@ public partial class MoleculePanel : UserControl, IDisposable
             VirtualHost, resourcesDir,
             CoreWebView2HostResourceAccessKind.Allow);
 
+        // v1.7.89+ second vhost for the preview HTML. Through 1.7.88
+        // we called WebView.NavigateToString(html), but WebView2 caps
+        // that at ~2 MB of content. Large PDBs (e.g. a fully-assembled
+        // ribosome ~600k atoms) blow that limit and crash with
+        // "ArgumentException: Value does not fall within the expected
+        // range" inside CoreWebView2.NavigateToString. Switching to a
+        // file-backed navigate sidesteps the limit entirely; the file
+        // sits under %LocalAppData% (always user-writable) and is
+        // cleaned up on the next load.
+        var previewDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "QuickLookProtein", "preview");
+        Directory.CreateDirectory(previewDir);
+        WebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+            PreviewVirtualHost, previewDir,
+            CoreWebView2HostResourceAccessKind.Allow);
+
         // Rewrite the bare <script src="3Dmol.js"> to point at the
         // virtual host. We do this in code rather than in the template
         // so the same template still works on macOS where it resolves
@@ -138,7 +172,25 @@ public partial class MoleculePanel : UserControl, IDisposable
             "<script src=\"3Dmol.js\">",
             $"<script src=\"https://{VirtualHost}/3Dmol.js\">");
 
-        WebView.NavigateToString(html);
+        // Write the rendered HTML to a per-load file under the
+        // preview vhost and navigate to it. New random filename
+        // each load so WebView2 never serves a stale cached page.
+        var previewName = $"preview-{Guid.NewGuid():N}.html";
+        var previewPath = Path.Combine(previewDir, previewName);
+        await Task.Run(() => File.WriteAllText(previewPath, html, Encoding.UTF8));
+        if (_disposed) throw new ObjectDisposedException(nameof(MoleculePanel));
+
+        WebView.CoreWebView2.Navigate($"https://{PreviewVirtualHost}/{previewName}");
+
+        // Best-effort: delete the previous load's temp file so the
+        // preview dir doesn't grow one file per Space-bar press.
+        // Interlocked so concurrent loads (shouldn't happen but
+        // defensive) can't race the previous-path read.
+        var stale = Interlocked.Exchange(ref _previewTempPath, previewPath);
+        if (stale != null)
+        {
+            try { File.Delete(stale); } catch { /* best effort */ }
+        }
     }
 
     /// Initialise the WebView2 core only once; subsequent calls are
@@ -483,5 +535,16 @@ public partial class MoleculePanel : UserControl, IDisposable
         // Dispatcher.UnhandledException and ends up in plugin.log.
         _disposed = true;
         WebView?.Dispose();
+
+        // v1.7.89+ clean up the preview temp file. Without this the
+        // preview dir grows one HTML file per Space-bar press across
+        // the lifetime of a QL-Win session. Best-effort: a held file
+        // lock (e.g. WebView2 still flushing) just means the next
+        // load will mop it up via the Interlocked.Exchange path.
+        var stale = Interlocked.Exchange(ref _previewTempPath, null);
+        if (stale != null)
+        {
+            try { File.Delete(stale); } catch { /* best effort */ }
+        }
     }
 }

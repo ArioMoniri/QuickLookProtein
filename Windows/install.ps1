@@ -73,8 +73,9 @@ function Write-Step($message) {
 
 function Test-QuickLookInstalled {
     # QL-Win installs to %LocalAppData%\Programs\QuickLook by default, but
-    # newer installers can also land in Program Files. Look in both places
-    # and fall back to whether the process is running.
+    # newer installers can also land in Program Files. Look in both places,
+    # check for the Microsoft Store packaged version (v1.7.89+), and fall
+    # back to whether the process is running.
     $candidates = @(
         (Join-Path $env:LocalAppData "Programs\QuickLook\QuickLook.exe"),
         (Join-Path ${env:ProgramFiles} "QuickLook\QuickLook.exe"),
@@ -83,7 +84,34 @@ function Test-QuickLookInstalled {
     foreach ($p in $candidates) {
         if ($p -and (Test-Path $p)) { return $true }
     }
+    if (Test-StoreQuickLookInstalled) { return $true }
     return [bool](Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue)
+}
+
+# v1.7.89+ Microsoft Store packaged-app detection. The Store version
+# of QL-Win is sandboxed under %ProgramFiles%\WindowsApps and won't
+# be picked up by the Test-Path probes above; Get-AppxPackage is the
+# canonical way to detect packaged apps for the current user.
+# Returning true here means we skip Install-QuickLookHost — otherwise
+# we'd install the GitHub release of QL-Win alongside the Store one,
+# leaving the user with two QuickLook.exe processes fighting over
+# the same plugin folder.
+function Test-StoreQuickLookInstalled {
+    try {
+        $pkg = Get-AppxPackage -Name "*QuickLook*" -ErrorAction SilentlyContinue |
+               Where-Object { $_.Name -match 'QuickLook' } |
+               Select-Object -First 1
+        if ($pkg) {
+            Write-Host "  Found QuickLook from Microsoft Store: $($pkg.PackageFamilyName)"
+            return $true
+        }
+    } catch {
+        # Get-AppxPackage isn't available on Windows Server Core or
+        # in PowerShell 7 without the WindowsCompatibility module —
+        # treat the failure as "not installed" rather than blocking
+        # the install.
+    }
+    return $false
 }
 
 function Find-LocalQuickLookInstaller {

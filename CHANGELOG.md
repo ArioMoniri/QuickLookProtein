@@ -4,6 +4,27 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.89] — 2026-05-20
+
+### 🪟 Windows — fix "Could not render molecule: ArgumentException" on large PDBs
+
+`WebView.CoreWebView2.NavigateToString(html)` is capped at ~2 MB of content. Large PDBs (e.g. a fully-assembled ribosome with hundreds of thousands of atoms) inlined into the viewer template blow past the limit and crash with `ArgumentException: Value does not fall within the expected range` — the QL-Win preview window then shows the canned "Could not render molecule" error page instead of the structure.
+
+v1.7.89 sidesteps the limit: the rendered HTML is written to a per-load temp file under `%LocalAppData%\QuickLookProtein\preview\preview-<guid>.html`, mapped to a new virtual host `https://quicklookprotein-preview.local/`, and navigated to via `Navigate(...)`. No content-size limit on the file path. The previous load's temp file is deleted on the next load (and on `Dispose`) so the dir doesn't grow one file per Space-bar press.
+
+### 🪟 Windows — detect Microsoft Store QuickLook to avoid double-install
+
+A user reported two `QuickLook-4.5.0.exe` processes running simultaneously after a Setup.exe install — one suspended (the Store version's app container), one running (our GitHub-bundled install). `Test-QuickLookInstalled` was only checking the legacy `%LocalAppData%\Programs\QuickLook` / Program Files paths; the Microsoft Store version lives under `%ProgramFiles%\WindowsApps` and was missed.
+
+v1.7.89 adds `Test-StoreQuickLookInstalled` (calls `Get-AppxPackage -Name "*QuickLook*"`); when the Store version is present, install.ps1 skips `Install-QuickLookHost` entirely. The Store path is now recommended in the README + `docs/INSTALL.md` as the primary install route — it's signed by Microsoft, auto-updates, and runs in a sandbox.
+
+### 📄 README simplified; details moved to docs/
+
+The README grew to nearly 400 lines of version-stamped paragraphs and per-feature prose. v1.7.89 trims it to a tight intro + install + features matrix + troubleshooting pointer, with the long-form content moved to:
+- [`docs/INSTALL.md`](docs/INSTALL.md) — every install path with the implementation notes
+- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — symptom → log → fix table for both OSes
+- [`CHANGELOG.md`](CHANGELOG.md) (existing) — version history
+
 ## [1.7.88] — 2026-05-20
 
 ### 🪟 Windows — race fix on Quick Look fast-advance
