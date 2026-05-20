@@ -6,6 +6,30 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.84</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.84</link>
+      <pubDate>Wed, 20 May 2026 08:23:38 +0000</pubDate>
+      <sparkle:version>1.7.84</sparkle:version>
+      <sparkle:shortVersionString>1.7.84</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🍎 macOS — diagnostic log viewer for every extension&lt;/h3&gt;
+&lt;p&gt;The Updater already wrote a file log since v1.7.80, but the three Quick Look extensions (preview, thumbnail, Quick Actions) only emitted &lt;code&gt;os_log&lt;/code&gt; against per-extension subsystems — only retrievable via &lt;code&gt;log show&lt;/code&gt; or Console.app, both of which a sandboxed Settings UI cannot reach (sandbox blocks &lt;code&gt;/var/db/diagnostics&lt;/code&gt;). When a preview rendered as a blank document or a thumbnail came back generic, there was no way for a user to ship a useful bug report.&lt;/p&gt;
+&lt;p&gt;v1.7.84 adds a file-based diagnostic logger to each extension and a viewer in the main app:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;DiagLog&lt;/code&gt; helper&lt;/strong&gt; in &lt;code&gt;PreviewViewController.swift&lt;/code&gt;, &lt;code&gt;ThumbnailProvider.swift&lt;/code&gt;, and &lt;code&gt;ActionRequestHandler.swift&lt;/code&gt;. Each writes timestamped lines to its own log under&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;  &lt;code&gt;~/Library/Group Containers/&amp;lt;group&amp;gt;/Library/Logs/QuickLookProtein/&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;  (sandbox-local &lt;code&gt;~/Library/Logs/QuickLookProtein/&lt;/code&gt; fallback when the App Group container isn&amp;#x27;t provisioned). Files: &lt;code&gt;qlpreview.log&lt;/code&gt;, &lt;code&gt;qlthumbnail.log&lt;/code&gt;, &lt;code&gt;qlactions.log&lt;/code&gt;. 2 MB cap with truncate-and-restart so no file grows unbounded.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Entry + catch instrumentation&lt;/strong&gt; at the key points: &lt;code&gt;preparePreviewOfFile&lt;/code&gt;, &lt;code&gt;provideThumbnail&lt;/code&gt;, &lt;code&gt;beginRequest&lt;/code&gt;, the merged-PDB writer, the share-temp-PNG writer, the USDZ exporter. Every error path now leaves a forensic trail.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&amp;quot;Extension logs&amp;quot; section in About → Software Update&lt;/strong&gt; with one button per component (Updater · Quick Look preview · Thumbnail · Quick Actions). Tapping opens a &lt;code&gt;LogViewerSheet&lt;/code&gt; that reads the corresponding file, defaults to the last 200 lines (toggle for full file), and exposes Reveal-in-Finder / Refresh / Copy / Save buttons. Identical UX across all four targets.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&amp;quot;Reveal logs folder in Finder&amp;quot;&lt;/strong&gt; button as a fast escape hatch — jumps straight to the App Group &lt;code&gt;Library/Logs/QuickLookProtein&lt;/code&gt; directory so users can grab the whole folder for a bug report in one drag.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;We deliberately do *not* shell out to &lt;code&gt;/usr/bin/log show&lt;/code&gt; from the sandboxed main app — it would silently return empty because the sandbox blocks &lt;code&gt;/var/db/diagnostics&lt;/code&gt; access. File-based logging via the shared App Group works inside the sandbox without extra entitlements.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.84"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.84/QuickLookProtein-1.7.84.zip" sparkle:edSignature="f6w5IT/ZQ4qMaFFdRF0tVIjr/z/736EWZONL72FzEVyee4jqCkAx546ht7qSkO6yd2NaU7wIl69eoFBJ+TvwBA==" length="4550172" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.83</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.83</link>
       <pubDate>Wed, 20 May 2026 07:52:40 +0000</pubDate>
