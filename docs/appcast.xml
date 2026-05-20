@@ -6,6 +6,25 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.78</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.78</link>
+      <pubDate>Wed, 20 May 2026 04:50:27 +0000</pubDate>
+      <sparkle:version>1.7.78</sparkle:version>
+      <sparkle:shortVersionString>1.7.78</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🔧 Hotfix for v1.7.77&amp;#x27;s partial-release&lt;/h3&gt;
+&lt;p&gt;v1.7.77&amp;#x27;s tag shipped only the macOS DMG; the Windows side of the release pipeline failed during &lt;code&gt;Build Settings WPF app&lt;/code&gt; because &lt;code&gt;UpdateChecker.cs&lt;/code&gt; used two features the net472 SDK doesn&amp;#x27;t auto-provide:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;using System.Net.Http;&lt;/code&gt; — &lt;code&gt;HttpClient&lt;/code&gt; is in the net472 reference assemblies but isn&amp;#x27;t auto-referenced in SDK-style csproj. &lt;strong&gt;Fixed&lt;/strong&gt;: explicit &lt;code&gt;&amp;lt;Reference Include=&amp;quot;System.Net.Http&amp;quot; /&amp;gt;&lt;/code&gt; in &lt;code&gt;QuickLookProtein.Settings.csproj&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;public string TagName { get; init; }&lt;/code&gt; — C# 9&amp;#x27;s init-only setters require &lt;code&gt;System.Runtime.CompilerServices.IsExternalInit&lt;/code&gt;, which ships in .NET 5+ but not Framework. &lt;strong&gt;Fixed&lt;/strong&gt;: new &lt;code&gt;IsExternalInit.cs&lt;/code&gt; polyfill (the &lt;a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-9.0/init"&gt;officially-blessed Roslyn pattern for downlevel targets&lt;/a&gt;).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;🛡 &lt;code&gt;ci-validate&lt;/code&gt; now mirrors release.yml&amp;#x27;s build flags&lt;/h3&gt;
+&lt;p&gt;User flagged the actual gap: &lt;code&gt;ci-validate.yml&lt;/code&gt; was building with &lt;code&gt;dotnet build -c Release&lt;/code&gt; but the release workflow builds with &lt;code&gt;/p:Version=$ver /p:FileVersion=$ver /p:InformationalVersion=$ver&lt;/code&gt;. A code change that compiled fine without the version cascade but failed with it (exactly what 1.7.77 hit) wouldn&amp;#x27;t have been caught by CI. &lt;strong&gt;Fixed&lt;/strong&gt;: &lt;code&gt;ci-validate.yml&lt;/code&gt;&amp;#x27;s plugin + Settings build steps now pass &lt;code&gt;/p:Version=0.0.0-ci /p:FileVersion=0.0.0 /p:InformationalVersion=0.0.0-ci&lt;/code&gt; so the version-stamped code path is exercised on every push to feature/**.&lt;/p&gt;
+&lt;p&gt;The release workflow&amp;#x27;s atomic-publish gate (don&amp;#x27;t create the GitHub release until both Mac and Windows builds succeed) is queued for a separate follow-up — it requires restructuring release.yml&amp;#x27;s job graph and is larger than this hotfix should carry.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.78"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.78/QuickLookProtein-1.7.78.zip" sparkle:edSignature="iIaaOKeol0A36yVd0CO9Ly0+i9BeBii6ks3PmC9U50ptVpoWUe3T9jrQdfL1lzxc+Wb9US7EfUKfnfjrDEUtDA==" length="4482820" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.77</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.77</link>
       <pubDate>Wed, 20 May 2026 04:39:38 +0000</pubDate>
