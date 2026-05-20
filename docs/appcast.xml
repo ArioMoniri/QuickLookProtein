@@ -6,6 +6,24 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.72</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.72</link>
+      <pubDate>Wed, 20 May 2026 03:21:41 +0000</pubDate>
+      <sparkle:version>1.7.72</sparkle:version>
+      <sparkle:shortVersionString>1.7.72</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Diagnostic — cctor sentinel file&lt;/h3&gt;
+&lt;p&gt;User reported that after a clean 1.7.71 install, &lt;code&gt;plugin.log&lt;/code&gt; still doesn&amp;#x27;t appear when QL-Win previews a &lt;code&gt;.pdb&lt;/code&gt;. The follow-up x86-PowerShell diagnostic confirmed our DLL loads cleanly under 32-bit (matching QL-Win&amp;#x27;s actual bitness on their machine), &lt;code&gt;GetTypes()&lt;/code&gt; returns all 16 expected types, and &lt;code&gt;Activator.CreateInstance(Plugin)&lt;/code&gt; succeeds — so the assembly itself is structurally fine for QL-Win to discover. The failure is somewhere in QL-Win&amp;#x27;s discovery loop, *not* in our plugin&amp;#x27;s code.&lt;/p&gt;
+&lt;p&gt;To prove this from the QL-Win process side rather than from PowerShell, &lt;code&gt;Plugin&lt;/code&gt;&amp;#x27;s static cctor now writes a &lt;code&gt;cctor.txt&lt;/code&gt; sentinel file at &lt;code&gt;%LocalAppData%\QuickLookProtein\cctor.txt&lt;/code&gt; via raw &lt;code&gt;File.WriteAllText&lt;/code&gt;, bypassing &lt;code&gt;PluginLog&lt;/code&gt; entirely. The file records the timestamp, host process PID + exe path, bitness, and the plugin&amp;#x27;s assembly version. After installing 1.7.72 and pressing Space on a &lt;code&gt;.pdb&lt;/code&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;If &lt;code&gt;cctor.txt&lt;/code&gt; &lt;strong&gt;exists&lt;/strong&gt;, QL-Win is touching our type but never reaching &lt;code&gt;Init()&lt;/code&gt; — we look at QL-Win&amp;#x27;s discovery internals.&lt;/li&gt;
+&lt;li&gt;If &lt;code&gt;cctor.txt&lt;/code&gt; &lt;strong&gt;doesn&amp;#x27;t exist&lt;/strong&gt;, QL-Win isn&amp;#x27;t loading our DLL at all — we look at QL-Win&amp;#x27;s plugin folder scanning, caches, or version compatibility.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;No functional change to the plugin&amp;#x27;s render path; purely a diagnostic instrumentation aid.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.72"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.72/QuickLookProtein-1.7.72.zip" sparkle:edSignature="DkMhhOS8xJcCciLQwxJtf+H/yx5FxsFh2t2cx6vTQgEhr3r0YrZrDs4dKhfxMn83l4VpEdLA7s8pruMcoNxJCA==" length="4462805" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.71</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.71</link>
       <pubDate>Tue, 19 May 2026 09:38:38 +0000</pubDate>
