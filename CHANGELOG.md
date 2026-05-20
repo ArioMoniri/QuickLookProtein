@@ -4,6 +4,18 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.85] — 2026-05-20
+
+### 🪟 Windows — "Repair thumbnail registration" button
+
+v1.7.83's self-test surfaced a partial-registration failure mode that real users are hitting on Win11: the per-extension shell-handler keys are present (step 1 OK) but the CLSID's `InProcServer32` entry is missing (step 2 MISSING). Most likely cause: an old QuickLookProtein uninstall, a system-cleaner tool, or a security product wiped only the CLSID node and left the per-extension breadcrumbs pointing at a dead end.
+
+v1.7.85 lets users fix this in one click from Settings → About → Diagnostics → **"Repair thumbnail registration"**. The button rewrites the same HKCU keys `install.ps1`'s `Register-ThumbnailHandler` writes on first install — CLSID + `InProcServer32` (`mscoree.dll` bridge, `Assembly`, `Class`, `CodeBase`, `RuntimeVersion`), plus the per-extension `ShellEx\{IID}` entries for all 16 supported extensions, then broadcasts `SHChangeNotify(SHCNE_ASSOCCHANGED)` so Explorer re-walks the extension-to-CLSID map without an explorer.exe restart.
+
+DLL discovery probes both QL-Win 4.x (`%AppData%\pooi.moe\QuickLook\QuickLook.Plugin\QuickLookProtein\`) and legacy 3.x (`%LocalAppData%\QuickLook\plugins\QuickLookProtein\`) plugin paths; if the DLL isn't in either, the button surfaces "the DLL itself is missing — re-run Setup.exe" rather than writing dead registry entries.
+
+After repairing, re-run **"Test thumbnail provider"** — all four steps should report OK. Switch a folder of `.pdb` / `.cif` / `.sdf` files to Icon view and the thumbnails should redraw within a second or two.
+
 ## [1.7.84] — 2026-05-20
 
 ### 🍎 macOS — diagnostic log viewer for every extension

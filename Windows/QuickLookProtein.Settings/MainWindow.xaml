@@ -1040,9 +1040,13 @@
                                     <Button Content="Open plugin folder" Padding="10,4" Margin="0,2,6,2" Click="OpenPluginFolderButton_Click"/>
                                     <Button Content="Open plugin log" Padding="10,4" Margin="0,2,6,2" Click="OpenPluginLog_Click"/>
                                     <Button Content="Test thumbnail provider" Padding="10,4" Margin="0,2,6,2"
-                                            Style="{StaticResource PrimaryButton}"
                                             ToolTip="Walk the registration chain: per-extension key → CLSID → managed DLL load → COM CreateInstance. Pinpoints whether Explorer can't find us, can't load the DLL, or fails CLR activation. Writes results to thumbnail.log."
                                             Click="TestThumbnailProvider_Click"/>
+                                    <Button Content="Repair thumbnail registration"
+                                            Style="{StaticResource PrimaryButton}"
+                                            Padding="12,4" Margin="0,2,6,2"
+                                            ToolTip="Rewrite the CLSID + per-extension shell-handler registry keys from inside Settings.exe (same writes install.ps1 does on first install). Use this when the self-test reports step 2 MISSING — fixes the registration without needing to re-run Setup.exe."
+                                            Click="RepairThumbnailRegistration_Click"/>
                                     <Button Content="Open thumbnail log" Padding="10,4" Margin="0,2,6,2"
                                             ToolTip="Open the rolling log written by the Explorer thumbnail provider. Empty means Explorer never loaded our DLL; entries with parse / render errors point at the specific failure."
                                             Click="OpenThumbnailLog_Click"/>

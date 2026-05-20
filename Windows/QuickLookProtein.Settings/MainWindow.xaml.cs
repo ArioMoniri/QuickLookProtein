@@ -6,6 +6,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -1141,6 +1142,138 @@ public partial class MainWindow : Window
             "Thumbnail provider self-test",
             MessageBoxButton.OK,
             step4 == "OK" ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    // v1.7.85: rewrite the CLSID + per-extension shell-handler keys
+    // from Settings.exe. Install.ps1 does this on first install, but
+    // partial wipes (uninstalling an old version, system-cleaner
+    // tools, a security product nuking "unknown CLSIDs") can leave
+    // the per-extension keys pointing at a CLSID that no longer has
+    // an InProcServer32 entry — exactly the "step 1 OK, step 2
+    // MISSING" failure mode the v1.7.83 self-test surfaces. Rather
+    // than telling the user to re-run Setup.exe (which they may not
+    // have on hand), let them repair the registration in-place.
+    //
+    // Mirrors install.ps1's Register-ThumbnailHandler 1:1: same
+    // CLSID, same IID, same extension list, same mscoree.dll bridge,
+    // same Assembly/Class/CodeBase shape.
+    private void RepairThumbnailRegistration_Click(object sender, RoutedEventArgs e)
+    {
+        const string clsid    = "{B7E4A6F1-2D6E-4F58-9B1B-2E5A1F0B97A1}";
+        const string thumbIid = "{E357FCCD-A995-4576-B01F-234630154E96}";
+        // Same set install.ps1 writes; keep these in sync.
+        var extensions = new[]
+        {
+            ".pdb", ".ent", ".pdbqt", ".pqr", ".cif", ".mmcif",
+            ".sdf", ".mol", ".mol2", ".xyz", ".gro",
+            ".cube", ".cub", ".vasp", ".poscar", ".cdjson",
+        };
+
+        try
+        {
+            // 1) Locate the thumbnail DLL. It lives next to the
+            //    plugin DLL in QL-Win's plugin folder (4.x path).
+            //    Settings.exe runs out of <installdir>\Settings —
+            //    DLL is two dirs up. We also probe the legacy 3.x
+            //    location as a fallback for users still on QL-Win 3.
+            var thumbDll = FindThumbnailDll();
+            if (thumbDll == null || !File.Exists(thumbDll))
+            {
+                MessageBox.Show(this,
+                    "Could not locate QuickLookProtein.Thumbnail.dll in any of the standard plugin paths.\r\n\r\n" +
+                    "Re-run QuickLookProtein-Setup.exe — the DLL itself is missing, not just its registration.",
+                    "Repair thumbnail registration",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // 2) Resolve the assembly's strong name. install.ps1 uses
+            //    [System.Reflection.AssemblyName]::GetAssemblyName,
+            //    we use the same — Assembly.LoadFile would lock the
+            //    DLL, GetAssemblyName reads metadata only.
+            string asmFullName;
+            try
+            {
+                asmFullName = AssemblyName.GetAssemblyName(thumbDll).FullName;
+            }
+            catch
+            {
+                asmFullName = "QuickLookProtein.Thumbnail, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null";
+            }
+
+            // 3) Write the CLSID + InProcServer32 chain.
+            using (var clsidKey = Registry.CurrentUser.CreateSubKey(
+                       $@"Software\Classes\CLSID\{clsid}", writable: true))
+            {
+                if (clsidKey == null)
+                    throw new InvalidOperationException("Could not open HKCU\\...\\CLSID for writing");
+                clsidKey.SetValue("", "QuickLookProtein Thumbnail Provider", RegistryValueKind.String);
+                clsidKey.SetValue("DisableProcessIsolation", 1, RegistryValueKind.DWord);
+
+                using var inproc = clsidKey.CreateSubKey("InProcServer32", writable: true)
+                    ?? throw new InvalidOperationException("Could not open InProcServer32 for writing");
+                inproc.SetValue("",                "mscoree.dll",                                                  RegistryValueKind.String);
+                inproc.SetValue("ThreadingModel",  "Both",                                                         RegistryValueKind.String);
+                inproc.SetValue("Class",           "QuickLookProtein.Thumbnail.MoleculeThumbnailProvider",         RegistryValueKind.String);
+                inproc.SetValue("Assembly",        asmFullName,                                                    RegistryValueKind.String);
+                inproc.SetValue("RuntimeVersion",  "v4.0.30319",                                                   RegistryValueKind.String);
+                inproc.SetValue("CodeBase",        "file:///" + thumbDll.Replace('\\', '/'),                       RegistryValueKind.String);
+            }
+
+            // 4) Per-extension shell-handler key.
+            int wrote = 0;
+            foreach (var ext in extensions)
+            {
+                using var k = Registry.CurrentUser.CreateSubKey(
+                    $@"Software\Classes\{ext}\ShellEx\{thumbIid}", writable: true);
+                if (k != null)
+                {
+                    k.SetValue("", clsid, RegistryValueKind.String);
+                    wrote++;
+                }
+            }
+
+            // 5) Broadcast SHChangeNotify so Explorer re-walks the
+            //    extension-to-CLSID map without needing an explorer.exe
+            //    restart.
+            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+
+            StatusLabel.Text = $"Thumbnail registration repaired ({wrote} extensions written + CLSID InProcServer32). Switch a folder to Icon view to see thumbnails redraw.";
+
+            MessageBox.Show(this,
+                $"Thumbnail registration written successfully.\r\n\r\n" +
+                $"CLSID:        {clsid}\r\n" +
+                $"DLL:          {thumbDll}\r\n" +
+                $"Extensions:   {wrote}\r\n\r\n" +
+                "Run \"Test thumbnail provider\" again to verify, then switch a folder of structure files to Icon view to see the thumbnails redraw.",
+                "Repair thumbnail registration",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            StatusLabel.Text = "Repair failed: " + ex.Message;
+            MessageBox.Show(this,
+                "Repair failed:\r\n\r\n" + ex,
+                "Repair thumbnail registration",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// Probe the standard QL-Win plugin directories for the
+    /// thumbnail DLL. QL-Win 4.x moved the scan path; we keep
+    /// support for both so a user still on 3.x can also repair.
+    private static string? FindThumbnailDll()
+    {
+        var candidates = new[]
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                         "pooi.moe", "QuickLook", "QuickLook.Plugin",
+                         "QuickLookProtein", "QuickLookProtein.Thumbnail.dll"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                         "QuickLook", "plugins",
+                         "QuickLookProtein", "QuickLookProtein.Thumbnail.dll"),
+        };
+        return candidates.FirstOrDefault(File.Exists);
     }
 
     // v1.7.82: open the rolling log written by the Explorer thumbnail
