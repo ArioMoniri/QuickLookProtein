@@ -6,6 +6,10 @@ adhere to SemVer because version numbers are driven by upstream releases.
 
 ## [1.7.81] — 2026-05-20
 
+### 🍎 macOS — System-following / Light / Dark theme picker
+
+New **App appearance** section at the top of Appearance → settings: `System` (default — follows macOS Appearance setting), `Light`, `Dark`. Implemented via SwiftUI's `.preferredColorScheme()` on `ContentView` — `nil` for System (the existing "follow the user's macOS-wide setting" behaviour the app has always had), `.light` / `.dark` to pin the window regardless of the system setting. Stored as `Settings.AppearanceMode` in the App-Group `UserDefaults`, so the choice survives relaunch and is consistent across the Quick Look extension's preview process. SwiftUI already updates the entire view tree on a `.preferredColorScheme` change, so flipping the picker is instant.
+
 ### 🪟 Windows — Settings app redesign (sidebar nav, system-following theme, Mica)
 
 The Windows Settings app shipped through v1.7.80 as a single vertical-scroll wall of dark cards. v1.7.81 rebuilds it from the chrome down to feel native on Windows 11 and match the macOS app's structure.

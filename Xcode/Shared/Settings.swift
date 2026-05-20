@@ -64,6 +64,13 @@ class SettingsStorage: ObservableObject {
     @Published var atomStyleCDJSON: Settings.AtomStyle { didSet { Self.write(atomStyleCDJSON, forKey: "atomStyleCDJSON") } }
     @Published var atomStyleMMTF:   Settings.AtomStyle { didSet { Self.write(atomStyleMMTF,   forKey: "atomStyleMMTF")   } }
 
+    // MARK: - App appearance (v1.7.81+)
+    // Defaults to .system so first-launch tracks the user's macOS
+    // Appearance setting. .preferredColorScheme(nil) is the SwiftUI
+    // "follow system" sentinel and is what the ContentView applies
+    // when this is .system.
+    @Published var appearanceMode:  Settings.AppearanceMode { didSet { Self.write(appearanceMode,  forKey: "appearanceMode")  } }
+
     // MARK: - Global rendering
     @Published var rotationSpeed:   Settings.RotationSpeed { didSet { Self.write(rotationSpeed,   forKey: "rotationSpeed")   } }
     @Published var colorScheme:     Settings.ColorScheme   { didSet { Self.write(colorScheme,     forKey: "colorScheme")     } }
@@ -284,6 +291,7 @@ class SettingsStorage: ObservableObject {
         self.atomStyleVASP   = Self.read(forKey: "atomStyleVASP",   default: .sphere)
         self.atomStyleCDJSON = Self.read(forKey: "atomStyleCDJSON", default: .stick)
         self.atomStyleMMTF   = Self.read(forKey: "atomStyleMMTF",   default: .cartoon)
+        self.appearanceMode  = Self.read(forKey: "appearanceMode",  default: .system)
         self.rotationSpeed   = Self.read(forKey: "rotationSpeed",   default: .medium)
         self.colorScheme     = Self.read(forKey: "colorScheme",     default: .spectrum)
         self.defaultZoom     = Self.read(forKey: "defaultZoom",     default: .auto)
@@ -528,6 +536,28 @@ struct Settings {
             case .zoom125: return 1.25
             case .zoom150: return 1.5
             case .zoom200: return 2.0
+            }
+        }
+    }
+
+    /// App appearance preference (v1.7.81+). "System" follows the
+    /// macOS dark/light setting via SwiftUI's default behaviour;
+    /// Light/Dark override unconditionally via .preferredColorScheme.
+    /// Stored as a RawRepresentable enum so the userdefaults round-
+    /// trip survives a string-typed write.
+    enum AppearanceMode: String, CaseIterable, Identifiable {
+        case system = "System"
+        case light  = "Light"
+        case dark   = "Dark"
+
+        var id: AppearanceMode { return self }
+
+        /// Maps to the SwiftUI value: nil ⇒ "follow system".
+        var colorScheme: SwiftUI.ColorScheme? {
+            switch self {
+            case .system: return nil
+            case .light:  return .light
+            case .dark:   return .dark
             }
         }
     }

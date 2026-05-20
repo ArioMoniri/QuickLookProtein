@@ -414,6 +414,12 @@ struct ContentView: View {
         // this through every selection background, switch tint, and
         // Picker chevron beneath.
         .accentColor(Color(red: 0.76, green: 0.10, blue: 0.36))
+        // App appearance override (v1.7.81+). System → nil so SwiftUI
+        // continues to follow the macOS-wide Appearance setting (the
+        // default behaviour for the entire app's history). Light/Dark
+        // pin the window to that scheme regardless of what System
+        // Settings says.
+        .preferredColorScheme(userSettings.appearanceMode.colorScheme)
     }
 
     // MARK: - Sidebar
@@ -783,7 +789,28 @@ struct ContentView: View {
     @ViewBuilder
     private var appearancePanel: some View {
         VStack(alignment: .leading, spacing: 18) {
-            panelHeader(.appearance, subtitle: "Color, motion, and background of the preview")
+            panelHeader(.appearance, subtitle: "App theme, color, motion, and background of the preview")
+
+            // App-wide appearance override (v1.7.81+). Defaults to
+            // System so the window follows macOS Appearance settings;
+            // Light/Dark pin via SwiftUI's .preferredColorScheme on
+            // ContentView. The picker uses a segmented style so all
+            // three options stay visible without a popover round-trip,
+            // matching the Mac System-Settings "Appearance" row.
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "App appearance")
+                Card {
+                    FormRow(label: "Theme") {
+                        Picker("", selection: $userSettings.appearanceMode) {
+                            ForEach(Settings.AppearanceMode.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(SegmentedPickerStyle())
+                        .frame(width: 240)
+                        .help("System: follow macOS Appearance setting. Light/Dark: pin the QuickLookProtein2 window to that scheme regardless of the system setting.")
+                    }
+                }
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 SectionLabel(text: "Color")
