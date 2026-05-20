@@ -133,6 +133,16 @@ public partial class MainWindow : Window
         CtlShowLabelCACheck.IsChecked  = SettingsStore.GetCtlShowLabelCA();
         CtlShowRecenterCheck.IsChecked = SettingsStore.GetCtlShowRecenter();
 
+        // Preview window size — populate slider + text box. The
+        // text-box-changed handler updates the slider and vice versa
+        // (both wired in WireChangeHandlers below).
+        var pw = SettingsStore.GetPreviewWidth();
+        var ph = SettingsStore.GetPreviewHeight();
+        PreviewWidthSlider.Value = pw;
+        PreviewWidthBox.Text     = pw.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        PreviewHeightSlider.Value = ph;
+        PreviewHeightBox.Text     = ph.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
         InfoFileNameCheck.IsChecked         = SettingsStore.GetInfoShowFileName();
         InfoAtomCountCheck.IsChecked        = SettingsStore.GetInfoShowAtomCount();
         InfoChainCountCheck.IsChecked       = SettingsStore.GetInfoShowChainCount();
@@ -196,6 +206,84 @@ public partial class MainWindow : Window
         InfoBondCountCheck.Click        += (_, _) => Save(() => SettingsStore.SetInfoShowBondCount(InfoBondCountCheck.IsChecked == true));
         InfoPDBTitleCheck.Click         += (_, _) => Save(() => SettingsStore.SetInfoShowPDBTitle(InfoPDBTitleCheck.IsChecked == true));
         InfoFormatCheck.Click           += (_, _) => Save(() => SettingsStore.SetInfoShowFormat(InfoFormatCheck.IsChecked == true));
+
+        // Preview-window-size wiring. The slider and text box stay in
+        // sync via a guard flag so the slider->box->slider feedback
+        // doesn't loop on every micro-change. ValueChanged on the
+        // slider writes the int to the store; LostFocus on the box
+        // parses, clamps, and writes (avoiding a write per keystroke).
+        bool syncing = false;
+        void UpdateFromSlider(Slider s, TextBox tb, Action<int> setter, int min, int max)
+        {
+            if (syncing) return;
+            syncing = true;
+            var v = (int)Math.Round(s.Value);
+            v = Math.Max(min, Math.Min(max, v));
+            tb.Text = v.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Save(() => setter(v));
+            syncing = false;
+        }
+        void UpdateFromBox(TextBox tb, Slider s, Action<int> setter, int min, int max)
+        {
+            if (syncing) return;
+            if (!int.TryParse(tb.Text,
+                              System.Globalization.NumberStyles.Integer,
+                              System.Globalization.CultureInfo.InvariantCulture,
+                              out var v)) return;
+            v = Math.Max(min, Math.Min(max, v));
+            syncing = true;
+            tb.Text  = v.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            s.Value  = v;
+            Save(() => setter(v));
+            syncing = false;
+        }
+        PreviewWidthSlider.ValueChanged  += (_, _) => UpdateFromSlider(
+            PreviewWidthSlider, PreviewWidthBox,
+            SettingsStore.SetPreviewWidth,
+            SettingsStore.PreviewWidthMin, SettingsStore.PreviewWidthMax);
+        PreviewHeightSlider.ValueChanged += (_, _) => UpdateFromSlider(
+            PreviewHeightSlider, PreviewHeightBox,
+            SettingsStore.SetPreviewHeight,
+            SettingsStore.PreviewHeightMin, SettingsStore.PreviewHeightMax);
+        PreviewWidthBox.LostFocus  += (_, _) => UpdateFromBox(
+            PreviewWidthBox, PreviewWidthSlider,
+            SettingsStore.SetPreviewWidth,
+            SettingsStore.PreviewWidthMin, SettingsStore.PreviewWidthMax);
+        PreviewHeightBox.LostFocus += (_, _) => UpdateFromBox(
+            PreviewHeightBox, PreviewHeightSlider,
+            SettingsStore.SetPreviewHeight,
+            SettingsStore.PreviewHeightMin, SettingsStore.PreviewHeightMax);
+        // Enter on the text box commits the value immediately.
+        PreviewWidthBox.KeyDown  += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) UpdateFromBox(
+            PreviewWidthBox, PreviewWidthSlider,
+            SettingsStore.SetPreviewWidth,
+            SettingsStore.PreviewWidthMin, SettingsStore.PreviewWidthMax); };
+        PreviewHeightBox.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) UpdateFromBox(
+            PreviewHeightBox, PreviewHeightSlider,
+            SettingsStore.SetPreviewHeight,
+            SettingsStore.PreviewHeightMin, SettingsStore.PreviewHeightMax); };
+    }
+
+    /// One-click preset for a compact preview popover.
+    private void PreviewSize_Compact_Click(object sender, RoutedEventArgs e)
+        => ApplyPreviewSize(480, 360);
+
+    /// Reset preview size to the new in-tree default (560 x 420).
+    private void PreviewSize_Default_Click(object sender, RoutedEventArgs e)
+        => ApplyPreviewSize(SettingsStore.PreviewWidthDefault,
+                            SettingsStore.PreviewHeightDefault);
+
+    /// One-click preset for a roomy preview window (matches the
+    /// 1.7.66-1.7.73 default).
+    private void PreviewSize_Large_Click(object sender, RoutedEventArgs e)
+        => ApplyPreviewSize(960, 720);
+
+    private void ApplyPreviewSize(int w, int h)
+    {
+        PreviewWidthSlider.Value  = w;
+        PreviewHeightSlider.Value = h;
+        // Box text is updated by the slider-changed handler; the
+        // Save call also fires there, so we don't double-write here.
     }
 
     private void Save(Action action)

@@ -4,6 +4,22 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.75] — 2026-05-20
+
+### 🪟 + 🍎 User-tunable Quick Look preview window size
+
+A user reported the Windows QL preview was still too large at 720×420 and asked for a way to adjust the initial popover size. Done — and mirrored on the Mac side so the same setting works on both platforms (with the OS-imposed caveats noted below).
+
+- **New shared setting `PreviewWidth` / `PreviewHeight`** (registry on Windows under `HKCU\Software\QuickLookProtein\Settings`, `NSUserDefaults` on macOS under `previewWidth` / `previewHeight`). Default **560 × 420** — the smallest size that comfortably fits atom labels at default zoom while still feeling like a Quick Look popover.
+- **🪟 Windows Settings → Preview window card** with sliders + numeric text boxes + one-click presets (Compact 480×360 / Default 560×420 / Large 960×720). `Plugin.Prepare` reads the live values from the registry on every Space-bar tap, so changes apply with no QL-Win restart. QL-Win still lets the user drag-resize the popover after it appears; the slider in Settings controls the *initial* size only.
+- **🍎 macOS Settings → Appearance → Preview size** with W × H text fields and a "Default" button. `PreviewViewController.loadView` sets `preferredContentSize` from this on the first preview of each file type. Apple's Quick Look only honours that hint the first time a UTI is previewed; after that, Finder persists the user's last drag-resize per-UTI and ignores the setting. So adjust here on a clean install or when you want a different starting geometry for a brand-new file type.
+
+README's "Settings app" section now carries a full preview-window-size matrix (where the control lives on each OS, what's actually persisted, and the platform-specific limits).
+
+### Cross-cutting
+
+No functional change to the render path. Settings store + UI plumbing on both platforms; everything else from 1.7.66 → 1.7.74 remains.
+
 ## [1.7.74] — 2026-05-20
 
 ### 🪟 Windows polish round

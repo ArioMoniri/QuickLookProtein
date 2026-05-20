@@ -21,6 +21,20 @@ private let supportedExtensions: Set<String> = [
 /// long enough to feel like a hang.
 private let maxDropBytes: Int = 25 * 1024 * 1024
 
+/// NumberFormatter for the preview-size text fields. Integer only,
+/// no thousands separator (so "1024" parses cleanly), bounded to
+/// reasonable values so a typo can't size a preview to one pixel or
+/// a million.
+private let previewSizeFormatter: NumberFormatter = {
+    let f = NumberFormatter()
+    f.numberStyle = .none
+    f.allowsFloats = false
+    f.minimum = 240
+    f.maximum = 4000
+    f.usesGroupingSeparator = false
+    return f
+}()
+
 /// Filter chips on the File Formats panel — matches the design's `all /
 /// protein / small / sim` segmented control.
 enum FormatFilter: String, CaseIterable, Identifiable {
@@ -778,6 +792,37 @@ struct ContentView: View {
                         }
                         .labelsHidden()
                         .frame(width: 160)
+                    }
+                    RowDivider()
+                    // QL preview popover starting size (1.7.75+).
+                    // macOS Quick Look honours this on the FIRST
+                    // preview of each UTI; after the user drag-
+                    // resizes once, Finder persists the new size
+                    // per-UTI and ignores this value. So adjust here
+                    // on a clean install, or set the desired
+                    // "starting" size before previewing a new file
+                    // type for the first time.
+                    FormRow(label: "Preview size") {
+                        HStack(spacing: 8) {
+                            TextField("W", value: $userSettings.previewWidth,
+                                      formatter: previewSizeFormatter)
+                                .frame(width: 60)
+                                .multilineTextAlignment(.trailing)
+                                .help("Initial Quick Look popover width in pixels (240–4000).")
+                            Text("×").foregroundColor(.secondary)
+                            TextField("H", value: $userSettings.previewHeight,
+                                      formatter: previewSizeFormatter)
+                                .frame(width: 60)
+                                .multilineTextAlignment(.trailing)
+                                .help("Initial Quick Look popover height in pixels (180–4000).")
+                            Text("px").foregroundColor(.secondary).font(.caption)
+                            Spacer()
+                            Button("Default") {
+                                userSettings.previewWidth  = 560
+                                userSettings.previewHeight = 420
+                            }
+                            .controlSize(.small)
+                        }
                     }
                 }
             }

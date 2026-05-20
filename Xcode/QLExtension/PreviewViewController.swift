@@ -67,6 +67,19 @@ class PreviewViewController: NSViewController,
     override func loadView() {
         super.loadView()
 
+        // User-tunable preferred preview size (1.7.75+). macOS Quick
+        // Look uses preferredContentSize as a *hint* for the first
+        // time a UTI is previewed; after that, Finder remembers the
+        // user's last drag-resize per-UTI and ignores this value
+        // (which is how Apple expects extensions to behave). So the
+        // setting is the "first time you Space-bar a .pdb on a fresh
+        // user account" geometry, plus the value Finder falls back
+        // to if its own per-UTI store gets cleared.  Defaults match
+        // the Windows-side default (560 x 420).
+        let prefs = SettingsStorage()
+        self.preferredContentSize = NSSize(width: prefs.previewWidth,
+                                           height: prefs.previewHeight)
+
         let webConfiguration = WKWebViewConfiguration()
         // Share-button (1.7.33+) bridge: viewer.html posts the rendered
         // PNG via window.webkit.messageHandlers.shareImage.postMessage,

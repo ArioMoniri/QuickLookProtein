@@ -238,13 +238,19 @@ public sealed class Plugin : IViewer
 
     public void Prepare(string path, ContextObject context)
     {
-        PluginLog.Info($"Prepare({path}) - QL-Win is about to call View()");
-        // Default preview window size. Was 960x720 in 1.7.66-1.7.73,
-        // which dominated 1080p screens. 720x540 is roughly half the
-        // viewport on a 1080p laptop - large enough to read atom
-        // labels at default zoom, small enough that the QuickLook
-        // popover doesn't feel like a window. Users can resize freely.
-        context.PreferredSize = new Size(720, 540);
+        // User-tunable preview window size (1.7.75+): the Settings
+        // app exposes Window > Preview width / height, written to the
+        // HKCU\Software\QuickLookProtein registry hive that both
+        // processes share. Default 560 x 420 - small enough to feel
+        // like a Quick Look popover, large enough to read atom
+        // labels at default zoom. QL-Win uses PreferredSize as the
+        // INITIAL size; the user can drag-resize after, and QL-Win
+        // persists that across subsequent previews of the same
+        // extension.
+        var w = QuickLookProtein.Shared.SettingsStore.GetPreviewWidth();
+        var h = QuickLookProtein.Shared.SettingsStore.GetPreviewHeight();
+        PluginLog.Info($"Prepare({path}) - QL-Win is about to call View() - PreferredSize={w}x{h}");
+        context.PreferredSize = new Size(w, h);
     }
 
     public void View(string path, ContextObject context)

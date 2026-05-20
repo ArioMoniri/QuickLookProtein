@@ -218,6 +218,49 @@ public static class SettingsStore
     public static void SetShowUnitCell(bool v)    => WriteBool("ShowUnitCell",    v);
     public static void SetShowInfoOverlay(bool v) => WriteBool("ShowInfoOverlay", v);
 
+    // ---- QuickLook preview window default size (1.7.75+) -------------------
+    //
+    // Plugin.Prepare() reads these and sets ContextObject.PreferredSize on
+    // every preview, so changing them in the Settings app takes effect on
+    // the next Space-bar tap with no restart.  QL-Win uses PreferredSize as
+    // the *initial* window size; the user can still drag-resize the
+    // QuickLook window after it appears, and the new size persists in
+    // QL-Win's own per-extension preference store for subsequent previews.
+    //
+    // Defaults of 560 x 420 reflect "popover-ish" sizing - large enough to
+    // read atom labels at default zoom, small enough that the QuickLook
+    // panel feels like a Quick Look popover rather than a full window.
+    // Min 240 and max 4000 clamp to sane values without coupling to the
+    // user's monitor resolution (their actual screen geometry only matters
+    // for QL-Win, which clamps for itself).
+    public const int PreviewWidthMin  = 240;
+    public const int PreviewWidthMax  = 4000;
+    public const int PreviewHeightMin = 180;
+    public const int PreviewHeightMax = 4000;
+    public const int PreviewWidthDefault  = 560;
+    public const int PreviewHeightDefault = 420;
+
+    public static int GetPreviewWidth()
+    {
+        var v = ReadInt("PreviewWidth", PreviewWidthDefault);
+        return Math.Max(PreviewWidthMin, Math.Min(PreviewWidthMax, v));
+    }
+    public static int GetPreviewHeight()
+    {
+        var v = ReadInt("PreviewHeight", PreviewHeightDefault);
+        return Math.Max(PreviewHeightMin, Math.Min(PreviewHeightMax, v));
+    }
+    public static void SetPreviewWidth(int v)
+    {
+        WriteInt("PreviewWidth",
+            Math.Max(PreviewWidthMin, Math.Min(PreviewWidthMax, v)));
+    }
+    public static void SetPreviewHeight(int v)
+    {
+        WriteInt("PreviewHeight",
+            Math.Max(PreviewHeightMin, Math.Min(PreviewHeightMax, v)));
+    }
+
     // ---- Background color (RGBA, 0..1 floats) ------------------------------
 
     public static (double R, double G, double B, double A) GetBgColor()
@@ -284,6 +327,31 @@ public static class SettingsStore
         {
             using var key = OpenRoot(true);
             key?.SetValue(name, value ? 1 : 0, RegistryValueKind.DWord);
+        }
+        catch { }
+    }
+
+    private static int ReadInt(string name, int fallback)
+    {
+        try
+        {
+            using var key = OpenRoot(false);
+            var v = key?.GetValue(name);
+            if (v is int i) return i;
+            if (v is string s && int.TryParse(s, System.Globalization.NumberStyles.Integer,
+                                              System.Globalization.CultureInfo.InvariantCulture, out var n))
+                return n;
+            return fallback;
+        }
+        catch { return fallback; }
+    }
+
+    private static void WriteInt(string name, int value)
+    {
+        try
+        {
+            using var key = OpenRoot(true);
+            key?.SetValue(name, value, RegistryValueKind.DWord);
         }
         catch { }
     }

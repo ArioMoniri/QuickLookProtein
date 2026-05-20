@@ -514,6 +514,87 @@
                             <CheckBox x:Name="InfoFormatCheck"          Content="File format"        Margin="0,4"/>
                         </StackPanel>
                     </Border>
+
+                    <!--
+                      Window-size card (1.7.75+). User-tunable initial
+                      size of the QuickLook preview popover. QL-Win
+                      uses ContextObject.PreferredSize as the initial
+                      window size; the user can drag-resize the
+                      QuickLook window after it appears and QL-Win
+                      persists that across subsequent previews. So
+                      these values are the "first time you Space-bar
+                      this file" size only - after that, your last
+                      resize wins.
+                    -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Preview window"
+                                       Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Style="{StaticResource Caption}"
+                                       Text="Initial size of the QuickLook preview popover when you press Space on a structure file. Drag-resize the preview itself for ad-hoc adjustments — QL-Win remembers your last size across files."/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Width row -->
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Text="Width:"
+                                           VerticalAlignment="Center"
+                                           Foreground="#CFD2D6"/>
+                                <Slider   Grid.Row="0" Grid.Column="2"
+                                          x:Name="PreviewWidthSlider"
+                                          Minimum="240" Maximum="2400"
+                                          TickFrequency="80"
+                                          IsSnapToTickEnabled="False"
+                                          Margin="0,6"/>
+                                <TextBox  Grid.Row="0" Grid.Column="4"
+                                          x:Name="PreviewWidthBox"
+                                          Width="64" Margin="0,6"
+                                          HorizontalContentAlignment="Right"
+                                          ToolTip="Width in pixels (240 - 2400)"/>
+
+                                <!-- Height row -->
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Height:"
+                                           VerticalAlignment="Center"
+                                           Foreground="#CFD2D6"/>
+                                <Slider   Grid.Row="1" Grid.Column="2"
+                                          x:Name="PreviewHeightSlider"
+                                          Minimum="180" Maximum="2400"
+                                          TickFrequency="60"
+                                          IsSnapToTickEnabled="False"
+                                          Margin="0,6"/>
+                                <TextBox  Grid.Row="1" Grid.Column="4"
+                                          x:Name="PreviewHeightBox"
+                                          Width="64" Margin="0,6"
+                                          HorizontalContentAlignment="Right"
+                                          ToolTip="Height in pixels (180 - 2400)"/>
+                            </Grid>
+
+                            <!-- Quick presets - one-click jumps. Pure
+                                 convenience; the user can always type
+                                 a precise value into the text boxes. -->
+                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                <Button Content="Compact (480 x 360)"
+                                        Margin="0,0,6,0"
+                                        Click="PreviewSize_Compact_Click"/>
+                                <Button Content="Default (560 x 420)"
+                                        Margin="0,0,6,0"
+                                        Click="PreviewSize_Default_Click"/>
+                                <Button Content="Large (960 x 720)"
+                                        Click="PreviewSize_Large_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <!-- RIGHT COLUMN: About + Tips -->

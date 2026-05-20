@@ -217,6 +217,17 @@ Windows Explorer's built-in search (and Everything / Listary if you have them) w
 
 ![Screenshot of the main app](Screenshots/Main_app.png "Main app used to set settings")
 
+#### Preview window size (1.7.75+)
+
+Both Settings apps expose a **Preview size** control that drives the initial geometry of the Quick Look popover. Default is **560 × 420 px** — small enough to feel like a Quick Look popover, large enough to read atom labels at default zoom.
+
+| Platform | Where to change it | What's actually persisted | Limits |
+|---|---|---|---|
+| 🍎 macOS | **Settings → Appearance → Preview size** (W × H text fields) | macOS's Quick Look uses this as a **hint** for the first preview of each file type on a fresh user account. After your first drag-resize of the Quick Look window, **Finder remembers that size per-UTI** and your "Preview size" setting only applies again if Finder's per-UTI state is cleared (account migration, etc.). | 240–4000 px each dimension |
+| 🪟 Windows | **Settings → Preview window** (sliders + W/H boxes + Compact/Default/Large presets) | QL-Win uses the value as the **initial** popover size on every Space-bar tap. You can still drag-resize the popover, and QL-Win persists that across subsequent previews. Resetting the setting in the Settings app re-applies on the next Space-bar tap. | 240–2400 px each dimension |
+
+**TL;DR:** if the preview window feels too big or too small, change it in the Settings app once. Both platforms let you drag-resize the popover from any corner for ad-hoc adjustments.
+
 ---
 
 ## 📦 Installation

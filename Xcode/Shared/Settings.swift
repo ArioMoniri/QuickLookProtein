@@ -254,6 +254,22 @@ class SettingsStorage: ObservableObject {
     @Published var bgColorBlue:    Double { didSet { Self.preferencesStore.set(bgColorBlue,    forKey: "bgColorBlue")    } }
     @Published var bgColorOpacity: Double { didSet { Self.preferencesStore.set(bgColorOpacity, forKey: "bgColorOpacity") } }
 
+    // MARK: - QL extension preview window size (1.7.75+)
+    //
+    // Apple's Quick Look uses preferredContentSize on the
+    // QLPreviewProvider as a *hint* for the first time a UTI is
+    // previewed on a fresh user account. After that, Finder
+    // persists the user's last drag-resize per-UTI and ignores
+    // this value (by design). So these settings are:
+    //   1. The "first time" geometry on a clean install.
+    //   2. The value Finder falls back to if its per-UTI state
+    //      gets cleared (a user account migration, a system reset,
+    //      etc.).
+    // Defaults 560 x 420 match the Windows-side default so the
+    // cross-platform first-launch experience is identical.
+    @Published var previewWidth:  Double { didSet { Self.preferencesStore.set(previewWidth,  forKey: "previewWidth")  } }
+    @Published var previewHeight: Double { didSet { Self.preferencesStore.set(previewHeight, forKey: "previewHeight") } }
+
     init() {
         let store = Self.preferencesStore
         self.atomStyleCIF    = Self.read(forKey: "atomStyleCIF",    default: .stick)
@@ -331,6 +347,16 @@ class SettingsStorage: ObservableObject {
         self.bgColorGreen    = store.double(forKey: "bgColorGreen")
         self.bgColorBlue     = store.double(forKey: "bgColorBlue")
         self.bgColorOpacity  = store.double(forKey: "bgColorOpacity")
+
+        // Preview window size (1.7.75+). UserDefaults.double returns
+        // 0.0 for unset keys, which would size the QL preview to
+        // nothing; substitute the in-tree default in that case.
+        // Min/max clamp prevents nonsense values from a manually
+        // edited preferences plist.
+        let pw = store.double(forKey: "previewWidth")
+        let ph = store.double(forKey: "previewHeight")
+        self.previewWidth  = pw < 240 ? 560 : min(pw, 4000)
+        self.previewHeight = ph < 180 ? 420 : min(ph, 4000)
     }
 
     /// Read a RawRepresentable (String-backed) enum from the shared store.
