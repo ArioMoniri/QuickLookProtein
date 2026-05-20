@@ -4,6 +4,24 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.73] — 2026-05-20
+
+### 🎯 Windows — **the actual root cause**: wrong plugin folder for QL-Win 4.x
+
+After five increasingly desperate hotfixes (1.7.68 → 1.7.72) attacking imaginary code-load failures, the user's QL-Win-version diagnostic revealed the real bug: **`install.ps1` was installing the plugin to the wrong folder all along**. QL-Win 4.0 (released early 2025) relocated the user-plugin scan path. We were installing to the 3.x path.
+
+| QL-Win 3.x scan path (where we installed) | QL-Win 4.x scan path (where it actually scans) |
+|---|---|
+| `%LocalAppData%\QuickLook\plugins\<plugin>\` | `%AppData%\pooi.moe\QuickLook\QuickLook.Plugin\<plugin>\` |
+
+Source: `QuickLook/App.xaml.cs` defines `UserPluginPath = Path.Combine(SettingHelper.LocalDataPath, "QuickLook.Plugin\\")`, and `QuickLook.Common/Helpers/SettingHelper.cs` defines `LocalDataPath = Path.Combine(Environment.SpecialFolder.ApplicationData, "pooi.moe\\QuickLook\\")` for non-portable installs. `PluginManager.LoadPlugins` then does `Directory.GetFiles(folder, "QuickLook.Plugin.*.dll", SearchOption.AllDirectories)` against that path.
+
+Releases 1.7.66 through 1.7.72 all landed in the 3.x folder, which QL-Win 4.5.0 simply doesn't scan. That's why **every** diagnostic showed the assembly was structurally fine (`Assembly.LoadFrom`, `GetTypes()`, `Activator.CreateInstance(Plugin)` all succeeded in standalone PowerShell) but `plugin.log` never appeared after Space-bar: QL-Win was never given the chance to load our DLL.
+
+**Fix**: `install.ps1` now installs to **both** paths — `%AppData%\pooi.moe\QuickLook\QuickLook.Plugin\QuickLookProtein\` as the primary (QL-Win 4.x) and `%LocalAppData%\QuickLook\plugins\QuickLookProtein\` as the legacy mirror (so anyone still on QL-Win 3.x keeps working). The Setup.exe payload is unchanged; only the install destination moves. Uninstaller template updated to clean both locations.
+
+The diagnostic + code-shape work from 1.7.68 → 1.7.72 (AssemblyResolve hook, AnyCPU, runtimes/ subtree, LoadLibraryW preload, type-decoupling, cctor sentinel) was *necessary* — it ruled out every other failure mode and pointed at the install layout as the last remaining suspect. But the *sufficient* fix is just one line: the plugin path.
+
 ## [1.7.72] — 2026-05-20
 
 ### 🪟 Diagnostic — cctor sentinel file

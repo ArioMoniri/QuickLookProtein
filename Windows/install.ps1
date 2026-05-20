@@ -48,8 +48,23 @@ $ProgressPreference    = "SilentlyContinue"   # makes Invoke-WebRequest fast
 $repoOwner   = "ArioMoniri"
 $repoName    = "QuickLookProtein"
 $pluginName  = "QuickLookProtein"
-$pluginDir   = Join-Path $env:LocalAppData "QuickLook\plugins\$pluginName"
-$tempRoot    = Join-Path $env:TEMP "QuickLookProtein-install"
+
+# QL-Win 4.x changed the user-plugin scan path. Old QL-Win 3.x:
+#   %LocalAppData%\QuickLook\plugins\<plugin>\
+# QL-Win 4.x (PluginManager.cs line ~32 in upstream master, against
+# `App.UserPluginPath = Path.Combine(SettingHelper.LocalDataPath,
+# "QuickLook.Plugin\\")` and SettingHelper.LocalDataPath
+# = `%AppData%\pooi.moe\QuickLook\`):
+#   %AppData%\pooi.moe\QuickLook\QuickLook.Plugin\<plugin>\
+# Releases 1.7.66 through 1.7.72 all installed to the 3.x path,
+# which is why "Space-bar shows raw text" survived every code fix:
+# QL-Win 4.x simply never scanned our folder. Install to the
+# correct 4.x path and ALSO keep a copy at the 3.x path so older
+# QL-Win installations still work for anyone who didn't upgrade.
+$pluginDirNew = Join-Path $env:AppData      "pooi.moe\QuickLook\QuickLook.Plugin\$pluginName"
+$pluginDirOld = Join-Path $env:LocalAppData "QuickLook\plugins\$pluginName"
+$pluginDir    = $pluginDirNew     # primary path - what QL-Win 4.x actually scans
+$tempRoot     = Join-Path $env:TEMP "QuickLookProtein-install"
 
 function Write-Step($message) {
     Write-Host ""
@@ -196,11 +211,19 @@ function Install-Plugin {
         Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $pluginPath
     }
 
-    Write-Step "Installing plugin to $pluginDir"
-    if (Test-Path $pluginDir) {
-        Remove-Item -Recurse -Force $pluginDir
+    Write-Step "Installing plugin"
+    Write-Host "  Primary path (QL-Win 4.x): $pluginDirNew"
+    Write-Host "  Legacy path  (QL-Win 3.x): $pluginDirOld"
+
+    # Wipe any prior install at BOTH locations so a clean upgrade
+    # doesn't leave stale DLLs from a different version anywhere
+    # QL-Win might scan.
+    foreach ($d in @($pluginDirNew, $pluginDirOld)) {
+        if (Test-Path $d) { Remove-Item -Recurse -Force $d }
     }
-    New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
+    foreach ($d in @($pluginDirNew, $pluginDirOld)) {
+        New-Item -ItemType Directory -Force -Path $d | Out-Null
+    }
 
     # .qlplugin is a zip - Expand-Archive accepts any extension provided
     # we hand it a .zip-shaped temp copy. (Expand-Archive in older Windows
@@ -208,7 +231,12 @@ function Install-Plugin {
     New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
     $tmpZip = Join-Path $tempRoot "QuickLookProtein-install.zip"
     Copy-Item $pluginPath $tmpZip -Force
-    Expand-Archive -Path $tmpZip -DestinationPath $pluginDir -Force
+    # Extract once to the new (canonical) path, then mirror to the
+    # old path. Doing two Expand-Archive calls is roughly equivalent
+    # in wall-time but the mirror copy preserves Expand-Archive's
+    # directory structure faithfully.
+    Expand-Archive -Path $tmpZip -DestinationPath $pluginDirNew -Force
+    Copy-Item -Path "$pluginDirNew\*" -Destination $pluginDirOld -Recurse -Force
     Remove-Item $tmpZip -Force
 
     # Sanity check - if the .dll didn't land, the plugin won't load
@@ -332,9 +360,12 @@ Get-Process -Name "QuickLook" -ErrorAction SilentlyContinue | ForEach-Object {
     try { $_ | Stop-Process -Force -ErrorAction SilentlyContinue } catch { }
 }
 
-# 2. Plugin folder.
-$pluginDir = Join-Path $env:LocalAppData "QuickLook\plugins\QuickLookProtein"
-if (Test-Path $pluginDir) { Remove-Item -Recurse -Force $pluginDir }
+# 2. Plugin folders (QL-Win 4.x primary + QL-Win 3.x legacy).
+$pluginDirNew = Join-Path $env:AppData      "pooi.moe\QuickLook\QuickLook.Plugin\QuickLookProtein"
+$pluginDirOld = Join-Path $env:LocalAppData "QuickLook\plugins\QuickLookProtein"
+foreach ($d in @($pluginDirNew, $pluginDirOld)) {
+    if (Test-Path $d) { Remove-Item -Recurse -Force $d }
+}
 
 # 3. Thumbnail handler registry entries.
 $clsid = '{B7E4A6F1-2D6E-4F58-9B1B-2E5A1F0B97A1}'
