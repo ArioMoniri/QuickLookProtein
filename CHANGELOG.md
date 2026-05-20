@@ -4,6 +4,19 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.72] — 2026-05-20
+
+### 🪟 Diagnostic — cctor sentinel file
+
+User reported that after a clean 1.7.71 install, `plugin.log` still doesn't appear when QL-Win previews a `.pdb`. The follow-up x86-PowerShell diagnostic confirmed our DLL loads cleanly under 32-bit (matching QL-Win's actual bitness on their machine), `GetTypes()` returns all 16 expected types, and `Activator.CreateInstance(Plugin)` succeeds — so the assembly itself is structurally fine for QL-Win to discover. The failure is somewhere in QL-Win's discovery loop, *not* in our plugin's code.
+
+To prove this from the QL-Win process side rather than from PowerShell, `Plugin`'s static cctor now writes a `cctor.txt` sentinel file at `%LocalAppData%\QuickLookProtein\cctor.txt` via raw `File.WriteAllText`, bypassing `PluginLog` entirely. The file records the timestamp, host process PID + exe path, bitness, and the plugin's assembly version. After installing 1.7.72 and pressing Space on a `.pdb`:
+
+- If `cctor.txt` **exists**, QL-Win is touching our type but never reaching `Init()` — we look at QL-Win's discovery internals.
+- If `cctor.txt` **doesn't exist**, QL-Win isn't loading our DLL at all — we look at QL-Win's plugin folder scanning, caches, or version compatibility.
+
+No functional change to the plugin's render path; purely a diagnostic instrumentation aid.
+
 ## [1.7.71] — 2026-05-19
 
 ### 🪟 Windows hotfix⁴ — ship the bitness-aware native loader into the .qlplugin, then pin it

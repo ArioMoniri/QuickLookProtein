@@ -8,6 +8,7 @@
 
 using QuickLook.Common.Plugin;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -67,6 +68,30 @@ public sealed class Plugin : IViewer
     /// resolution attempt succeeds.
     static Plugin()
     {
+        // FIRST thing the cctor does: drop a sentinel file. Bypasses
+        // PluginLog entirely (raw File.WriteAllText) so that even if
+        // PluginLog has a bug, we still get evidence that the cctor
+        // ran. This file's existence (or absence) is what tells us
+        // whether QL-Win is touching the Plugin type at all - the
+        // previous diagnostics couldn't distinguish "QL-Win never
+        // touched the type" from "QL-Win touched the type but
+        // PluginLog silently failed".
+        try
+        {
+            var sentinelDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "QuickLookProtein");
+            Directory.CreateDirectory(sentinelDir);
+            File.WriteAllText(
+                Path.Combine(sentinelDir, "cctor.txt"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}\n" +
+                $"Plugin static cctor ran in PID {Process.GetCurrentProcess().Id}\n" +
+                $"  exe={Process.GetCurrentProcess().MainModule?.FileName}\n" +
+                $"  is64bit={Environment.Is64BitProcess}\n" +
+                $"  ver={typeof(Plugin).Assembly.GetName().Version}\n");
+        }
+        catch { /* sentinel write is best-effort; never throw from cctor */ }
+
         try
         {
             AppDomain.CurrentDomain.AssemblyResolve += ResolvePluginAssembly;
@@ -84,16 +109,12 @@ public sealed class Plugin : IViewer
         // "WebView2Loader.dll" with no path, so Windows' default
         // DLL search order kicks in: AppDomain.BaseDirectory (= QL-
         // Win's exe folder, where there is no WebView2Loader), then
-        // PATH, then system dir - and never the plugin folder. The
-        // 1.7.69 build shipped only the x64 loader at the plugin
-        // root, which fell into the same trap as the plugin DLL
-        // itself: 64-bit binary, 32-bit QL-Win process,
-        // BadImageFormatException. Loading the correct bitness
-        // explicitly here puts the DLL in the process's loaded-
-        // module cache so when the managed wrapper's P/Invoke fires
-        // later, Windows resolves "WebView2Loader.dll" against the
-        // already-loaded module instead of going through its search
-        // order.
+        // PATH, then system dir - and never the plugin folder.
+        // Loading the correct bitness explicitly here puts the DLL
+        // in the process's loaded-module cache so when the managed
+        // wrapper's P/Invoke fires later, Windows resolves
+        // "WebView2Loader.dll" against the already-loaded module
+        // instead of going through its search order.
         try { PreloadWebView2Loader(); } catch { /* best-effort */ }
     }
 
