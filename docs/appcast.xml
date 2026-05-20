@@ -6,6 +6,26 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.75</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.75</link>
+      <pubDate>Wed, 20 May 2026 04:11:46 +0000</pubDate>
+      <sparkle:version>1.7.75</sparkle:version>
+      <sparkle:shortVersionString>1.7.75</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 + 🍎 User-tunable Quick Look preview window size&lt;/h3&gt;
+&lt;p&gt;A user reported the Windows QL preview was still too large at 720×420 and asked for a way to adjust the initial popover size. Done — and mirrored on the Mac side so the same setting works on both platforms (with the OS-imposed caveats noted below).&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;New shared setting &lt;code&gt;PreviewWidth&lt;/code&gt; / &lt;code&gt;PreviewHeight&lt;/code&gt;&lt;/strong&gt; (registry on Windows under &lt;code&gt;HKCU\Software\QuickLookProtein\Settings&lt;/code&gt;, &lt;code&gt;NSUserDefaults&lt;/code&gt; on macOS under &lt;code&gt;previewWidth&lt;/code&gt; / &lt;code&gt;previewHeight&lt;/code&gt;). Default &lt;strong&gt;560 × 420&lt;/strong&gt; — the smallest size that comfortably fits atom labels at default zoom while still feeling like a Quick Look popover.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;🪟 Windows Settings → Preview window card&lt;/strong&gt; with sliders + numeric text boxes + one-click presets (Compact 480×360 / Default 560×420 / Large 960×720). &lt;code&gt;Plugin.Prepare&lt;/code&gt; reads the live values from the registry on every Space-bar tap, so changes apply with no QL-Win restart. QL-Win still lets the user drag-resize the popover after it appears; the slider in Settings controls the *initial* size only.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;🍎 macOS Settings → Appearance → Preview size&lt;/strong&gt; with W × H text fields and a &amp;quot;Default&amp;quot; button. &lt;code&gt;PreviewViewController.loadView&lt;/code&gt; sets &lt;code&gt;preferredContentSize&lt;/code&gt; from this on the first preview of each file type. Apple&amp;#x27;s Quick Look only honours that hint the first time a UTI is previewed; after that, Finder persists the user&amp;#x27;s last drag-resize per-UTI and ignores the setting. So adjust here on a clean install or when you want a different starting geometry for a brand-new file type.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;README&amp;#x27;s &amp;quot;Settings app&amp;quot; section now carries a full preview-window-size matrix (where the control lives on each OS, what&amp;#x27;s actually persisted, and the platform-specific limits).&lt;/p&gt;
+&lt;h3&gt;Cross-cutting&lt;/h3&gt;
+&lt;p&gt;No functional change to the render path. Settings store + UI plumbing on both platforms; everything else from 1.7.66 → 1.7.74 remains.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.75"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.75/QuickLookProtein-1.7.75.zip" sparkle:edSignature="tqxgAFDza0YDs5xKosGiizIk3YOff/FQRtVNqyu1bs9A/e8BuI457iK9St12TWWU4xBUI5i4c3inWObEANnjDw==" length="4472483" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.74</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.74</link>
       <pubDate>Wed, 20 May 2026 04:02:40 +0000</pubDate>
