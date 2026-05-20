@@ -1684,6 +1684,7 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
     private var aboutPanel: some View {
         let v  = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let b  = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
