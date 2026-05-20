@@ -387,6 +387,8 @@ struct ContentView: View {
     // the LogViewerSheet; the sheet runs `log show --predicate ...`
     // against the corresponding subsystem and presents the result.
     @State private var diagnosticLogTarget: DiagnosticLogTarget?
+    // v1.7.90+ Mac self-test output, populated by runDiagnosticSelfTest.
+    @State private var diagnosticSelfTestReport: String?
 
     var body: some View {
         ZStack {
@@ -1671,28 +1673,12 @@ struct ContentView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                SectionLabel(text: "Rendering engine")
-                Card {
-                    VStack(alignment: .leading, spacing: 4) {
-                        (Text("Rendered by ") +
-                         Text("3Dmol.js").bold() +
-                         Text(" (Rego & Koes, 2015)"))
-                            .font(.system(size: 13))
-                        Button("3dmol.csb.pitt.edu →") {
-                            if let u = URL(string: "https://3dmol.csb.pitt.edu") {
-                                NSWorkspace.shared.open(u)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundColor(.accentColor)
-                        .font(.system(size: 12))
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-            }
-
+            // (v1.7.90+) Dropped the "RENDERING ENGINE" card here —
+            // it duplicated footerCredit verbatim two views below.
+            // The user reported seeing the 3Dmol.js attribution
+            // twice on the About panel; keeping the lower one
+            // (footerCredit's caption-style line) since it's the
+            // less-shouty version.
             footerCredit
         }
     }
@@ -1912,10 +1898,34 @@ struct ContentView: View {
                         FlowDiagnosticButtons(onTap: { target in
                             diagnosticLogTarget = target
                         })
-                        // "Reveal logs folder" jumps Finder to the App
-                        // Group Library/Logs/QuickLookProtein so users
-                        // can grab updater.log + any future file logs
-                        // we add in one shot.
+                        // v1.7.90+ component-level diagnostics.
+                        // Reveal-in-Finder buttons for the .appex
+                        // bundles (so a power user can inspect
+                        // entitlements / Info.plist / signature
+                        // without running `codesign -dvv`) and a
+                        // self-test that walks the extension-bundle
+                        // + App-Group + Sparkle-install-path chain
+                        // — Mac analogue of the Windows thumbnail
+                        // provider self-test added in v1.7.83.
+                        HStack(spacing: 8) {
+                            Button(action: runDiagnosticSelfTest) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "stethoscope")
+                                    Text("Run diagnostic self-test")
+                                }
+                            }
+                            .buttonStyle(PrimaryPillButtonStyle())
+                            .help("Verify every extension bundle is present, the App Group container is reachable, and Sparkle has write access to the install path. Results show inline.")
+
+                            Button(action: revealAppBundle) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "app.badge")
+                                    Text("Reveal app bundle")
+                                }
+                            }
+                            .buttonStyle(SecondaryPillButtonStyle())
+                            .help("Open the parent of QuickLookProtein.app in Finder so you can right-click → Show Package Contents and inspect Contents/PlugIns/.")
+                        }
                         Button(action: revealLogsFolder) {
                             HStack(spacing: 6) {
                                 Image(systemName: "folder")
@@ -1924,6 +1934,34 @@ struct ContentView: View {
                         }
                         .buttonStyle(SecondaryPillButtonStyle())
                         .help("Open ~/Library/Group Containers/<group>/Library/Logs/QuickLookProtein in Finder.")
+
+                        // Inline diagnostic-result block, populated
+                        // by runDiagnosticSelfTest. Hidden until at
+                        // least one run has happened so the panel
+                        // stays compact on launch.
+                        if let diag = diagnosticSelfTestReport {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Diagnostic results")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                Group {
+                                    if #available(macOS 12.0, *) {
+                                        Text(diag)
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundColor(.secondary)
+                                            .textSelection(.enabled)
+                                    } else {
+                                        Text(diag)
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(8)
+                            .background(Color.gray.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
                     }
                     .padding(.top, 4)
                 }
@@ -1938,6 +1976,109 @@ struct ContentView: View {
         let dir = Updater.updateLogURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         NSWorkspace.shared.activateFileViewerSelecting([dir])
+    }
+
+    /// v1.7.90+ Reveal the main app bundle (QuickLookProtein.app)
+    /// in Finder so the user can right-click → Show Package Contents
+    /// and inspect Contents/PlugIns/{QLExtension,QLThumbnail,
+    /// QLActions,MDImporter}.appex without `find` / `mdfind`.
+    private func revealAppBundle() {
+        let url = Bundle.main.bundleURL
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    /// v1.7.90+ Mac diagnostic self-test. Walks the same chain the
+    /// Windows thumbnail-provider self-test does, but for our four
+    /// Quick Look extensions + the App-Group plumbing + Sparkle's
+    /// install requirements:
+    ///   1. Each .appex bundle is present in Contents/PlugIns/
+    ///   2. App Group container resolves (entitlement provisioned)
+    ///   3. Sparkle has write access to the install path
+    ///   4. Update log directory is writable
+    ///   5. Sparkle's public EDDSA key is the production one
+    /// Result is written to the panel and to updater.log.
+    private func runDiagnosticSelfTest() {
+        var lines: [String] = []
+        let appBundle = Bundle.main.bundleURL
+
+        // 1. Extension bundles. Sometimes Sparkle's atomic-replace
+        //    operation can leave PlugIns/ momentarily out-of-sync;
+        //    we capture which extensions are missing so a partial
+        //    install is identifiable rather than silently broken.
+        let plugInsDir = appBundle.appendingPathComponent("Contents/PlugIns", isDirectory: true)
+        let expected = ["QLExtension.appex", "QLThumbnail.appex", "QLActions.appex", "MDImporter.appex"]
+        var missing: [String] = []
+        for name in expected {
+            let p = plugInsDir.appendingPathComponent(name)
+            if !FileManager.default.fileExists(atPath: p.path) { missing.append(name) }
+        }
+        lines.append(missing.isEmpty
+            ? "1. Extension bundles: OK (\(expected.count) present)"
+            : "1. Extension bundles: MISSING — \(missing.joined(separator: ", "))")
+
+        // 2. App Group container — required so the extensions + the
+        //    main app share UserDefaults + the Logs directory. When
+        //    this fails the per-extension log viewers fall back to
+        //    a sandbox-local directory; settings might not sync.
+        let groupID = "FF68N39FU5.group.com.ariomoniri.QuickLookProtein"
+        if let groupDir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID) {
+            lines.append("2. App Group container: OK (\(groupDir.path))")
+        } else {
+            lines.append("2. App Group container: NOT PROVISIONED — dev build? Settings won't sync between the main app and extensions.")
+        }
+
+        // 3. Write access to the app's parent. Sparkle's installer
+        //    needs to atomically replace the .app, so the *parent*
+        //    directory must be writable. /Applications usually is;
+        //    /System/Applications is not; ad-hoc copies to ~/Desktop
+        //    are. When this fails, Sparkle aborts with "An error
+        //    occurred while launching the installer".
+        let parent = appBundle.deletingLastPathComponent()
+        let writeProbe = parent.appendingPathComponent(".qlp-write-probe-\(UUID().uuidString)")
+        var canWrite = false
+        do {
+            try Data().write(to: writeProbe)
+            try FileManager.default.removeItem(at: writeProbe)
+            canWrite = true
+        } catch {
+            canWrite = false
+        }
+        lines.append(canWrite
+            ? "3. Sparkle install path writable: OK (\(parent.path))"
+            : "3. Sparkle install path NOT WRITABLE — \(parent.path). Sparkle won't be able to install updates here; move the app to /Applications.")
+
+        // 4. Update log directory writable (a side-channel sanity
+        //    check; the updater itself opens/creates this on first
+        //    write, but if it ever fails, no diagnostic line lands
+        //    in updater.log to tell us why).
+        let logDir = Updater.updateLogURL.deletingLastPathComponent()
+        var logWritable = false
+        do {
+            try FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+            let probe = logDir.appendingPathComponent(".write-probe-\(UUID().uuidString)")
+            try Data().write(to: probe)
+            try FileManager.default.removeItem(at: probe)
+            logWritable = true
+        } catch { }
+        lines.append(logWritable
+            ? "4. Log directory writable: OK"
+            : "4. Log directory NOT WRITABLE: \(logDir.path)")
+
+        // 5. Sparkle public EDDSA key — Info.plist key SUPublicEDKey.
+        //    A placeholder or empty value means signed updates can't
+        //    verify; Sparkle disables auto-updates in that case.
+        let edKey = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? ""
+        if edKey.isEmpty {
+            lines.append("5. Sparkle EDDSA key: MISSING — local dev build; auto-updates disabled by design.")
+        } else if edKey.contains("REPLACE_ME") || edKey.contains("PLACEHOLDER") {
+            lines.append("5. Sparkle EDDSA key: PLACEHOLDER (\(edKey.prefix(12))…) — local dev build.")
+        } else {
+            lines.append("5. Sparkle EDDSA key: OK (\(edKey.prefix(12))…)")
+        }
+
+        let report = lines.joined(separator: "\n")
+        diagnosticSelfTestReport = report
+        Updater.logUpdateEvent("INFO", "Diagnostic self-test:\n\(report)")
     }
 
     /// Middle card — original author + extender credits, repo link, and a tip

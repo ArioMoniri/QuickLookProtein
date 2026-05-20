@@ -4,6 +4,20 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.90] — 2026-05-20
+
+### 🍎 macOS — drop the duplicate Rendering-Engine card + Mac-side diagnostic self-test
+
+- **Removed the "RENDERING ENGINE" card** from the About panel — the same "Rendered by 3Dmol.js (Rego & Koes, 2015)" line was rendered twice (once as a Card, once as the footerCredit caption below). Kept the lower / quieter footerCredit instance.
+- **New "Run diagnostic self-test" button** in About → Software Update → Extension logs. Mac analogue of the Windows thumbnail-provider self-test. Walks five checks:
+  1. All four `.appex` bundles (QLExtension / QLThumbnail / QLActions / MDImporter) exist in `Contents/PlugIns/`
+  2. App Group container resolves (entitlement provisioned)
+  3. Sparkle install path is writable — when this fails Sparkle aborts with the generic "An error occurred while launching the installer" modal, and the path is the actionable clue
+  4. Log directory is writable
+  5. Sparkle's `SUPublicEDKey` is set (production key, not placeholder)
+- Result is shown inline below the button (monospace, copy-able on macOS 12+) **and** appended to `updater.log` so it can be attached to a bug report.
+- **New "Reveal app bundle" button** opens Finder pointed at `QuickLookProtein.app`'s parent so the user can right-click → Show Package Contents and inspect `Contents/PlugIns/` for entitlements/signature without dropping to the terminal.
+
 ## [1.7.89] — 2026-05-20
 
 ### 🪟 Windows — fix "Could not render molecule: ArgumentException" on large PDBs
