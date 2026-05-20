@@ -6,6 +6,25 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.73</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.73</link>
+      <pubDate>Wed, 20 May 2026 03:27:01 +0000</pubDate>
+      <sparkle:version>1.7.73</sparkle:version>
+      <sparkle:shortVersionString>1.7.73</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🎯 Windows — &lt;strong&gt;the actual root cause&lt;/strong&gt;: wrong plugin folder for QL-Win 4.x&lt;/h3&gt;
+&lt;p&gt;After five increasingly desperate hotfixes (1.7.68 → 1.7.72) attacking imaginary code-load failures, the user&amp;#x27;s QL-Win-version diagnostic revealed the real bug: &lt;strong&gt;&lt;code&gt;install.ps1&lt;/code&gt; was installing the plugin to the wrong folder all along&lt;/strong&gt;. QL-Win 4.0 (released early 2025) relocated the user-plugin scan path. We were installing to the 3.x path.&lt;/p&gt;
+&lt;p&gt;| QL-Win 3.x scan path (where we installed) | QL-Win 4.x scan path (where it actually scans) |&lt;/p&gt;
+&lt;p&gt;|---|---|&lt;/p&gt;
+&lt;p&gt;| &lt;code&gt;%LocalAppData%\QuickLook\plugins\&amp;lt;plugin&amp;gt;\&lt;/code&gt; | &lt;code&gt;%AppData%\pooi.moe\QuickLook\QuickLook.Plugin\&amp;lt;plugin&amp;gt;\&lt;/code&gt; |&lt;/p&gt;
+&lt;p&gt;Source: &lt;code&gt;QuickLook/App.xaml.cs&lt;/code&gt; defines &lt;code&gt;UserPluginPath = Path.Combine(SettingHelper.LocalDataPath, &amp;quot;QuickLook.Plugin\\&amp;quot;)&lt;/code&gt;, and &lt;code&gt;QuickLook.Common/Helpers/SettingHelper.cs&lt;/code&gt; defines &lt;code&gt;LocalDataPath = Path.Combine(Environment.SpecialFolder.ApplicationData, &amp;quot;pooi.moe\\QuickLook\\&amp;quot;)&lt;/code&gt; for non-portable installs. &lt;code&gt;PluginManager.LoadPlugins&lt;/code&gt; then does &lt;code&gt;Directory.GetFiles(folder, &amp;quot;QuickLook.Plugin.*.dll&amp;quot;, SearchOption.AllDirectories)&lt;/code&gt; against that path.&lt;/p&gt;
+&lt;p&gt;Releases 1.7.66 through 1.7.72 all landed in the 3.x folder, which QL-Win 4.5.0 simply doesn&amp;#x27;t scan. That&amp;#x27;s why &lt;strong&gt;every&lt;/strong&gt; diagnostic showed the assembly was structurally fine (&lt;code&gt;Assembly.LoadFrom&lt;/code&gt;, &lt;code&gt;GetTypes()&lt;/code&gt;, &lt;code&gt;Activator.CreateInstance(Plugin)&lt;/code&gt; all succeeded in standalone PowerShell) but &lt;code&gt;plugin.log&lt;/code&gt; never appeared after Space-bar: QL-Win was never given the chance to load our DLL.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Fix&lt;/strong&gt;: &lt;code&gt;install.ps1&lt;/code&gt; now installs to &lt;strong&gt;both&lt;/strong&gt; paths — &lt;code&gt;%AppData%\pooi.moe\QuickLook\QuickLook.Plugin\QuickLookProtein\&lt;/code&gt; as the primary (QL-Win 4.x) and &lt;code&gt;%LocalAppData%\QuickLook\plugins\QuickLookProtein\&lt;/code&gt; as the legacy mirror (so anyone still on QL-Win 3.x keeps working). The Setup.exe payload is unchanged; only the install destination moves. Uninstaller template updated to clean both locations.&lt;/p&gt;
+&lt;p&gt;The diagnostic + code-shape work from 1.7.68 → 1.7.72 (AssemblyResolve hook, AnyCPU, runtimes/ subtree, LoadLibraryW preload, type-decoupling, cctor sentinel) was *necessary* — it ruled out every other failure mode and pointed at the install layout as the last remaining suspect. But the *sufficient* fix is just one line: the plugin path.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.73"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.73/QuickLookProtein-1.7.73.zip" sparkle:edSignature="8fMXyhAz+g5hIFJTAcE5BFd5MWCtqOjouwLqm1OYPusub/nvuXJzjIB+JTcAoi3JewvgYm6J6gkkqzyu0MjUBg==" length="4462739" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.72</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.72</link>
       <pubDate>Wed, 20 May 2026 03:21:41 +0000</pubDate>
