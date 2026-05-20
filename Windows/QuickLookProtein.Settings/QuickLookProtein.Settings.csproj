@@ -61,6 +61,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      System.Net.Http is part of the .NET Framework 4.7.2 reference
+      assemblies but isn't auto-added to SDK-style net472 projects -
+      UpdateChecker.cs needs HttpClient, so we reference it
+      explicitly.  Without this, "The type or namespace name 'Http'
+      does not exist in the namespace 'System.Net'".
+    -->
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Ship the .ico as a Resource so the WPF window can load it
          at runtime via pack://application:,,, URIs. Without this,
          the <ApplicationIcon> above only sets the EXE icon - the

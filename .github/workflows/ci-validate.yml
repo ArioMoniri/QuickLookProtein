@@ -133,16 +133,42 @@ jobs:
           if (-not $common) { throw "QuickLook.Common.dll not found in QL-Win release" }
           New-Item -ItemType Directory -Force -Path Windows/QuickLookProtein.Plugin/libs | Out-Null
           Copy-Item $common.FullName Windows/QuickLookProtein.Plugin/libs/QuickLook.Common.dll -Force
+      # Mirror exactly what release.yml does so a CI-green branch
+      # implies a green release tag.  The release workflow stamps
+      # Version / FileVersion / InformationalVersion on every dotnet
+      # build via /p:Version=$ver - if a code change breaks the
+      # build only when those properties are set (e.g. an
+      # InternalsVisibleTo attribute or a binding-redirect that
+      # depends on the version), CI MUST exercise the same flag.
+      # v1.7.77 shipped broken because ci-validate was building
+      # without /p:Version=... and the Settings build only failed
+      # under the version-stamped path (UpdateChecker.cs uses
+      # `init` setters + System.Net.Http, both compile only when
+      # the IsExternalInit polyfill and the explicit reference are
+      # in place).  Pinning a CI sentinel version proves the
+      # version cascade still flows when properties are set.
       - name: Build plugin
-        run: dotnet build Windows/QuickLookProtein.Plugin/QuickLookProtein.Plugin.csproj -c Release
+        shell: pwsh
+        run: |
+          dotnet build Windows/QuickLookProtein.Plugin/QuickLookProtein.Plugin.csproj `
+              -c Release `
+              /p:Version=0.0.0-ci /p:FileVersion=0.0.0 /p:InformationalVersion=0.0.0-ci
       - name: Build thumbnail provider
-        run: dotnet build Windows/QuickLookProtein.Thumbnail/QuickLookProtein.Thumbnail.csproj -c Release
+        shell: pwsh
+        run: |
+          dotnet build Windows/QuickLookProtein.Thumbnail/QuickLookProtein.Thumbnail.csproj `
+              -c Release
       - name: Build Settings WPF app
-        # This is the build that fixes the "infinite respawn" bug
-        # would have been caught earlier by - it produces the exe
-        # plus the Microsoft.Web.WebView2.* DLLs that the runtime
-        # XAML parser needs.  The next step verifies they landed.
-        run: dotnet build Windows/QuickLookProtein.Settings/QuickLookProtein.Settings.csproj -c Release -o build/settings
+        # Exercises the same /p:Version cascade release.yml uses, so
+        # the in-process UpdateChecker code path (HttpClient +
+        # init-only properties) is compiled here under the same
+        # conditions a release tag would build it under.
+        shell: pwsh
+        run: |
+          dotnet build Windows/QuickLookProtein.Settings/QuickLookProtein.Settings.csproj `
+              -c Release `
+              /p:Version=0.0.0-ci /p:FileVersion=0.0.0 /p:InformationalVersion=0.0.0-ci `
+              -o build/settings
       - name: Verify Settings.exe build output includes WebView2 DLLs
         # The Settings app crashes with XamlParseException at
         # InitializeComponent if these assemblies are missing

@@ -4,6 +4,21 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.78] — 2026-05-20
+
+### 🔧 Hotfix for v1.7.77's partial-release
+
+v1.7.77's tag shipped only the macOS DMG; the Windows side of the release pipeline failed during `Build Settings WPF app` because `UpdateChecker.cs` used two features the net472 SDK doesn't auto-provide:
+
+- `using System.Net.Http;` — `HttpClient` is in the net472 reference assemblies but isn't auto-referenced in SDK-style csproj. **Fixed**: explicit `<Reference Include="System.Net.Http" />` in `QuickLookProtein.Settings.csproj`.
+- `public string TagName { get; init; }` — C# 9's init-only setters require `System.Runtime.CompilerServices.IsExternalInit`, which ships in .NET 5+ but not Framework. **Fixed**: new `IsExternalInit.cs` polyfill (the [officially-blessed Roslyn pattern for downlevel targets](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-9.0/init)).
+
+### 🛡 `ci-validate` now mirrors release.yml's build flags
+
+User flagged the actual gap: `ci-validate.yml` was building with `dotnet build -c Release` but the release workflow builds with `/p:Version=$ver /p:FileVersion=$ver /p:InformationalVersion=$ver`. A code change that compiled fine without the version cascade but failed with it (exactly what 1.7.77 hit) wouldn't have been caught by CI. **Fixed**: `ci-validate.yml`'s plugin + Settings build steps now pass `/p:Version=0.0.0-ci /p:FileVersion=0.0.0 /p:InformationalVersion=0.0.0-ci` so the version-stamped code path is exercised on every push to feature/**.
+
+The release workflow's atomic-publish gate (don't create the GitHub release until both Mac and Windows builds succeed) is queued for a separate follow-up — it requires restructuring release.yml's job graph and is larger than this hotfix should carry.
+
 ## [1.7.77] — 2026-05-20
 
 ### 🪟 Windows — in-process auto-updater (finally)
