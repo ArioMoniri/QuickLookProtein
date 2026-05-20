@@ -77,6 +77,15 @@
          the <ApplicationIcon> above only sets the EXE icon - the
          WPF window's title-bar icon would still be the WPF default. -->
     <Resource Include="Resources\AppIcon.ico" />
+    <!-- And a real 256-px PNG (v1.7.83+) for the in-app sidebar logo.
+         WPF's <Image Source="...ico"> picks Frames[0] of an ICO, which
+         is the 16-px frame, and `DecodePixelWidth=256` is a no-op on
+         multi-frame icons (it only works on single-frame bitmaps like
+         PNG/JPEG). Result through v1.7.82: the sidebar logo was the
+         16-px frame upscaled to 56 px, which looked pixelated. The
+         ICO still drives the EXE icon + taskbar + title bar where
+         the OS itself picks the right size. -->
+    <Resource Include="Resources\AppLogo-256.png" />
   </ItemGroup>
 
   <ItemGroup>

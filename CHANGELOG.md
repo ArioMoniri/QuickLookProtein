@@ -4,6 +4,21 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.83] — 2026-05-20
+
+### 🪟 Windows — real PNG logo + thumbnail self-test
+
+Two follow-ups from the v1.7.82 round of fixes:
+
+- **Sidebar logo finally renders crisp.** v1.7.82's "BitmapImage with `DecodePixelWidth=256`" trick didn't actually upscale the icon — `DecodePixelWidth` is a no-op on multi-frame ICOs, and WPF's `IconBitmapDecoder` returns `Frames[0]` (the 16-px entry) regardless. v1.7.83 ships `Resources\AppLogo-256.png` (the 256-px frame extracted from the ICO at build prep time) and references that directly. The ICO still drives the EXE icon + taskbar + window title-bar entries where the OS picks the right frame itself.
+- **Thumbnail provider self-test button in About → Diagnostics.** v1.7.82's thumbnail logger only fires when Explorer actually loads the DLL — if registration is broken or Explorer rejects the load, the log stays empty (which is exactly what users reported). The new **"Test thumbnail provider"** button walks the chain explicitly:
+  1. Reads `HKCU\…\Classes\.pdb\ShellEx\{E357…E96}` (per-extension shell handler)
+  2. Reads `HKCU\…\Classes\CLSID\{B7E4…7A1}\InProcServer32` (CLSID + CodeBase)
+  3. `Assembly.LoadFrom(CodeBase)` (managed assembly loads at all)
+  4. `Activator.CreateInstance(Type.GetTypeFromCLSID(...))` (COM activates — the exact path Explorer uses)
+  
+  Result of each step is appended to `thumbnail.log` and shown in a MessageBox; the user gets actionable text ("step 1 MISSING → re-run Setup.exe", "step 4 ERROR: CLR conflict → ship the log") rather than another silent failure.
+
 ## [1.7.82] — 2026-05-20
 
 ### 🪟 Windows — Settings polish + the *real* version-string bug

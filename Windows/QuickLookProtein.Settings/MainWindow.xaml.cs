@@ -993,6 +993,156 @@ public partial class MainWindow : Window
     // The log captures actual exception detail (HResult, message, stack)
     // for any failed check or install — the previous behaviour swallowed
     // those errors and only surfaced a generic MessageBox.
+    // v1.7.83: end-to-end self-test for the thumbnail provider.
+    // The thumbnail-still-white-after-refresh symptom can be caused
+    // by any link in the chain:
+    //   1) per-extension registry key missing (install.ps1 skipped or
+    //      another handler stole the slot)
+    //   2) CLSID registered but InProcServer32 CodeBase points at a
+    //      missing DLL (uninstall left a stub)
+    //   3) DLL exists but Explorer refuses to load it (managed
+    //      shell-extension hosting blocked, arch mismatch, Defender
+    //      blocked the load, etc.)
+    //   4) DLL loads but our COM class fails to instantiate (CLR
+    //      conflict, missing dependency)
+    //   5) Class instantiates but Initialize/GetThumbnail throws
+    //      (parser or renderer bug)
+    //
+    // This handler walks the chain in order, writes a diagnostic
+    // line per step to thumbnail.log, and shows a MessageBox with
+    // which step failed + where to find the log.
+    private void TestThumbnailProvider_Click(object sender, RoutedEventArgs e)
+    {
+        var report = new System.Text.StringBuilder();
+        var thumbLog = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "QuickLookProtein", "thumbnail.log");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(thumbLog)!);
+            File.AppendAllText(thumbLog,
+                $"\r\n{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [TEST] Settings app self-test starting\r\n");
+        }
+        catch { }
+
+        // Stable values from install.ps1 / ThumbnailProvider.cs.
+        const string clsid    = "{B7E4A6F1-2D6E-4F58-9B1B-2E5A1F0B97A1}";
+        const string thumbIid = "{E357FCCD-A995-4576-B01F-234630154E96}";
+
+        // Step 1 — per-extension shell-handler key.
+        string step1 = "FAIL";
+        string? extKeyPath = null;
+        try
+        {
+            using var k = Registry.CurrentUser.OpenSubKey(
+                $@"Software\Classes\.pdb\ShellEx\{thumbIid}");
+            var val = k?.GetValue("") as string;
+            if (val != null && val.Equals(clsid, StringComparison.OrdinalIgnoreCase))
+            {
+                step1 = "OK";
+                extKeyPath = $@"HKCU\Software\Classes\.pdb\ShellEx\{thumbIid}";
+            }
+            else if (k != null)
+            {
+                step1 = $"MISMATCH (value={val ?? "(null)"})";
+            }
+            else
+            {
+                step1 = "MISSING — install.ps1's Register-ThumbnailHandler didn't run or was wiped";
+            }
+        }
+        catch (Exception ex) { step1 = "ERROR: " + ex.Message; }
+        report.AppendLine($"1. Per-extension key (.pdb): {step1}");
+
+        // Step 2 — CLSID + InProcServer32 + CodeBase.
+        string step2 = "FAIL";
+        string? codeBasePath = null;
+        try
+        {
+            using var k = Registry.CurrentUser.OpenSubKey(
+                $@"Software\Classes\CLSID\{clsid}\InProcServer32");
+            if (k == null)
+            {
+                step2 = "MISSING — CLSID not registered in HKCU";
+            }
+            else
+            {
+                var cb = k.GetValue("CodeBase") as string;
+                var asm = k.GetValue("Assembly") as string;
+                var cls = k.GetValue("Class") as string;
+                report.AppendLine($"   Assembly:  {asm}");
+                report.AppendLine($"   Class:     {cls}");
+                report.AppendLine($"   CodeBase:  {cb}");
+                if (string.IsNullOrEmpty(cb))
+                {
+                    step2 = "MISSING CodeBase";
+                }
+                else
+                {
+                    var localPath = cb.StartsWith("file:///", StringComparison.OrdinalIgnoreCase)
+                        ? Uri.UnescapeDataString(cb.Substring("file:///".Length).Replace('/', '\\'))
+                        : cb;
+                    codeBasePath = localPath;
+                    step2 = File.Exists(localPath)
+                        ? "OK"
+                        : $"DLL MISSING at {localPath}";
+                }
+            }
+        }
+        catch (Exception ex) { step2 = "ERROR: " + ex.Message; }
+        report.AppendLine($"2. CLSID InProcServer32: {step2}");
+
+        // Step 3 — DLL loadable as a managed assembly?
+        string step3 = "SKIP";
+        if (codeBasePath != null && File.Exists(codeBasePath))
+        {
+            try
+            {
+                var asm = Assembly.LoadFrom(codeBasePath);
+                var t = asm.GetType("QuickLookProtein.Thumbnail.MoleculeThumbnailProvider");
+                step3 = t != null
+                    ? $"OK (type loaded, {asm.GetName().Version})"
+                    : "TYPE NOT FOUND in assembly";
+            }
+            catch (Exception ex) { step3 = "ERROR: " + ex.GetType().Name + ": " + ex.Message; }
+        }
+        report.AppendLine($"3. Managed DLL load: {step3}");
+
+        // Step 4 — CoCreateInstance via COM (the path Explorer takes).
+        // If 1+2 are OK but this fails, Explorer would also fail — and
+        // that's the "thumbnails stay white even after refresh" symptom.
+        string step4 = "SKIP";
+        if (step2 == "OK")
+        {
+            try
+            {
+                var t = Type.GetTypeFromCLSID(new Guid(clsid));
+                object? inst = t != null ? Activator.CreateInstance(t) : null;
+                step4 = inst != null
+                    ? "OK (CoCreateInstance succeeded — Explorer should also be able to load us)"
+                    : "FAIL (Activator.CreateInstance returned null)";
+                if (inst != null) Marshal.FinalReleaseComObject(inst);
+            }
+            catch (Exception ex) { step4 = "ERROR: " + ex.GetType().Name + ": " + ex.Message; }
+        }
+        report.AppendLine($"4. COM CoCreateInstance: {step4}");
+
+        try { File.AppendAllText(thumbLog, "[TEST] Result:\r\n" + report + "\r\n"); } catch { }
+
+        var summary = report.ToString();
+        var advice = step4 == "OK"
+            ? "All four checks passed. If thumbnails are still white, restart explorer.exe (Shift-click 'Refresh thumbnails')."
+            : step1.StartsWith("MISSING") || step2.StartsWith("MISSING")
+                ? "Re-run QuickLookProtein-Setup.exe — registration is missing or was removed."
+                : "Open thumbnail.log for full details; ship that file when reporting the issue.";
+
+        MessageBox.Show(this,
+            summary + "\r\n" + advice,
+            "Thumbnail provider self-test",
+            MessageBoxButton.OK,
+            step4 == "OK" ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
     // v1.7.82: open the rolling log written by the Explorer thumbnail
     // provider (QuickLookProtein.Thumbnail.MoleculeThumbnailProvider).
     // Path is duplicated rather than referenced so the Settings app

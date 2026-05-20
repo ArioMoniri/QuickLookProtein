@@ -451,25 +451,22 @@
                 BorderThickness="0,0,1,0">
             <DockPanel>
                 <!-- Header: logo + name + version.
-                     ICO holds 16/32/48/64/128/256 frames; WPF's default
-                     ImageSource on a pack:// ICO URI loads the *first*
-                     frame, not the closest match — which on this icon
-                     is 16px and looks pixelated upscaled to 56px.
-                     Forcing a BitmapImage with DecodePixelWidth=256
-                     selects the 256px PNG-encoded frame; HighQuality
-                     scaling then downsamples cleanly to 56. -->
+                     v1.7.83+ loads the real 256-px PNG (extracted from
+                     the ICO's largest frame at build time and shipped
+                     as Resources\AppLogo-256.png). The v1.7.82 attempt
+                     to use <BitmapImage UriSource="...ico"
+                     DecodePixelWidth="256"/> didn't actually upscale
+                     correctly — DecodePixelWidth is a no-op on multi-
+                     frame ICOs, and WPF's IconBitmapDecoder still
+                     returned Frames[0] (the 16-px entry). Sourcing
+                     a real PNG sidesteps the quirk entirely. -->
                 <StackPanel DockPanel.Dock="Top" Margin="16,18,16,12">
-                    <Image Width="56" Height="56"
+                    <Image Source="pack://application:,,,/Resources/AppLogo-256.png"
+                           Width="56" Height="56"
                            RenderOptions.BitmapScalingMode="HighQuality"
                            HorizontalAlignment="Left"
                            SnapsToDevicePixels="True"
-                           UseLayoutRounding="True">
-                        <Image.Source>
-                            <BitmapImage UriSource="pack://application:,,,/Resources/AppIcon.ico"
-                                         DecodePixelWidth="256"
-                                         CacheOption="OnLoad"/>
-                        </Image.Source>
-                    </Image>
+                           UseLayoutRounding="True"/>
                     <TextBlock Text="QuickLookProtein2"
                                FontSize="16"
                                FontWeight="SemiBold"
@@ -1042,6 +1039,10 @@
                                 <WrapPanel>
                                     <Button Content="Open plugin folder" Padding="10,4" Margin="0,2,6,2" Click="OpenPluginFolderButton_Click"/>
                                     <Button Content="Open plugin log" Padding="10,4" Margin="0,2,6,2" Click="OpenPluginLog_Click"/>
+                                    <Button Content="Test thumbnail provider" Padding="10,4" Margin="0,2,6,2"
+                                            Style="{StaticResource PrimaryButton}"
+                                            ToolTip="Walk the registration chain: per-extension key → CLSID → managed DLL load → COM CreateInstance. Pinpoints whether Explorer can't find us, can't load the DLL, or fails CLR activation. Writes results to thumbnail.log."
+                                            Click="TestThumbnailProvider_Click"/>
                                     <Button Content="Open thumbnail log" Padding="10,4" Margin="0,2,6,2"
                                             ToolTip="Open the rolling log written by the Explorer thumbnail provider. Empty means Explorer never loaded our DLL; entries with parse / render errors point at the specific failure."
                                             Click="OpenThumbnailLog_Click"/>
