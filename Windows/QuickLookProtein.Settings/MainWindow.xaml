@@ -865,6 +865,47 @@
                         <TextBlock Text="Thumbnails" Style="{StaticResource SectionTitle}"/>
                         <TextBlock Text="Style applied to thumbnails in Icon / Tile / Gallery view. 'Auto' uses cartoon-ribbon for proteins (multiple CA atoms) and CPK for small molecules."
                                    Style="{StaticResource SectionSubtitle}"/>
+
+                        <!--
+                          Registration-status banner (v1.7.86+). Hidden by
+                          default; the Loaded handler runs a quick self-
+                          check and reveals it (with a Repair button) when
+                          the thumbnail provider's CLSID isn't registered.
+                          Without this, users who never opened
+                          About → Diagnostics had no signal that the
+                          per-format style dropdowns below were no-ops —
+                          changing 'Auto' to 'Cartoon' wrote to the
+                          registry fine but Explorer never invoked us, so
+                          nothing visibly changed.
+                        -->
+                        <Border x:Name="ThumbnailRegBanner"
+                                Visibility="Collapsed"
+                                Background="{DynamicResource WarnBg}"
+                                BorderBrush="{DynamicResource CardStroke}"
+                                BorderThickness="1"
+                                CornerRadius="6" Padding="14"
+                                Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Thumbnail provider isn't registered"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource WarnText}"/>
+                                    <TextBlock Text="Style settings below are saved but won't take effect until Explorer can load our DLL. Click Repair to fix in-place."
+                                               Foreground="{DynamicResource WarnText}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Content="Repair now"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Padding="12,6" VerticalAlignment="Center"
+                                        Click="RepairThumbnailRegistration_Click"/>
+                            </Grid>
+                        </Border>
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
                                 <TextBlock Text="Thumbnail style per format" Style="{StaticResource CardTitle}"/>

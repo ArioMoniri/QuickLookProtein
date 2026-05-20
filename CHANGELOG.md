@@ -4,6 +4,15 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.86] — 2026-05-20
+
+### 🪟 Windows — make broken-registration recovery a single click
+
+v1.7.85 added the Repair button under About → Diagnostics, but users hitting white thumbnails were arriving at the Thumbnails tab first, picking "Auto" or "Cartoon" from a dropdown, seeing nothing happen, and assuming the dropdown was broken (it wasn't — the writes saved, but the DLL still wasn't loaded so the visible result was identical). v1.7.86 makes the broken state obvious *on the same tab the user lands on* and the fix one click away:
+
+- **Registration-status banner** at the top of the Thumbnails tab. Hidden when the CLSID's `InProcServer32` is present in HKCU; visible (warning-yellow, accent-stroked) with a "Repair now" button when it's missing. Checked on window load and re-evaluated after every successful repair. Stops users from fiddling with a dropdown that can't affect anything until registration is fixed.
+- **"Repair now" inline in the self-test dialog.** When **Test thumbnail provider** finds step 1 or step 2 MISSING, the result MessageBox is now Yes/No: Yes runs `RepairThumbnailRegistration` and re-runs the test so the user sees the post-repair OK state before closing. Cuts the recovery flow from four clicks (Test → see error → close → find Repair button → click → re-test) to two (Test → Yes).
+
 ## [1.7.85] — 2026-05-20
 
 ### 🪟 Windows — "Repair thumbnail registration" button

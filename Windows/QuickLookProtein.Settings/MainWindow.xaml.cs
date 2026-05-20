@@ -47,6 +47,7 @@ public partial class MainWindow : Window
         try { ApplyTheme();         } catch (Exception ex) { Debug.WriteLine("ApplyTheme: " + ex); }
         try { HookSystemThemeChange(); } catch (Exception ex) { Debug.WriteLine("Theme watcher: " + ex); }
         try { ConfigureSliders();   } catch (Exception ex) { Debug.WriteLine("ConfigureSliders: " + ex); }
+        try { UpdateThumbnailRegBanner(); } catch (Exception ex) { Debug.WriteLine("Banner check: " + ex); }
         try { SetVersionLabel();    } catch (Exception ex) { ReportStartupError("version label", ex); }
         try { PopulateAllCombos();  } catch (Exception ex) { ReportStartupError("populating options", ex); }
         try { LoadCurrentSettings();} catch (Exception ex) { ReportStartupError("loading saved settings", ex); }
@@ -1131,17 +1132,43 @@ public partial class MainWindow : Window
         try { File.AppendAllText(thumbLog, "[TEST] Result:\r\n" + report + "\r\n"); } catch { }
 
         var summary = report.ToString();
+        bool needsRepair = step1.StartsWith("MISSING") || step2.StartsWith("MISSING");
         var advice = step4 == "OK"
             ? "All four checks passed. If thumbnails are still white, restart explorer.exe (Shift-click 'Refresh thumbnails')."
-            : step1.StartsWith("MISSING") || step2.StartsWith("MISSING")
-                ? "Re-run QuickLookProtein-Setup.exe — registration is missing or was removed."
+            : needsRepair
+                ? "Click 'Repair now' to rewrite the missing registry entries from Settings.exe — no need to re-run Setup.exe."
                 : "Open thumbnail.log for full details; ship that file when reporting the issue.";
 
-        MessageBox.Show(this,
-            summary + "\r\n" + advice,
-            "Thumbnail provider self-test",
-            MessageBoxButton.OK,
-            step4 == "OK" ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        // When registration is broken, offer one-click recovery
+        // straight from the test dialog. Re-runs the test after
+        // repair so the user sees the fix landed before closing.
+        if (needsRepair)
+        {
+            var choice = MessageBox.Show(this,
+                summary + "\r\n" + advice,
+                "Thumbnail provider self-test",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning,
+                MessageBoxResult.Yes,
+                System.Windows.MessageBoxOptions.None);
+            // Yes => Repair now, No => dismiss. WPF's MessageBox
+            // doesn't let us label buttons; we lean on the
+            // "Click 'Repair now'…" sentence above to telegraph
+            // which button does what.
+            if (choice == MessageBoxResult.Yes)
+            {
+                RepairThumbnailRegistration_Click(this, new RoutedEventArgs());
+                // Re-run so the user can see the post-repair state.
+                TestThumbnailProvider_Click(this, new RoutedEventArgs());
+            }
+        }
+        else
+        {
+            MessageBox.Show(this,
+                summary + "\r\n" + advice,
+                "Thumbnail provider self-test",
+                MessageBoxButton.OK,
+                step4 == "OK" ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
     }
 
     // v1.7.85: rewrite the CLSID + per-extension shell-handler keys
@@ -1239,6 +1266,8 @@ public partial class MainWindow : Window
             SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
 
             StatusLabel.Text = $"Thumbnail registration repaired ({wrote} extensions written + CLSID InProcServer32). Switch a folder to Icon view to see thumbnails redraw.";
+            // Hide the warning banner now that the CLSID is back.
+            UpdateThumbnailRegBanner();
 
             MessageBox.Show(this,
                 $"Thumbnail registration written successfully.\r\n\r\n" +
@@ -1257,6 +1286,27 @@ public partial class MainWindow : Window
                 "Repair thumbnail registration",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    /// Show / hide the Thumbnails-tab registration banner based on
+    /// whether the CLSID's InProcServer32 entry exists in HKCU. The
+    /// per-extension key check is intentionally NOT done here — it's
+    /// noisier (16 reads) and the CLSID check alone catches the
+    /// failure mode users actually hit (step 2 MISSING in the
+    /// self-test). Called at Loaded and after a successful repair.
+    private void UpdateThumbnailRegBanner()
+    {
+        if (ThumbnailRegBanner == null) return;
+        const string clsid = "{B7E4A6F1-2D6E-4F58-9B1B-2E5A1F0B97A1}";
+        bool registered = false;
+        try
+        {
+            using var k = Registry.CurrentUser.OpenSubKey(
+                $@"Software\Classes\CLSID\{clsid}\InProcServer32");
+            registered = k != null;
+        }
+        catch { /* fail-closed: assume broken */ }
+        ThumbnailRegBanner.Visibility = registered ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// Probe the standard QL-Win plugin directories for the
