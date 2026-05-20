@@ -6,6 +6,38 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.76</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.76</link>
+      <pubDate>Wed, 20 May 2026 04:21:05 +0000</pubDate>
+      <sparkle:version>1.7.76</sparkle:version>
+      <sparkle:shortVersionString>1.7.76</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows — first-run experience and thumbnail cache refresh&lt;/h3&gt;
+&lt;p&gt;User reported &lt;code&gt;.pdb&lt;/code&gt; files showed blank/white thumbnails in Icon view after install, even though the diagnostic showed our &lt;code&gt;IThumbnailProvider&lt;/code&gt; was correctly registered under &lt;code&gt;HKCU\Software\Classes\.pdb\ShellEx&lt;/code&gt;. Cause: &lt;code&gt;install.ps1&lt;/code&gt; cleared the icon cache (&lt;code&gt;ie4uinit -ClearIconCache&lt;/code&gt;) but didn&amp;#x27;t tell Explorer that file *associations* had changed, so it kept serving its in-memory CLSID-&amp;gt;handler mapping without re-querying our new entry.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;install.ps1&lt;/code&gt; now broadcasts &lt;code&gt;SHChangeNotify(SHCNE_ASSOCCHANGED)&lt;/code&gt;&lt;/strong&gt; after the thumbnail-handler registration. Explorer re-reads associations and re-asks our handler for visible folders without any process kill. Same broadcast a well-behaved Inno Setup script triggers via the &lt;code&gt;ChangesAssociations&lt;/code&gt; directive.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;New &amp;quot;Refresh thumbnails&amp;quot; button&lt;/strong&gt; in Settings → Diagnostics. Runs the same broadcast + ClearIconCache from the user&amp;#x27;s session for cases where the install-time broadcast didn&amp;#x27;t propagate (RDP sessions, fast-user-switch scenarios). Shift-click does a nuclear-option &lt;code&gt;explorer.exe&lt;/code&gt; kill (the shell auto-respawns) for the rare cases where SHChangeNotify isn&amp;#x27;t enough.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;🪟 Windows — launch-at-startup&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Fixed code-comment mismatch in &lt;code&gt;install.ps1&lt;/code&gt;&lt;/strong&gt;: the comment block claimed we passed &lt;code&gt;/TASKS=startup&lt;/code&gt; to QL-Win&amp;#x27;s Inno Setup installer, but the actual &lt;code&gt;-ArgumentList&lt;/code&gt; didn&amp;#x27;t include it. Users were finding QL-Win disabled after every reboot and had to manually re-enable startup from QL-Win&amp;#x27;s tray menu. Added the missing arg.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;New &amp;quot;Startup&amp;quot; card in the Settings app&lt;/strong&gt; with a &amp;quot;Launch QuickLook at sign-in&amp;quot; checkbox. Reads + writes &lt;code&gt;HKCU\Software\Microsoft\Windows\CurrentVersion\Run\QuickLook&lt;/code&gt; (same key QL-Win&amp;#x27;s tray menu uses) so flipping it here flips QL-Win&amp;#x27;s view of the same setting. The value points at the installed &lt;code&gt;QuickLook.exe&lt;/code&gt; (Local/Programs/QuickLook, Program Files, or Program Files (x86); whichever exists).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;🪟 Windows — Settings app launches after every install (not just first)&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Previously gated on &lt;code&gt;-not (Test-Path Settings.exe)&lt;/code&gt; so only the FIRST install opened the Settings window. Upgrades stayed silent, which left users wondering whether the upgrade had finished. Now the Settings window opens after every install run unless &lt;code&gt;QLP_SKIP_LAUNCH=1&lt;/code&gt; is set (for headless CI installs into throwaway profiles). This also surfaces the new Startup / Preview-size / Refresh-thumbnails controls to existing users without them needing to dig through the Start Menu.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;🍎 macOS — Open at login toggle&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;New &lt;code&gt;Xcode/QuickLookProtein/LoginItem.swift&lt;/code&gt;&lt;/strong&gt; wraps &lt;code&gt;SMAppService.mainApp&lt;/code&gt; (macOS 13+) so the Settings UI can flip &amp;quot;launch QuickLookProtein2 at sign-in&amp;quot; without diving into System Settings. The toggle in Settings → Appearance reads the runtime state via &lt;code&gt;SMAppService.mainApp.status&lt;/code&gt; so it stays in sync if the user flips it elsewhere.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;macOS 11/12 fallback&lt;/strong&gt;: those versions don&amp;#x27;t expose a sandboxed programmatic toggle; the Settings row instead shows an &amp;quot;Open Login Items…&amp;quot; button that deep-links into &lt;code&gt;System Settings → General → Login Items&lt;/code&gt; so the user can add the app there with one click. The deep-link URL has been stable since Big Sur even though the pane moved between &amp;quot;System Preferences&amp;quot; and &amp;quot;System Settings&amp;quot; in macOS 13.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Both — README&lt;/h3&gt;
+&lt;p&gt;The Settings section&amp;#x27;s matrix now includes Launch-at-startup behaviour per OS alongside Preview-size. Diagnostics section gains a &amp;quot;white thumbnails after install&amp;quot; entry pointing at the new Refresh button.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.76"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.76/QuickLookProtein-1.7.76.zip" sparkle:edSignature="p/9rKdIux1QtgUAlqY6zVNvQi7hyv/v5TSLNPVDOF1k23DAI/SrkJxzqjuxNMAiKWAfMvRWk7vj9e0p6A9+EDQ==" length="4482560" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.75</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.75</link>
       <pubDate>Wed, 20 May 2026 04:11:46 +0000</pubDate>
