@@ -4,6 +4,37 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.92] — 2026-05-20
+
+### 🍎 macOS — fix two false negatives in the diagnostic self-test
+
+User reported the v1.7.91 self-test failing two steps on a perfectly-working install:
+
+```
+1. Extension bundles: MISSING — QLExtension.appex, MDImporter.appex
+3. Sparkle install path NOT WRITABLE — /Applications.
+```
+
+Both were bugs in the *checker*, not the install.
+
+- **Step 1**: v1.7.90 hardcoded the wrong filenames. The QL preview extension is actually `QuickLookProtein Extension.appex` (with a space; matches the pbxproj `WRAPPER_NAME`), not `QLExtension.appex`. `MDImporter.appex` isn't built into PlugIns/ at all — the Spotlight target ships separately on macOS 12+. v1.7.92 splits the expected list into REQUIRED (`QuickLookProtein Extension.appex`, `QLThumbnail.appex`) and OPTIONAL (`QLActions.appex`, `MDImporter.appex`); missing optionals report as "not built — fine" instead of failure.
+
+- **Step 3**: the sandboxed Settings app can't write-probe `/Applications`, but Sparkle's installer XPC service has the `com.apple.security.files.user-selected.read-write` entitlement and absolutely can. The "NOT WRITABLE — move the app to /Applications" message was misleading when the app *was* in /Applications. v1.7.92 special-cases the standard locations (`/Applications`, `~/Applications`) as OK, fails read-only prefixes (`/System/`, `/Volumes/`), and uses `URL.resourceValues(.isWritableKey)` for everything else — the kernel-level writable bit respects the sandbox correctly.
+
+### 🪟 Windows — full diagnostic self-test (Mac parity)
+
+The existing "Test thumbnail provider" only walks the thumbnail registration chain. v1.7.92 adds **"Run diagnostic self-test"** (primary button in About → Diagnostics) that walks the whole stack — 7 steps, result shown in a MessageBox and written to `update.log`:
+
+1. Settings.exe `FileVersion` (warns if 1.0.0.0 — means pre-1.7.82 or local dev)
+2. QuickLook host installed (any of 3 standard paths, or Microsoft Store running)
+3. Plugin DLL present in QL-Win 4.x scan path (or legacy 3.x fallback)
+4. Thumbnail handler CLSID `InProcServer32` registered in HKCU
+5. WebView2 Evergreen Runtime installed (HKLM probe under EdgeUpdate\Clients\{F3017226-…})
+6. SettingsStore hive readable in HKCU
+7. Update-log directory writable
+
+Each step's outcome is "OK" / "MISSING …" / specific instruction — no guess-work.
+
 ## [1.7.91] — 2026-05-20
 
 ### 🍎 macOS — dedicated Diagnostics tab in the sidebar

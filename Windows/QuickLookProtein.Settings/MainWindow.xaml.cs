@@ -1018,6 +1018,151 @@ public partial class MainWindow : Window
     // This handler walks the chain in order, writes a diagnostic
     // line per step to thumbnail.log, and shows a MessageBox with
     // which step failed + where to find the log.
+    // v1.7.92+ broader self-diagnose. Through 1.7.91 the only Win
+    // self-test was thumbnail-provider-specific; this one walks the
+    // whole stack so an "everything's broken" report tells the user
+    // exactly which link failed. Matches the Mac self-test added in
+    // v1.7.90 step-for-step where the OSes overlap.
+    private void RunDiagnosticSelfTest_Click(object sender, RoutedEventArgs e)
+    {
+        var report = new System.Text.StringBuilder();
+        try
+        {
+            // 1. Settings.exe version stamp. v1.7.81's FileVersionInfo
+            //    path fixes the AssemblyVersion=1.0.0.0 trap; a return
+            //    of 1.0.0.0 here means the user installed a stale or
+            //    locally-built copy.
+            var ver = UpdateChecker.CurrentVersion;
+            report.AppendLine($"1. Settings.exe version: {ver}" +
+                (ver.Major == 1 && ver.Minor == 0
+                    ? "  ⚠ pre-1.7.82 or local dev build"
+                    : ""));
+
+            // 2. QuickLook host present. install.ps1 ships a check
+            //    against the 3 standard install paths + the
+            //    Microsoft Store packaged app. Mirror it here so we
+            //    can tell the user whether the host they need is
+            //    even installed.
+            var qlPaths = new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                             "Programs", "QuickLook", "QuickLook.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                             "QuickLook", "QuickLook.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                             "QuickLook", "QuickLook.exe"),
+            };
+            var foundQl = qlPaths.FirstOrDefault(File.Exists);
+            var qlRunning = System.Diagnostics.Process.GetProcessesByName("QuickLook").Any();
+            if (foundQl != null)
+                report.AppendLine($"2. QuickLook host: OK ({foundQl})");
+            else if (qlRunning)
+                report.AppendLine("2. QuickLook host: RUNNING (likely Microsoft Store version under WindowsApps — fine)");
+            else
+                report.AppendLine("2. QuickLook host: NOT INSTALLED — install QuickLook from Microsoft Store or re-run QuickLookProtein-Setup.exe.");
+
+            // 3. Plugin DLL present in QL-Win 4.x scan path (and
+            //    legacy 3.x path as fallback). Without this no
+            //    Space-bar preview can possibly work.
+            var pluginDll4 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                          "pooi.moe", "QuickLook", "QuickLook.Plugin",
+                                          "QuickLookProtein", "QuickLookProtein.Plugin.dll");
+            var pluginDll3 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                                          "QuickLook", "plugins",
+                                          "QuickLookProtein", "QuickLookProtein.Plugin.dll");
+            string? pluginPath = new[] { pluginDll4, pluginDll3 }.FirstOrDefault(File.Exists);
+            report.AppendLine(pluginPath != null
+                ? $"3. Plugin DLL: OK ({pluginPath})"
+                : "3. Plugin DLL: MISSING — re-run Setup.exe.");
+
+            // 4. Thumbnail DLL present + COM-registered. We don't
+            //    inline the full self-test walk here; the dedicated
+            //    Test thumbnail provider button does that. Just
+            //    surface whether the CLSID InProcServer32 exists
+            //    so the user knows whether to click Repair.
+            const string clsid = "{B7E4A6F1-2D6E-4F58-9B1B-2E5A1F0B97A1}";
+            using (var k = Registry.CurrentUser.OpenSubKey(
+                $@"Software\Classes\CLSID\{clsid}\InProcServer32"))
+            {
+                report.AppendLine(k != null
+                    ? "4. Thumbnail handler CLSID: OK (click Test for the full chain)"
+                    : "4. Thumbnail handler CLSID: NOT REGISTERED — click Repair thumbnail registration.");
+            }
+
+            // 5. WebView2 Runtime. The plugin's MoleculePanel and
+            //    the live preview in Settings both require it. The
+            //    Evergreen runtime registers under HKLM\Software\
+            //    Microsoft\EdgeUpdate\Clients\... ; we check the
+            //    user-machine combined hive via 32-bit + 64-bit
+            //    views since the installer is per-machine.
+            bool wv2 = WebView2RuntimeInstalled();
+            report.AppendLine(wv2
+                ? "5. WebView2 Runtime: OK"
+                : "5. WebView2 Runtime: NOT INSTALLED — modern Windows 11 / Windows 10 21H2+ has this by default; on older Win10 install from https://aka.ms/webview2.");
+
+            // 6. SettingsStore hive readable. If HKCU writes are
+            //    blocked (rare; corp images sometimes do this) the
+            //    Settings UI saves silently but the plugin never
+            //    reads the new value.
+            try
+            {
+                using var k = Registry.CurrentUser.OpenSubKey(@"Software\QuickLookProtein\Settings");
+                report.AppendLine(k != null
+                    ? "6. SettingsStore hive: OK"
+                    : "6. SettingsStore hive: EMPTY — change any Settings value to populate.");
+            }
+            catch (Exception ex)
+            {
+                report.AppendLine($"6. SettingsStore hive: ERROR — {ex.GetType().Name}: {ex.Message}");
+            }
+
+            // 7. Update log writable.
+            string updateLogPath = UpdateChecker.LogPath;
+            bool logWritable = false;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(updateLogPath)!);
+                var probe = Path.Combine(Path.GetDirectoryName(updateLogPath)!,
+                                         $".probe-{Guid.NewGuid():N}");
+                File.WriteAllText(probe, "");
+                File.Delete(probe);
+                logWritable = true;
+            }
+            catch { }
+            report.AppendLine(logWritable
+                ? $"7. Log directory writable: OK ({Path.GetDirectoryName(updateLogPath)})"
+                : $"7. Log directory NOT WRITABLE: {Path.GetDirectoryName(updateLogPath)}");
+        }
+        catch (Exception ex)
+        {
+            report.AppendLine($"\nSelf-test ERROR: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        var text = report.ToString();
+        UpdateChecker.Log("INFO", "Diagnostic self-test:\r\n" + text);
+        MessageBox.Show(this, text,
+            "QuickLookProtein diagnostic self-test",
+            MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// Probe HKLM for the WebView2 Evergreen Runtime. The runtime
+    /// registers under EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-...}
+    /// (per-machine). On modern Windows 11 it's preinstalled.
+    private static bool WebView2RuntimeInstalled()
+    {
+        const string clientsKey = @"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
+        const string clientsKey64 = @"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
+        try
+        {
+            using (var k = Registry.LocalMachine.OpenSubKey(clientsKey64))
+                if (k != null && k.GetValue("pv") is string v && v != "0.0.0.0") return true;
+            using (var k = Registry.LocalMachine.OpenSubKey(clientsKey))
+                if (k != null && k.GetValue("pv") is string v && v != "0.0.0.0") return true;
+        }
+        catch { }
+        return false;
+    }
+
     private void TestThumbnailProvider_Click(object sender, RoutedEventArgs e)
     {
         var report = new System.Text.StringBuilder();

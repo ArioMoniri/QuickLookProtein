@@ -2030,20 +2030,33 @@ struct ContentView: View {
         var lines: [String] = []
         let appBundle = Bundle.main.bundleURL
 
-        // 1. Extension bundles. Sometimes Sparkle's atomic-replace
-        //    operation can leave PlugIns/ momentarily out-of-sync;
-        //    we capture which extensions are missing so a partial
-        //    install is identifiable rather than silently broken.
+        // 1. Extension bundles. Names had to come from the pbxproj —
+        //    the QL preview extension lives at "QuickLookProtein
+        //    Extension.appex" (with a space), not "QLExtension.appex"
+        //    as v1.7.90 assumed. QLActions and MDImporter are only
+        //    built for some configurations / Xcode versions, so we
+        //    list them as OPTIONAL rather than reporting them
+        //    missing on a perfectly-good install.
         let plugInsDir = appBundle.appendingPathComponent("Contents/PlugIns", isDirectory: true)
-        let expected = ["QLExtension.appex", "QLThumbnail.appex", "QLActions.appex", "MDImporter.appex"]
-        var missing: [String] = []
-        for name in expected {
-            let p = plugInsDir.appendingPathComponent(name)
-            if !FileManager.default.fileExists(atPath: p.path) { missing.append(name) }
+        let required = ["QuickLookProtein Extension.appex", "QLThumbnail.appex"]
+        let optional = ["QLActions.appex", "MDImporter.appex"]
+        var missingRequired: [String] = []
+        var missingOptional: [String] = []
+        for name in required {
+            if !FileManager.default.fileExists(atPath:
+                plugInsDir.appendingPathComponent(name).path) { missingRequired.append(name) }
         }
-        lines.append(missing.isEmpty
-            ? "1. Extension bundles: OK (\(expected.count) present)"
-            : "1. Extension bundles: MISSING — \(missing.joined(separator: ", "))")
+        for name in optional {
+            if !FileManager.default.fileExists(atPath:
+                plugInsDir.appendingPathComponent(name).path) { missingOptional.append(name) }
+        }
+        if !missingRequired.isEmpty {
+            lines.append("1. Extension bundles: MISSING — \(missingRequired.joined(separator: ", "))")
+        } else if !missingOptional.isEmpty {
+            lines.append("1. Extension bundles: OK (\(required.count) required present; \(missingOptional.joined(separator: ", ")) not built — fine for Quick Look + Thumbnails to work)")
+        } else {
+            lines.append("1. Extension bundles: OK (\(required.count + optional.count) present)")
+        }
 
         // 2. App Group container — required so the extensions + the
         //    main app share UserDefaults + the Logs directory. When
@@ -2056,25 +2069,44 @@ struct ContentView: View {
             lines.append("2. App Group container: NOT PROVISIONED — dev build? Settings won't sync between the main app and extensions.")
         }
 
-        // 3. Write access to the app's parent. Sparkle's installer
-        //    needs to atomically replace the .app, so the *parent*
-        //    directory must be writable. /Applications usually is;
-        //    /System/Applications is not; ad-hoc copies to ~/Desktop
-        //    are. When this fails, Sparkle aborts with "An error
-        //    occurred while launching the installer".
+        // 3. Sparkle install path. The sandboxed Settings app
+        //    can't write-probe /Applications even though Sparkle
+        //    (running unsandboxed during install via its XPC
+        //    services) absolutely can. v1.7.90 used a write-probe
+        //    that always failed in /Applications and produced a
+        //    misleading "NOT WRITABLE — move the app to
+        //    /Applications" when the app was already there.
+        //
+        //    v1.7.92 distinguishes three cases:
+        //      a) Standard location (/Applications or
+        //         ~/Applications): the sandbox blocks our probe
+        //         but Sparkle's installer XPC service has the
+        //         needed entitlement. Mark OK.
+        //      b) Custom location: try .isWritableKey (respects
+        //         sandbox correctly via the kernel rather than
+        //         doing an actual write).
+        //      c) Read-only system location (/System/Applications,
+        //         a DMG mount): always fail.
         let parent = appBundle.deletingLastPathComponent()
-        let writeProbe = parent.appendingPathComponent(".qlp-write-probe-\(UUID().uuidString)")
-        var canWrite = false
-        do {
-            try Data().write(to: writeProbe)
-            try FileManager.default.removeItem(at: writeProbe)
-            canWrite = true
-        } catch {
-            canWrite = false
+        let parentPath = parent.path
+        let standardLocations = ["/Applications",
+                                 NSHomeDirectory() + "/Applications"]
+        let readOnlyPrefixes  = ["/System/", "/Volumes/"]
+        if standardLocations.contains(parentPath) {
+            lines.append("3. Sparkle install path: OK (\(parentPath) — Sparkle's installer XPC service has the entitlement to write here)")
+        } else if readOnlyPrefixes.contains(where: parentPath.hasPrefix) {
+            lines.append("3. Sparkle install path: READ-ONLY — \(parentPath). Move the app to /Applications.")
+        } else {
+            // Custom location: ask the file system kernel directly.
+            var canWrite = false
+            do {
+                let values = try parent.resourceValues(forKeys: [.isWritableKey])
+                canWrite = values.isWritable ?? false
+            } catch { canWrite = false }
+            lines.append(canWrite
+                ? "3. Sparkle install path writable: OK (\(parentPath))"
+                : "3. Sparkle install path NOT WRITABLE — \(parentPath). Move the app to /Applications.")
         }
-        lines.append(canWrite
-            ? "3. Sparkle install path writable: OK (\(parent.path))"
-            : "3. Sparkle install path NOT WRITABLE — \(parent.path). Sparkle won't be able to install updates here; move the app to /Applications.")
 
         // 4. Update log directory writable (a side-channel sanity
         //    check; the updater itself opens/creates this on first
