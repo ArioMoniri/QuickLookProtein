@@ -664,13 +664,13 @@ jobs:
 
           **Option A — Disk image (recommended)**
 
-          1. Download **${DMGNAME}** from the Assets below.
+          1. Download **[${DMGNAME}](https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${DMGNAME})** — or click [${DMGNAME}](https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/QuickLookProtein.dmg) to always grab the latest.
           2. Open it and drag **QuickLookProtein** onto the **Applications** shortcut.
           3. Eject the disk image.
 
           **Option B — Zip**
 
-          1. Download **${ZIPNAME}** from the Assets below.
+          1. Download **[${ZIPNAME}](https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${ZIPNAME})**.
           2. Unzip and drag **QuickLookProtein.app** into your **Applications** folder.
 
           Either way: open any \`.pdb\` / \`.cif\` / \`.sdf\` / \`.mol\` / \`.mol2\` / \`.xyz\` / \`.gro\` / \`.cube\` / \`.pqr\` / \`.vasp\` / \`.cdjson\` / \`.mmtf\` file in Finder, hit <kbd>Space</kbd> for the interactive 3D preview, or switch to Icon View for molecular thumbnails.
