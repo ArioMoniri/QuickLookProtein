@@ -255,6 +255,14 @@ The Windows updater is **opt-in for auto-check** — the box is unticked on firs
 
 Explorer caches the `<extension> → IThumbnailProvider CLSID` mapping at startup. After a fresh install of a thumbnail handler it doesn't re-query our entry until either (a) `SHChangeNotify(SHCNE_ASSOCCHANGED)` is broadcast or (b) `explorer.exe` restarts. `install.ps1` now broadcasts that signal at the end of the thumbnail-handler registration step, but for users whose Explorer didn't pick it up (RDP sessions, fast-user-switching, etc.) the Settings app exposes a **Refresh thumbnails** button under Diagnostics. **Shift-click** that button to do a nuclear `explorer.exe` kill (the shell auto-respawns) for cases where SHChangeNotify alone isn't enough.
 
+If the **"Test thumbnail provider"** self-test reports step 2 *MISSING* (CLSID not registered), use the **Repair thumbnail registration** button (or **Repair now** banner) in 1.7.85+. That rewrites the missing HKCU entries from inside Settings.exe without needing to re-run `Setup.exe`.
+
+#### "Thumbnails show in Icon view but not in Details view" (expected Windows behaviour)
+
+Windows Explorer invokes `IThumbnailProvider` (our thumbnail handler) for **Icon / Tile / Gallery / Content** views — those are the views built around per-file thumbnails. **Details / List / Small-icon** views render the file type's icon (registered via `DefaultIcon`), not the thumbnail; Explorer is using a different shell handler (`IExtractIcon`) for that column, and a custom thumbnail provider isn't called.
+
+This is a fundamental Windows shell design choice, not a bug. To see thumbnails, switch the folder view to Icon / Tile / Gallery / Content (View menu → Large icons / Tiles / Content). Details view will continue to show the generic file icon.
+
 ---
 
 ## 📦 Installation

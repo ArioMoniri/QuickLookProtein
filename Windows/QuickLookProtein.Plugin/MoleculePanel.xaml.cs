@@ -32,6 +32,16 @@ public partial class MoleculePanel : UserControl, IDisposable
     /// <c>https://VIRTUAL_HOST/&lt;filename&gt;</c>.
     private const string VirtualHost = "quicklookprotein.local";
 
+    /// v1.7.88+ disposed-state guard. QL-Win disposes the IViewer
+    /// (and therefore us) the moment the user advances to the next
+    /// file or closes the preview popover. If LoadFile / EnsureWebView
+    /// is still in flight when Dispose runs, the next access to
+    /// WebView.CoreWebView2 throws ObjectDisposedException — visible
+    /// in plugin.log as the QuickLookProtein-side stack the user
+    /// reported. Every await point in the load pipeline now early-
+    /// returns when this flag is set.
+    private bool _disposed;
+
     public MoleculePanel()
     {
         InitializeComponent();
@@ -48,24 +58,42 @@ public partial class MoleculePanel : UserControl, IDisposable
             await LoadFileAsync(path, context);
             PluginLog.Info($"MoleculePanel.LoadFile({path}) - LoadFileAsync returned cleanly");
         }
+        catch (ObjectDisposedException)
+        {
+            // User moved to the next file (or closed Quick Look) before
+            // this load completed; QL-Win disposed us mid-await. Not an
+            // error — log INFO and let the dead path unwind quietly.
+            PluginLog.Info($"MoleculePanel.LoadFile({path}) - cancelled (WebView disposed)");
+        }
         catch (Exception ex)
         {
             PluginLog.Exception($"MoleculePanel.LoadFile({path})", ex);
             // Surface the failure in the preview itself rather than
             // ending up with a silent blank window. QL-Win doesn't have
             // a built-in "error sheet" we can pop, so we render an
-            // HTML error page inside the same WebView.
-            await EnsureWebViewReadyAsync();
-            WebView.NavigateToString(BuildErrorHtml(
-                "Could not render molecule",
-                $"{ex.GetType().Name}: {ex.Message}"));
+            // HTML error page inside the same WebView — but only if
+            // the panel is still alive. If we got here because we
+            // were disposed, touching WebView would re-throw.
+            if (_disposed) return;
+            try
+            {
+                await EnsureWebViewReadyAsync();
+                if (_disposed) return;
+                WebView.NavigateToString(BuildErrorHtml(
+                    "Could not render molecule",
+                    $"{ex.GetType().Name}: {ex.Message}"));
+            }
+            catch (ObjectDisposedException) { /* disposed during error render */ }
         }
         finally
         {
-            // Mark the panel as no-longer-busy on the UI thread so
-            // QL-Win's spinner clears.
-            await Dispatcher.InvokeAsync(() => context.IsBusy = false,
-                                         DispatcherPriority.Loaded);
+            if (!_disposed)
+            {
+                // Mark the panel as no-longer-busy on the UI thread so
+                // QL-Win's spinner clears.
+                await Dispatcher.InvokeAsync(() => context.IsBusy = false,
+                                             DispatcherPriority.Loaded);
+            }
         }
     }
 
@@ -117,6 +145,7 @@ public partial class MoleculePanel : UserControl, IDisposable
     /// no-ops because EnsureCoreWebView2Async short-circuits internally.
     private async Task EnsureWebViewReadyAsync()
     {
+        if (_disposed) throw new ObjectDisposedException(nameof(MoleculePanel));
         if (WebView.CoreWebView2 != null) return;
         // Use a per-user data folder under LocalAppData so multiple
         // QL-Win plugins can't fight over a shared user-data folder.
@@ -127,7 +156,12 @@ public partial class MoleculePanel : UserControl, IDisposable
         var env = await CoreWebView2Environment.CreateAsync(
             browserExecutableFolder: null,
             userDataFolder: userDataFolder);
+        // CreateAsync can take 100-300 ms on cold-cache machines; the
+        // user can dismiss Quick Look in that window. Bail before
+        // touching WebView in that case.
+        if (_disposed) throw new ObjectDisposedException(nameof(MoleculePanel));
         await WebView.EnsureCoreWebView2Async(env);
+        if (_disposed) throw new ObjectDisposedException(nameof(MoleculePanel));
 
         // Hide the splash once the WebView has fully painted. We use
         // NavigationCompleted (not ContentLoading) because the WebGL
@@ -441,6 +475,13 @@ public partial class MoleculePanel : UserControl, IDisposable
 
     public void Dispose()
     {
+        // Flag first so any in-flight LoadFileAsync sees the disposed
+        // state on its next await-return BEFORE touching WebView.
+        // QL-Win calls Dispose on the UI thread the moment the user
+        // moves to the next file; without this flip, the load
+        // continuation throws ObjectDisposedException up through
+        // Dispatcher.UnhandledException and ends up in plugin.log.
+        _disposed = true;
         WebView?.Dispose();
     }
 }

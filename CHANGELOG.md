@@ -4,6 +4,31 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.88] — 2026-05-20
+
+### 🪟 Windows — race fix on Quick Look fast-advance
+
+Plugin log captured:
+```
+System.ObjectDisposedException: Cannot access a disposed object.
+Object name: 'WebView'.
+  at Microsoft.Web.WebView2.Wpf.WebView2Base.VerifyNotDisposed()
+  at QuickLookProtein.Plugin.MoleculePanel.EnsureWebViewReadyAsync
+  at QuickLookProtein.Plugin.MoleculePanel.LoadFile
+```
+
+QL-Win disposes the `IViewer` (and therefore `MoleculePanel`) the instant the user advances to the next file or closes the popover. If `LoadFile` was still awaiting `Task.Run(File.ReadAllText)` or `CoreWebView2Environment.CreateAsync`, the continuation would resume after Dispose ran and touch `WebView.CoreWebView2` — boom, `ObjectDisposedException` into the dispatcher's unhandled-exception handler.
+
+v1.7.88 fixes this:
+- New `_disposed` flag on `MoleculePanel`, set first in `Dispose()` before `WebView?.Dispose()`.
+- `EnsureWebViewReadyAsync` re-checks `_disposed` after every `await` and throws `ObjectDisposedException` instead of letting the next line dereference a dead WebView.
+- `LoadFile` catches `ObjectDisposedException` specifically and logs it as INFO ("cancelled (WebView disposed)") rather than ERR — that's the correct outcome for fast-advance, not a real failure.
+- The error-render fallback also short-circuits when `_disposed` so a slow render failure doesn't itself trigger a second ObjectDisposedException trying to display the first one.
+
+### 🪟 Windows — README: "thumbnails in Details view" is expected
+
+Added a section explaining Windows shell behaviour: `IThumbnailProvider` is only invoked for Icon / Tile / Gallery / Content views; Details / List / Small-icon use `IExtractIcon` (which we don't implement). Users seeing white icons in Details view should switch view modes — it's not a bug, just how Explorer's column renderer works.
+
 ## [1.7.87] — 2026-05-20
 
 ### 🪟 Windows — readable + scrollable release notes in the updater card
