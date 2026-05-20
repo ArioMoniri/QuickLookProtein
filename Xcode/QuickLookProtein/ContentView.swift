@@ -56,15 +56,16 @@ enum FormatFilter: String, CaseIterable, Identifiable {
 /// General → Formats → Appearance → Rendering → Toolbar → Info → Multi
 /// → Updates → About.
 enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
-    case general    = "General"
-    case formats    = "File Formats"
-    case multi      = "Multi-file"
-    case appearance = "Appearance"
-    case rendering  = "Rendering"
-    case toolbar    = "Toolbar"
-    case info       = "Info Overlay"
-    case updates    = "Software Update"
-    case about      = "About"
+    case general     = "General"
+    case formats     = "File Formats"
+    case multi       = "Multi-file"
+    case appearance  = "Appearance"
+    case rendering   = "Rendering"
+    case toolbar     = "Toolbar"
+    case info        = "Info Overlay"
+    case updates     = "Software Update"
+    case diagnostics = "Diagnostics"
+    case about       = "About"
 
     var id: String { rawValue }
 
@@ -72,15 +73,16 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     /// the DockDoor-style design reference. No colored tile backgrounds.
     var symbol: String {
         switch self {
-        case .general:    return "gearshape"
-        case .formats:    return "doc.on.doc"
-        case .multi:      return "rectangle.split.3x1"
-        case .appearance: return "paintpalette"
-        case .rendering:  return "cube.transparent"
-        case .toolbar:    return "slider.horizontal.below.rectangle"
-        case .info:       return "info.bubble"
-        case .updates:    return "arrow.triangle.2.circlepath"
-        case .about:      return "atom"
+        case .general:     return "gearshape"
+        case .formats:     return "doc.on.doc"
+        case .multi:       return "rectangle.split.3x1"
+        case .appearance:  return "paintpalette"
+        case .rendering:   return "cube.transparent"
+        case .toolbar:     return "slider.horizontal.below.rectangle"
+        case .info:        return "info.bubble"
+        case .updates:     return "arrow.triangle.2.circlepath"
+        case .diagnostics: return "stethoscope"
+        case .about:       return "atom"
         }
     }
 
@@ -88,10 +90,10 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     /// `nil` means the row sits ungrouped at the top of the sidebar.
     var category: String? {
         switch self {
-        case .general:                                     return nil
-        case .formats, .multi:                             return "Features"
-        case .appearance, .rendering, .toolbar, .info:     return "Customization"
-        case .updates, .about:                             return "System"
+        case .general:                                       return nil
+        case .formats, .multi:                               return "Features"
+        case .appearance, .rendering, .toolbar, .info:       return "Customization"
+        case .updates, .diagnostics, .about:                 return "System"
         }
     }
 }
@@ -554,8 +556,9 @@ struct ContentView: View {
         case .toolbar:    toolbarPanel
         case .info:       infoOverlayPanel
         case .multi:      multiFilePanel
-        case .updates:    updatesPanel
-        case .about:      aboutPanel
+        case .updates:     updatesPanel
+        case .diagnostics: diagnosticsPanel
+        case .about:       aboutPanel
         }
     }
 
@@ -1534,23 +1537,18 @@ struct ContentView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                SectionLabel(text: "Maintenance")
-                Card {
-                    FormRow(label: "Quick Look cache",
-                            hint: "Run if previews stop refreshing after an update.") {
-                        Button("Reset Quick Look cache") { updater.resetQuickLookCache() }
-                    }
-                }
-                if !updater.lastCheckStatus.isEmpty {
-                    Text(updater.lastCheckStatus)
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 16)
-                }
+            // v1.7.91+ Maintenance ("Reset Quick Look cache") and
+            // the "Quick Look not updating?" troubleshooting card
+            // moved to the new Diagnostics tab so this panel only
+            // handles the update flow itself. lastCheckStatus
+            // stays — it's an update-event log line, not a
+            // diagnostic.
+            if !updater.lastCheckStatus.isEmpty {
+                Text(updater.lastCheckStatus)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 16)
             }
-
-            troubleshootingCard
         }
     }
 
@@ -1571,6 +1569,121 @@ struct ContentView: View {
     }
 
     @ViewBuilder
+    /// v1.7.91+ Diagnostics tab.
+    ///
+    /// Consolidates every troubleshooting / log-viewer / self-test
+    /// surface in one place, matching the Mac-System-Settings
+    /// pattern and our own Windows app's About → Diagnostics card.
+    /// Through v1.7.90 these controls were scattered between the
+    /// Software Update card on the About tab (extension logs +
+    /// self-test) and the bottom of the Software Update tab (cache
+    /// reset + "Quick Look not updating?" tile); users had to know
+    /// to look in two unrelated places.
+    private var diagnosticsPanel: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            panelHeader(.diagnostics, subtitle: "Logs, self-tests, and the macOS Quick Look cache")
+
+            // ---- Extension logs --------------------------------
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "Extension logs")
+                Card {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Quick Look extensions run in their own processes (PluginKit). Their logs land in dedicated files under the App Group container; the buttons below open each.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        // Two-up grid so the buttons stay compact.
+                        FlowDiagnosticButtons(onTap: { target in
+                            diagnosticLogTarget = target
+                        })
+                        Button(action: revealLogsFolder) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "folder")
+                                Text("Reveal logs folder in Finder")
+                            }
+                        }
+                        .buttonStyle(SecondaryPillButtonStyle())
+                        .help("Open ~/Library/Group Containers/<group>/Library/Logs/QuickLookProtein in Finder.")
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+            }
+
+            // ---- Self-test -------------------------------------
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "Self-test")
+                Card {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Verifies every extension bundle is present, the App Group container is reachable, Sparkle has write access to the install path, and the EdDSA key is set. Results show inline below.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 8) {
+                            Button(action: runDiagnosticSelfTest) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "stethoscope")
+                                    Text("Run diagnostic self-test")
+                                }
+                            }
+                            .buttonStyle(PrimaryPillButtonStyle())
+
+                            Button(action: revealAppBundle) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "app.badge")
+                                    Text("Reveal app bundle")
+                                }
+                            }
+                            .buttonStyle(SecondaryPillButtonStyle())
+                            .help("Open the parent of QuickLookProtein.app in Finder so you can right-click → Show Package Contents.")
+                        }
+                        if let diag = diagnosticSelfTestReport {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Last result")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                Group {
+                                    if #available(macOS 12.0, *) {
+                                        Text(diag)
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundColor(.secondary)
+                                            .textSelection(.enabled)
+                                    } else {
+                                        Text(diag)
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(8)
+                            .background(Color.gray.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+            }
+
+            // ---- Quick Look cache ------------------------------
+            VStack(alignment: .leading, spacing: 6) {
+                SectionLabel(text: "macOS Quick Look cache")
+                Card {
+                    FormRow(label: "Quick Look cache",
+                            hint: "Run if previews stop refreshing after an update.") {
+                        Button("Reset Quick Look cache") { updater.resetQuickLookCache() }
+                    }
+                }
+            }
+
+            // ---- "Quick Look not updating?" tile -------------
+            // Existing expanding troubleshooting card with the
+            // qlmanage / Extensions-Settings how-to.
+            troubleshootingCard
+        }
+    }
+
     private var aboutPanel: some View {
         let v  = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let b  = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
@@ -1873,97 +1986,12 @@ struct ContentView: View {
                     }
                     .padding(.top, 6)
 
-                    // v1.7.84+ extension log viewers. Each button
-                    // shells out to `log show --predicate
-                    // 'subsystem == "..."'` and presents the unified-
-                    // logging output in a copy/save-able sheet. The
-                    // QuickLook preview, thumbnail, and Quick Action
-                    // extensions run in their own PluginKit processes
-                    // where stdout / NSLog never bubble up; os_log to
-                    // a subsystem is the only place their state
-                    // transitions land, and `log show` is the only
-                    // way to retrieve them — gnarly enough that
-                    // bug-report-quality logs were effectively
-                    // unobtainable from non-developers before this.
-                    Divider().padding(.vertical, 4)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Extension logs")
-                            .font(.callout)
-                            .fontWeight(.semibold)
-                        Text("Quick Look extensions run in their own processes; their logs only live in unified logging. Open a viewer below to see the last hour of each extension's output.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        // Two-up grid so the buttons stay compact.
-                        FlowDiagnosticButtons(onTap: { target in
-                            diagnosticLogTarget = target
-                        })
-                        // v1.7.90+ component-level diagnostics.
-                        // Reveal-in-Finder buttons for the .appex
-                        // bundles (so a power user can inspect
-                        // entitlements / Info.plist / signature
-                        // without running `codesign -dvv`) and a
-                        // self-test that walks the extension-bundle
-                        // + App-Group + Sparkle-install-path chain
-                        // — Mac analogue of the Windows thumbnail
-                        // provider self-test added in v1.7.83.
-                        HStack(spacing: 8) {
-                            Button(action: runDiagnosticSelfTest) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "stethoscope")
-                                    Text("Run diagnostic self-test")
-                                }
-                            }
-                            .buttonStyle(PrimaryPillButtonStyle())
-                            .help("Verify every extension bundle is present, the App Group container is reachable, and Sparkle has write access to the install path. Results show inline.")
-
-                            Button(action: revealAppBundle) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "app.badge")
-                                    Text("Reveal app bundle")
-                                }
-                            }
-                            .buttonStyle(SecondaryPillButtonStyle())
-                            .help("Open the parent of QuickLookProtein.app in Finder so you can right-click → Show Package Contents and inspect Contents/PlugIns/.")
-                        }
-                        Button(action: revealLogsFolder) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "folder")
-                                Text("Reveal logs folder in Finder")
-                            }
-                        }
-                        .buttonStyle(SecondaryPillButtonStyle())
-                        .help("Open ~/Library/Group Containers/<group>/Library/Logs/QuickLookProtein in Finder.")
-
-                        // Inline diagnostic-result block, populated
-                        // by runDiagnosticSelfTest. Hidden until at
-                        // least one run has happened so the panel
-                        // stays compact on launch.
-                        if let diag = diagnosticSelfTestReport {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Diagnostic results")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                Group {
-                                    if #available(macOS 12.0, *) {
-                                        Text(diag)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundColor(.secondary)
-                                            .textSelection(.enabled)
-                                    } else {
-                                        Text(diag)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .padding(8)
-                            .background(Color.gray.opacity(0.08))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                    }
-                    .padding(.top, 4)
+                    // v1.7.91+ NOTE: the Extension-logs / self-test /
+                    // reveal-folder block previously lived here. It
+                    // moved to its own top-level Diagnostics tab so
+                    // all troubleshooting is in one obvious place,
+                    // matching the Windows app's About → Diagnostics
+                    // card layout.
                 }
             }
         }

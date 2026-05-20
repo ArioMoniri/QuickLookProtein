@@ -4,6 +4,21 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.91] — 2026-05-20
+
+### 🍎 macOS — dedicated Diagnostics tab in the sidebar
+
+Through v1.7.90 the diagnostic surfaces were scattered: extension log viewers + self-test under About → Software Update card, "Reset Quick Look cache" + "Quick Look not updating?" tile at the bottom of the Software Update tab. Users hitting "Quick Look isn't refreshing" had to know to look in two unrelated places.
+
+v1.7.91 consolidates everything under a new **Diagnostics** sidebar entry (stethoscope icon, under the System group with Software Update and About):
+
+- **Extension logs** card — Show Updater / QL preview / Thumbnail / Quick Actions log buttons + Reveal logs folder in Finder.
+- **Self-test** card — Run diagnostic self-test (5-step check from v1.7.90) + Reveal app bundle, with the inline result block.
+- **macOS Quick Look cache** card — Reset Quick Look cache (moved from Software Update → Maintenance).
+- **Quick Look not updating?** expanding troubleshooting tile (moved from the bottom of Software Update).
+
+Software Update tab is now strictly about updates (status hero, Check for Updates, Download from GitHub, auto-check toggle, frequency picker, the lastCheckStatus line). About tab is strictly credits + formats + version.
+
 ## [1.7.90] — 2026-05-20
 
 ### 🍎 macOS — drop the duplicate Rendering-Engine card + Mac-side diagnostic self-test
