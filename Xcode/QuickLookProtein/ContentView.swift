@@ -1637,6 +1637,24 @@ struct ContentView: View {
                             .buttonStyle(SecondaryPillButtonStyle())
                             .help("Open the parent of QuickLookProtein.app in Finder so you can right-click → Show Package Contents.")
                         }
+                        // v1.7.94+ Sparkle-specific verifier. The user's
+                        // recurring SUSparkleErrorDomain 4005 ("An
+                        // error occurred while launching the installer")
+                        // is typically nested-code-signing breakage or
+                        // a quarantine xattr on the framework after a
+                        // DMG drag-install — neither of which the
+                        // generic self-test catches. This button runs
+                        // codesign --verify + xattr probes on
+                        // Sparkle.framework / Updater.app / Installer
+                        // .xpc and surfaces the result inline.
+                        Button(action: runSparkleVerifier) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "sparkle")
+                                Text("Verify Sparkle components")
+                            }
+                        }
+                        .buttonStyle(SecondaryPillButtonStyle())
+                        .help("Runs codesign --verify --deep --strict on Sparkle.framework, its Updater.app, and Installer.xpc; checks for com.apple.quarantine xattr; reports the underlying cause of 'An error occurred while launching the installer' (Sparkle code 4005).")
                         if let diag = diagnosticSelfTestReport {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Last result")
@@ -2026,6 +2044,115 @@ struct ContentView: View {
     ///   4. Update log directory is writable
     ///   5. Sparkle's public EDDSA key is the production one
     /// Result is written to the panel and to updater.log.
+    /// v1.7.94+ Sparkle-specific verifier. Targets the recurring
+    /// SUSparkleErrorDomain code 4005 ("An error occurred while
+    /// launching the installer"), which the generic 5-step
+    /// self-test doesn't catch. The 4005 root causes we cover:
+    ///   - Sparkle.framework / nested code has a broken signature
+    ///     (codesign --verify --deep --strict fails)
+    ///   - The Installer.xpc service or Updater.app is missing
+    ///   - com.apple.quarantine xattr on the .app / framework
+    ///     (Gatekeeper blocks XPC service launch)
+    ///   - SUFeedURL is unreachable / not HTTPS in this build
+    private func runSparkleVerifier() {
+        var lines: [String] = []
+        let app = Bundle.main.bundleURL
+        let framework = app.appendingPathComponent("Contents/Frameworks/Sparkle.framework")
+        let updaterApp = framework.appendingPathComponent("Versions/B/Updater.app")
+        let installerXpc = framework.appendingPathComponent("Versions/B/XPCServices/Installer.xpc")
+        let downloaderXpc = framework.appendingPathComponent("Versions/B/XPCServices/Downloader.xpc")
+        let fm = FileManager.default
+
+        // 1. File existence — the killer "where Sparkle expects
+        //    to find its installer XPC" check.
+        let pieces: [(String, URL)] = [
+            ("Sparkle.framework",        framework),
+            ("Sparkle Updater.app",      updaterApp),
+            ("Installer.xpc",            installerXpc),
+            ("Downloader.xpc",           downloaderXpc),
+        ]
+        var missing: [String] = []
+        for (name, url) in pieces {
+            if !fm.fileExists(atPath: url.path) { missing.append(name) }
+        }
+        lines.append(missing.isEmpty
+            ? "1. Sparkle layout: OK (framework + Updater.app + Installer.xpc + Downloader.xpc present)"
+            : "1. Sparkle layout: MISSING — \(missing.joined(separator: ", "))")
+
+        // 2. Quarantine xattr on the main bundle or framework.
+        //    Gatekeeper enforces post-launch policy on quarantined
+        //    code; Sparkle's installer XPC fails to activate when
+        //    its framework is quarantined.
+        var quarantined: [String] = []
+        for (name, url) in [("App bundle", app),
+                             ("Sparkle.framework", framework)] {
+            if hasQuarantineXattr(at: url) { quarantined.append(name) }
+        }
+        lines.append(quarantined.isEmpty
+            ? "2. Quarantine xattr: OK (clean)"
+            : "2. Quarantine xattr: PRESENT on \(quarantined.joined(separator: ", ")) — run `xattr -dr com.apple.quarantine \(app.path)` in Terminal to clear it.")
+
+        // 3. codesign --verify --deep --strict on the main bundle
+        //    AND each Sparkle nested binary. Catches the most
+        //    common 4005 root cause: nested code that wasn't re-
+        //    signed correctly during the release pipeline.
+        for (name, url) in pieces + [("App bundle", app)] {
+            guard fm.fileExists(atPath: url.path) else { continue }
+            let result = runCodesignVerify(on: url)
+            lines.append("3. codesign \(name): \(result)")
+        }
+
+        // 4. SUFeedURL sanity check. A non-https URL (or missing
+        //    feed key) means Sparkle can't even start a check;
+        //    not the 4005 cause but a useful sanity probe.
+        if let feed = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String {
+            lines.append(feed.hasPrefix("https://")
+                ? "4. SUFeedURL: OK (\(feed))"
+                : "4. SUFeedURL: NOT HTTPS — \(feed). Sparkle 2 refuses non-HTTPS appcasts.")
+        } else {
+            lines.append("4. SUFeedURL: MISSING from Info.plist — Sparkle won't auto-check.")
+        }
+
+        let report = lines.joined(separator: "\n")
+        diagnosticSelfTestReport = report
+        Updater.logUpdateEvent("INFO", "Sparkle verifier:\n\(report)")
+    }
+
+    /// True if the URL has the com.apple.quarantine extended
+    /// attribute set. Uses xattr via Process; reading directly via
+    /// URL.resourceValues(forKeys: [.quarantinePropertiesKey]) is
+    /// the official API but only works when the value is a plist,
+    /// not a raw flag, so we shell out for reliability.
+    private func hasQuarantineXattr(at url: URL) -> Bool {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+        task.arguments = ["-p", "com.apple.quarantine", url.path]
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = Pipe()
+        do { try task.run(); task.waitUntilExit() } catch { return false }
+        return task.terminationStatus == 0
+    }
+
+    /// Run `codesign --verify --deep --strict --verbose=2` on the
+    /// given URL. Returns either "OK" or a single-line summary of
+    /// the failure (codesign writes diagnostics to stderr).
+    private func runCodesignVerify(on url: URL) -> String {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        task.arguments = ["--verify", "--deep", "--strict", "--verbose=2", url.path]
+        let out = Pipe(); let err = Pipe()
+        task.standardOutput = out
+        task.standardError  = err
+        do { try task.run(); task.waitUntilExit() } catch {
+            return "ERROR launching codesign: \(error.localizedDescription)"
+        }
+        if task.terminationStatus == 0 { return "OK" }
+        let errStr = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let firstLine = errStr.split(separator: "\n", omittingEmptySubsequences: true).first.map(String.init) ?? errStr
+        return "FAIL (exit \(task.terminationStatus)) — \(firstLine)"
+    }
+
     private func runDiagnosticSelfTest() {
         var lines: [String] = []
         let appBundle = Bundle.main.bundleURL

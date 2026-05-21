@@ -333,32 +333,98 @@ final class Updater: NSObject, ObservableObject, SPUUpdaterDelegate {
         }
     }
 
-    /// Pretty-print an NSError into a single line covering everything an
-    /// upstream bug report would want: domain, code, localizedDescription,
-    /// failureReason, recoverySuggestion, and any nested underlyingError.
-    /// Sparkle's SUError codes map to constants in
-    /// `SUErrorCode` (e.g. 4 = SUInstallationCancelledError,
-    /// 5 = SUInstallationAuthorizeLaterError, 10 = SUInstallationError,
-    /// 11 = SUInstallationWriteNoPermissionError, 51 = SULaunchToolError).
+    /// Pretty-print an NSError covering everything an upstream bug
+    /// report would want. v1.7.94+ dumps the **full userInfo dict**
+    /// + walks the entire underlyingError chain (not just one level
+    /// deep), since the user's recurring SUSparkleErrorDomain code
+    /// 4005 ("An error occurred while launching the installer") was
+    /// landing in the log with no underlying cause shown — Sparkle
+    /// puts the real reason in keys we weren't reading.
+    ///
+    /// Sparkle SUErrorCode reference:
+    /// `SUErrorCode` enums (subset of the codes most relevant here):
+    ///   1001 = SUNoUpdateError            ("You're up to date")
+    ///   4005 = SUInstallationError        (install-launcher failed)
+    ///   4006 = SUInstallationWriteNoPermissionError
+    ///   4007 = SUInstallationCancelledError
+    ///   4008 = SUInstallationAuthorizeLaterError
+    ///   4015 = SUInstallationLaunchToolError
     nonisolated private static func describe(error: Error) -> String {
-        let ns = error as NSError
         var parts: [String] = []
-        parts.append("domain=\(ns.domain)")
-        parts.append("code=\(ns.code)")
-        parts.append("desc=\"\(ns.localizedDescription)\"")
-        if let reason = ns.localizedFailureReason {
-            parts.append("reason=\"\(reason)\"")
+        var current = error as NSError
+        var depth = 0
+        // Walk underlyingError chain up to 5 deep so a cascade of
+        // wrapped errors (XPC -> launchd -> dyld) is all captured.
+        while depth < 5 {
+            let prefix = depth == 0 ? "" : "underlying[\(depth)]="
+            parts.append("\(prefix)domain=\(current.domain) code=\(current.code) desc=\"\(current.localizedDescription)\"")
+            if let reason = current.localizedFailureReason {
+                parts.append("  reason=\"\(reason)\"")
+            }
+            if let suggestion = current.localizedRecoverySuggestion {
+                parts.append("  suggestion=\"\(suggestion)\"")
+            }
+            // Dump every userInfo key we haven't already printed.
+            // Sparkle stashes the framework-internal "installerName"
+            // / "bundleIdentifier" / "downloadPath" keys here that
+            // are the actual debugging breadcrumbs.
+            let printedKeys: Set<String> = [
+                NSLocalizedDescriptionKey,
+                NSLocalizedFailureReasonErrorKey,
+                NSLocalizedRecoverySuggestionErrorKey,
+                NSUnderlyingErrorKey,
+            ]
+            let extra = current.userInfo
+                .filter { !printedKeys.contains($0.key) }
+                .sorted { $0.key < $1.key }
+            for (k, v) in extra {
+                let s = String(describing: v).replacingOccurrences(of: "\n", with: " | ")
+                let truncated = s.count > 400 ? String(s.prefix(400)) + " …" : s
+                parts.append("  userInfo[\(k)]=\(truncated)")
+            }
+            guard let next = current.userInfo[NSUnderlyingErrorKey] as? NSError else { break }
+            current = next
+            depth += 1
         }
-        if let suggestion = ns.localizedRecoverySuggestion {
-            parts.append("suggestion=\"\(suggestion)\"")
-        }
-        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
-            parts.append("underlying={domain=\(underlying.domain) code=\(underlying.code) desc=\"\(underlying.localizedDescription)\"}")
-        }
-        return parts.joined(separator: " ")
+        return parts.joined(separator: "\n  ")
     }
 
     nonisolated func updaterMayCheck(forUpdates updater: SPUUpdater) -> Bool { true }
+
+    // ============================================================
+    // v1.7.94+ install-lifecycle delegate methods
+    // ============================================================
+    //
+    // didAbortWithError gives us the *outer* failure; these hooks
+    // catch the moments right before/after Sparkle hands control to
+    // its installer XPC service. When 4005 fires, the most useful
+    // forensic data point is whether we ever got past
+    // willInstallUpdate (= installer XPC launched OK, problem is
+    // post-launch) or whether the launch itself was the failure
+    // (= 4005 fired before willInstallUpdate).
+
+    /// Fires once Sparkle has decided to install — and right before
+    /// it asks the user driver to start. If we see this in the log
+    /// but then 4005 still fires, the failure is during the install
+    /// itself, not the launcher.
+    nonisolated func updater(_ updater: SPUUpdater,
+                             willInstallUpdate item: SUAppcastItem) {
+        Self.logUpdateEvent("INFO",
+            "willInstallUpdate: version=\(item.versionString) tag=\(item.displayVersionString)")
+    }
+
+    /// Fires after Sparkle has extracted the downloaded update to
+    /// disk but before handing off to the installer. The forensic
+    /// value: if we see didExtractUpdate then `didAbortWithError
+    /// SUSparkleErrorDomain 4005`, the failure is downstream of
+    /// extraction (likely the Installer XPC service couldn't be
+    /// activated). If we never see didExtractUpdate, the failure
+    /// is in the download/integrity step instead.
+    nonisolated func updater(_ updater: SPUUpdater,
+                             didExtractUpdate item: SUAppcastItem) {
+        Self.logUpdateEvent("INFO",
+            "didExtractUpdate: extracted \(item.versionString); installer launcher next")
+    }
 
     /// Bring the update log up in the user's default text editor so they
     /// can copy-paste the failure into a bug report.  Falls back to

@@ -4,6 +4,28 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.94] — 2026-05-21
+
+### 🍎 macOS — hunt down the recurring SUSparkleErrorDomain 4005 install failure
+
+User's `updater.log` shows **`SUSparkleErrorDomain code=4005 desc="An error occurred while launching the installer"`** firing on roughly half of Sparkle install attempts, despite the v1.7.92 self-test reporting all 5 checks OK. 4005 is `SUInstallationError` — Sparkle couldn't activate its installer XPC service to launch the install — and the failure modes the generic self-test doesn't cover are: broken nested code-signing, quarantine xattr on `Sparkle.framework` after a DMG drag-install, missing `Installer.xpc` / `Updater.app` / `Downloader.xpc` from inside the framework, or a non-HTTPS feed URL.
+
+Three additions to make the next 4005 yield actionable data:
+
+1. **`describe(error:)` now dumps the full `NSError.userInfo`** + walks the `underlyingError` chain up to 5 deep (was 1). Through v1.7.93 the 4005 line had nothing useful past the canned localized description because Sparkle stashes the real reason in framework-internal `userInfo` keys (`installerName`, `bundleIdentifier`, `downloadPath`) we weren't reading. Every key now lands in `updater.log` with one indented line per entry, recursively per nested error.
+
+2. **Install-lifecycle delegate methods wired**: `updater(_:willInstallUpdate:)` + `updater(_:didExtractUpdate:)`. Together they let us bisect the failure on the next 4005:
+   - `didExtractUpdate` present in log → the .app was downloaded + unpacked OK; 4005 is in the installer-launch step (the most common case: nested code-signing or quarantine xattr)
+   - `didExtractUpdate` absent → 4005 fired before extraction; the download/integrity check itself is the failure
+
+3. **"Verify Sparkle components" button** in Diagnostics → Self-test. Four-step Sparkle-specific check (separate from the generic self-test):
+   - File layout: `Sparkle.framework` + `Versions/B/Updater.app` + `Versions/B/XPCServices/Installer.xpc` + `Versions/B/XPCServices/Downloader.xpc` all present?
+   - `com.apple.quarantine` xattr on the main app or framework? (Gatekeeper blocks XPC service activation when this is set — `xattr -dr com.apple.quarantine /Applications/QuickLookProtein.app` clears it)
+   - `codesign --verify --deep --strict --verbose=2` on each piece — catches nested-signing mismatches that the v1.7.62 explicit `--identifier` re-sign step is supposed to prevent
+   - `SUFeedURL` present + HTTPS
+
+Inline result + `updater.log` entry; one button click and you'll see exactly which sub-component is broken on the next 4005.
+
 ## [1.7.93] — 2026-05-21
 
 ### 🍎 macOS — PDBQT actually gets previewed in Quick Look
