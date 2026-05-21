@@ -6,6 +6,25 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.95</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.95</link>
+      <pubDate>Thu, 21 May 2026 03:46:07 +0000</pubDate>
+      <sparkle:version>1.7.95</sparkle:version>
+      <sparkle:shortVersionString>1.7.95</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🍎 macOS — one-click fix for the Sparkle 4005 root cause&lt;/h3&gt;
+&lt;p&gt;The v1.7.94 Sparkle verifier confirmed the recurring &lt;code&gt;SUSparkleErrorDomain code=4005&lt;/code&gt; is &lt;strong&gt;&lt;code&gt;com.apple.quarantine&lt;/code&gt; xattr on the installed app bundle&lt;/strong&gt; (and therefore on &lt;code&gt;Sparkle.framework&lt;/code&gt; inside it). macOS sometimes leaves the quarantine flag on a notarized app after a DMG drag-install — Gatekeeper then blocks Sparkle&amp;#x27;s installer XPC service from activating, and every auto-update attempt aborts with the canned &amp;quot;An error occurred while launching the installer&amp;quot; modal.&lt;/p&gt;
+&lt;p&gt;The fix is &lt;code&gt;xattr -dr com.apple.quarantine /Applications/QuickLookProtein.app&lt;/code&gt; in Terminal. Users shouldn&amp;#x27;t have to drop to the command line for this.&lt;/p&gt;
+&lt;p&gt;v1.7.95 adds a &lt;strong&gt;&amp;quot;Clear quarantine flags&amp;quot;&lt;/strong&gt; button next to &amp;quot;Verify Sparkle components&amp;quot; in Diagnostics → Self-test. It:&lt;/p&gt;
+&lt;p&gt;1. Spawns &lt;code&gt;/usr/bin/xattr -dr com.apple.quarantine&lt;/code&gt; against &lt;code&gt;Bundle.main.bundleURL&lt;/code&gt; (recursive — clears nested files including &lt;code&gt;Sparkle.framework&lt;/code&gt;).&lt;/p&gt;
+&lt;p&gt;2. Logs the action + exit status to &lt;code&gt;updater.log&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;3. Re-runs the Sparkle verifier automatically so step 2 (&amp;quot;Quarantine xattr&amp;quot;) flips from PRESENT → OK in the inline result, confirming the fix.&lt;/p&gt;
+&lt;p&gt;4. On failure (e.g. sandbox or ownership issue), falls back to printing the literal Terminal command the user can paste manually.&lt;/p&gt;
+&lt;p&gt;After clearing, the next Sparkle update should install cleanly — no more 4005 modal.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.95"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.95/QuickLookProtein-1.7.95.zip" sparkle:edSignature="qUEB2i7XekmdWCPXIzQigiqSwGCcjrzfRyK3MgXhYxiVb07m/QDVi7N4Ej/KtAQXeVzy669ujRUZ4o5Zku7nDg==" length="4604989" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.94</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.94</link>
       <pubDate>Thu, 21 May 2026 03:05:24 +0000</pubDate>
