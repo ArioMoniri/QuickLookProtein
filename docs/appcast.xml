@@ -6,6 +6,24 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.96</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.96</link>
+      <pubDate>Thu, 21 May 2026 03:57:42 +0000</pubDate>
+      <sparkle:version>1.7.96</sparkle:version>
+      <sparkle:shortVersionString>1.7.96</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🍎 macOS — Sparkle 4005 part 2: spctl + stapler + cache state&lt;/h3&gt;
+&lt;p&gt;After v1.7.95&amp;#x27;s quarantine-clear button fixed the obvious case, the user reported 4005 still firing with quarantine confirmed clean and every existing check OK. Sparkle constructs the 4005 NSError thin (no underlying error chain, no extra userInfo keys), so the next round of diagnostics has to come from outside the error object itself.&lt;/p&gt;
+&lt;p&gt;Three new checks added to the Sparkle verifier:&lt;/p&gt;
+&lt;p&gt;5. &lt;strong&gt;&lt;code&gt;spctl --assess --verbose=4 --type execute&lt;/code&gt;&lt;/strong&gt; — Gatekeeper&amp;#x27;s runtime assessment, stricter than &lt;code&gt;codesign --verify&lt;/code&gt;. Validates the notarization ticket + signing chain against Apple&amp;#x27;s online database. A 4005 with everything else OK is often caused by spctl failing.&lt;/p&gt;
+&lt;p&gt;6. &lt;strong&gt;&lt;code&gt;xcrun stapler validate&lt;/code&gt;&lt;/strong&gt; — checks whether the notarization ticket is *stapled* (embedded) into the bundle. When it isn&amp;#x27;t, macOS phones Apple on every Sparkle XPC launch; intermittent network or Apple-side issues then cause sporadic 4005s. release.yml already calls &lt;code&gt;xcrun stapler staple&lt;/code&gt; on both the .app and the .dmg, but this verifies the install actually preserved it.&lt;/p&gt;
+&lt;p&gt;7. &lt;strong&gt;Stale Sparkle cache state&lt;/strong&gt; — checks for &lt;code&gt;~/Library/Caches/Sparkle/&lt;/code&gt; and &lt;code&gt;~/Library/Caches/&amp;lt;bundleID&amp;gt;/Sparkle/&lt;/code&gt;. After a failed install, Sparkle can leave partial download / lock files behind that subsequent installs reuse and fail on.&lt;/p&gt;
+&lt;p&gt;New &lt;strong&gt;&amp;quot;Clear Sparkle cache&amp;quot;&lt;/strong&gt; button next to &amp;quot;Clear quarantine flags&amp;quot; removes both cache dirs and re-runs the verifier so step 7 flips to &amp;quot;clean&amp;quot; inline. Together with the v1.7.95 quarantine clear, this is the second of three known root causes; spctl + stapler are the third.&lt;/p&gt;
+&lt;p&gt;Plus a shared &lt;code&gt;runShellTool(path:args:)&lt;/code&gt; helper to consolidate the four Process-spawning sites (xattr, codesign, spctl, stapler) into one well-tested code path.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.96"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.96/QuickLookProtein-1.7.96.zip" sparkle:edSignature="mWd6jwa04SlLY2cglqFj54ANhvon1n5gwLBQG+IWErTZ3YkpNlzASIJ7w4ahhwZxmsh7xT3/84qfbKJoJHocDA==" length="4612835" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.95</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.95</link>
       <pubDate>Thu, 21 May 2026 03:46:07 +0000</pubDate>
