@@ -6,6 +6,25 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.93</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.93</link>
+      <pubDate>Thu, 21 May 2026 02:33:21 +0000</pubDate>
+      <sparkle:version>1.7.93</sparkle:version>
+      <sparkle:shortVersionString>1.7.93</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🍎 macOS — PDBQT actually gets previewed in Quick Look&lt;/h3&gt;
+&lt;p&gt;PDBQT (AutoDock / Vina docking output) has been routed through every parser, renderer, and Quick Action since 1.7.30, and Windows already registers &lt;code&gt;.pdbqt&lt;/code&gt; with the shell. On macOS though, the host &lt;code&gt;Info.plist&lt;/code&gt; only declared &lt;code&gt;pdb&lt;/code&gt; and &lt;code&gt;ent&lt;/code&gt; as filename extensions for &lt;code&gt;com.ariomoniri.QuickLookProtein.pdb&lt;/code&gt;. macOS&amp;#x27;s UTI resolver therefore never gave &lt;code&gt;.pdbqt&lt;/code&gt; a content-type that matched our &lt;code&gt;QLSupportedContentTypes&lt;/code&gt;, so Quick Look fell back to its generic preview — no 3Dmol render at all on Space-bar.&lt;/p&gt;
+&lt;p&gt;v1.7.93 fixes this by declaring a separate UTI:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;New &lt;code&gt;com.ariomoniri.QuickLookProtein.pdbqt&lt;/code&gt; in &lt;code&gt;QuickLookProtein/Info.plist&lt;/code&gt; (&lt;code&gt;UTExportedTypeDeclarations&lt;/code&gt;) — &lt;code&gt;public.data&lt;/code&gt; conformant, claims the &lt;code&gt;pdbqt&lt;/code&gt; extension and &lt;code&gt;chemical/x-pdbqt&lt;/code&gt; MIME, description &amp;quot;AutoDock / Vina PDBQT docking file&amp;quot;.&lt;/li&gt;
+&lt;li&gt;Added to the &lt;code&gt;QLSupportedContentTypes&lt;/code&gt; array in &lt;code&gt;QLExtension/Info.plist&lt;/code&gt;, the thumbnail provider&amp;#x27;s content-type list in &lt;code&gt;QLThumbnail/Info.plist&lt;/code&gt;, and the &lt;code&gt;MDImporter/Info.plist&lt;/code&gt; Spotlight imports.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Kept as its own UTI rather than tacking &lt;code&gt;pdbqt&lt;/code&gt; onto the PDB UTI&amp;#x27;s tag list — same pattern &lt;code&gt;mmcif&lt;/code&gt; uses w.r.t. &lt;code&gt;cif&lt;/code&gt;, so docking-aware tools that look for &lt;code&gt;.pdbqt&lt;/code&gt; find a distinct type identifier instead of being told &amp;quot;this is plain PDB&amp;quot;. The render and atom-style routing still bridges to the PDB code path (PDBQT is structurally a PDB superset), so no rendering changes needed.&lt;/p&gt;
+&lt;p&gt;After updating, &lt;code&gt;.pdbqt&lt;/code&gt; files Space-bar through the same interactive 3Dmol preview as &lt;code&gt;.pdb&lt;/code&gt; files, with Icon-view thumbnails and Spotlight indexing both lighting up. Windows side was already working — no changes there.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.93"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.93/QuickLookProtein-1.7.93.zip" sparkle:edSignature="RfDG36eLBpbIFJpjfVHDz8iGW5+xR5/bUM8or89a+Mg8wJan/+Lh2+aswO+b2jizoPonQgTeyoYj59QTwVEPDQ==" length="4580216" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.92</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.92</link>
       <pubDate>Wed, 20 May 2026 11:26:11 +0000</pubDate>
