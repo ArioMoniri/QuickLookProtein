@@ -6,6 +6,29 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.94</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.94</link>
+      <pubDate>Thu, 21 May 2026 03:05:24 +0000</pubDate>
+      <sparkle:version>1.7.94</sparkle:version>
+      <sparkle:shortVersionString>1.7.94</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🍎 macOS — hunt down the recurring SUSparkleErrorDomain 4005 install failure&lt;/h3&gt;
+&lt;p&gt;User&amp;#x27;s &lt;code&gt;updater.log&lt;/code&gt; shows &lt;strong&gt;&lt;code&gt;SUSparkleErrorDomain code=4005 desc=&amp;quot;An error occurred while launching the installer&amp;quot;&lt;/code&gt;&lt;/strong&gt; firing on roughly half of Sparkle install attempts, despite the v1.7.92 self-test reporting all 5 checks OK. 4005 is &lt;code&gt;SUInstallationError&lt;/code&gt; — Sparkle couldn&amp;#x27;t activate its installer XPC service to launch the install — and the failure modes the generic self-test doesn&amp;#x27;t cover are: broken nested code-signing, quarantine xattr on &lt;code&gt;Sparkle.framework&lt;/code&gt; after a DMG drag-install, missing &lt;code&gt;Installer.xpc&lt;/code&gt; / &lt;code&gt;Updater.app&lt;/code&gt; / &lt;code&gt;Downloader.xpc&lt;/code&gt; from inside the framework, or a non-HTTPS feed URL.&lt;/p&gt;
+&lt;p&gt;Three additions to make the next 4005 yield actionable data:&lt;/p&gt;
+&lt;p&gt;1. &lt;strong&gt;&lt;code&gt;describe(error:)&lt;/code&gt; now dumps the full &lt;code&gt;NSError.userInfo&lt;/code&gt;&lt;/strong&gt; + walks the &lt;code&gt;underlyingError&lt;/code&gt; chain up to 5 deep (was 1). Through v1.7.93 the 4005 line had nothing useful past the canned localized description because Sparkle stashes the real reason in framework-internal &lt;code&gt;userInfo&lt;/code&gt; keys (&lt;code&gt;installerName&lt;/code&gt;, &lt;code&gt;bundleIdentifier&lt;/code&gt;, &lt;code&gt;downloadPath&lt;/code&gt;) we weren&amp;#x27;t reading. Every key now lands in &lt;code&gt;updater.log&lt;/code&gt; with one indented line per entry, recursively per nested error.&lt;/p&gt;
+&lt;p&gt;2. &lt;strong&gt;Install-lifecycle delegate methods wired&lt;/strong&gt;: &lt;code&gt;updater(_:willInstallUpdate:)&lt;/code&gt; + &lt;code&gt;updater(_:didExtractUpdate:)&lt;/code&gt;. Together they let us bisect the failure on the next 4005:&lt;/p&gt;
+&lt;p&gt;   - &lt;code&gt;didExtractUpdate&lt;/code&gt; present in log → the .app was downloaded + unpacked OK; 4005 is in the installer-launch step (the most common case: nested code-signing or quarantine xattr)&lt;/p&gt;
+&lt;p&gt;   - &lt;code&gt;didExtractUpdate&lt;/code&gt; absent → 4005 fired before extraction; the download/integrity check itself is the failure&lt;/p&gt;
+&lt;p&gt;3. &lt;strong&gt;&amp;quot;Verify Sparkle components&amp;quot; button&lt;/strong&gt; in Diagnostics → Self-test. Four-step Sparkle-specific check (separate from the generic self-test):&lt;/p&gt;
+&lt;p&gt;   - File layout: &lt;code&gt;Sparkle.framework&lt;/code&gt; + &lt;code&gt;Versions/B/Updater.app&lt;/code&gt; + &lt;code&gt;Versions/B/XPCServices/Installer.xpc&lt;/code&gt; + &lt;code&gt;Versions/B/XPCServices/Downloader.xpc&lt;/code&gt; all present?&lt;/p&gt;
+&lt;p&gt;   - &lt;code&gt;com.apple.quarantine&lt;/code&gt; xattr on the main app or framework? (Gatekeeper blocks XPC service activation when this is set — &lt;code&gt;xattr -dr com.apple.quarantine /Applications/QuickLookProtein.app&lt;/code&gt; clears it)&lt;/p&gt;
+&lt;p&gt;   - &lt;code&gt;codesign --verify --deep --strict --verbose=2&lt;/code&gt; on each piece — catches nested-signing mismatches that the v1.7.62 explicit &lt;code&gt;--identifier&lt;/code&gt; re-sign step is supposed to prevent&lt;/p&gt;
+&lt;p&gt;   - &lt;code&gt;SUFeedURL&lt;/code&gt; present + HTTPS&lt;/p&gt;
+&lt;p&gt;Inline result + &lt;code&gt;updater.log&lt;/code&gt; entry; one button click and you&amp;#x27;ll see exactly which sub-component is broken on the next 4005.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.94"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.94/QuickLookProtein-1.7.94.zip" sparkle:edSignature="lsncn7qCWOjQp/RIiIyt5oSjNzpyTd6c4Gur39B1LKzGlczCxBN9frxDy/E0WurpapFfDC8ujnGv5zgs/Pw0AQ==" length="4601844" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.93</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.93</link>
       <pubDate>Thu, 21 May 2026 02:33:21 +0000</pubDate>
