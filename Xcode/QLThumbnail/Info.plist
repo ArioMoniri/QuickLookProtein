@@ -36,6 +36,7 @@
 				<string>com.revvity.external.cif</string>
 				<string>com.tripos.mol2</string>
 				<string>com.ariomoniri.QuickLookProtein.pdb</string>
+				<string>com.ariomoniri.QuickLookProtein.pdbqt</string>
 				<string>com.ariomoniri.QuickLookProtein.cif</string>
 				<string>com.ariomoniri.QuickLookProtein.mmcif</string>
 				<string>com.ariomoniri.QuickLookProtein.sdf</string>

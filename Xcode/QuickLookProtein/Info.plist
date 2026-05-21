@@ -108,6 +108,34 @@
 				</array>
 			</dict>
 		</dict>
+		<!-- v1.7.93+ separate UTI for AutoDock/Vina PDBQT files.
+		     Structurally a PDB superset (extra columns for partial
+		     charge + AutoDock atom type, plus ROOT/BRANCH/TORSDOF
+		     docking records), but kept as its own UTI - same pattern
+		     mmcif uses w.r.t. cif - so docking-aware tools that look
+		     for `.pdbqt` get the right type identifier instead of
+		     being told 'this is a plain PDB'. -->
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.ariomoniri.QuickLookProtein.pdbqt</string>
+			<key>UTTypeDescription</key>
+			<string>AutoDock / Vina PDBQT docking file</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>pdbqt</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>chemical/x-pdbqt</string>
+				</array>
+			</dict>
+		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
 			<string>com.ariomoniri.QuickLookProtein.cif</string>

@@ -4,6 +4,21 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.93] — 2026-05-21
+
+### 🍎 macOS — PDBQT actually gets previewed in Quick Look
+
+PDBQT (AutoDock / Vina docking output) has been routed through every parser, renderer, and Quick Action since 1.7.30, and Windows already registers `.pdbqt` with the shell. On macOS though, the host `Info.plist` only declared `pdb` and `ent` as filename extensions for `com.ariomoniri.QuickLookProtein.pdb`. macOS's UTI resolver therefore never gave `.pdbqt` a content-type that matched our `QLSupportedContentTypes`, so Quick Look fell back to its generic preview — no 3Dmol render at all on Space-bar.
+
+v1.7.93 fixes this by declaring a separate UTI:
+
+- New `com.ariomoniri.QuickLookProtein.pdbqt` in `QuickLookProtein/Info.plist` (`UTExportedTypeDeclarations`) — `public.data` conformant, claims the `pdbqt` extension and `chemical/x-pdbqt` MIME, description "AutoDock / Vina PDBQT docking file".
+- Added to the `QLSupportedContentTypes` array in `QLExtension/Info.plist`, the thumbnail provider's content-type list in `QLThumbnail/Info.plist`, and the `MDImporter/Info.plist` Spotlight imports.
+
+Kept as its own UTI rather than tacking `pdbqt` onto the PDB UTI's tag list — same pattern `mmcif` uses w.r.t. `cif`, so docking-aware tools that look for `.pdbqt` find a distinct type identifier instead of being told "this is plain PDB". The render and atom-style routing still bridges to the PDB code path (PDBQT is structurally a PDB superset), so no rendering changes needed.
+
+After updating, `.pdbqt` files Space-bar through the same interactive 3Dmol preview as `.pdb` files, with Icon-view thumbnails and Spotlight indexing both lighting up. Windows side was already working — no changes there.
+
 ## [1.7.92] — 2026-05-20
 
 ### 🍎 macOS — fix two false negatives in the diagnostic self-test
