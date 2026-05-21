@@ -1675,6 +1675,21 @@ struct ContentView: View {
                             .buttonStyle(SecondaryPillButtonStyle())
                             .help("Runs `xattr -dr com.apple.quarantine` on the installed app bundle. Fixes the most common cause of Sparkle's 'An error occurred while launching the installer' error (code 4005) when the bundle carries a quarantine flag from a previous DMG drag-install. Re-runs the verifier after clearing so you can confirm.")
                         }
+                        // v1.7.96+ Clear Sparkle cache button.
+                        // After quarantine + signing + everything
+                        // else checks OK and 4005 STILL fires, the
+                        // most likely remaining cause is stale
+                        // Sparkle state from previous failed
+                        // attempts in ~/Library/Caches/Sparkle/
+                        // and the per-bundle Sparkle subdir.
+                        Button(action: clearSparkleCache) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "trash.circle")
+                                Text("Clear Sparkle cache")
+                            }
+                        }
+                        .buttonStyle(SecondaryPillButtonStyle())
+                        .help("Removes ~/Library/Caches/Sparkle and the per-bundle Sparkle cache subdir. Run if 4005 persists after Clear quarantine flags — a previous failed install can leave partial download / lock state that subsequent installs reuse and fail on.")
                         if let diag = diagnosticSelfTestReport {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Last result")
@@ -2133,9 +2148,115 @@ struct ContentView: View {
             lines.append("4. SUFeedURL: MISSING from Info.plist — Sparkle won't auto-check.")
         }
 
+        // 5. Gatekeeper assessment (v1.7.96+). codesign --verify
+        //    passes when the signature is structurally valid;
+        //    `spctl --assess` is the stronger check Gatekeeper
+        //    uses at runtime (validates notarization + signing
+        //    chain against Apple's online database). A 4005 with
+        //    everything else OK is often caused by spctl failing.
+        let spctl = runShellTool(path: "/usr/sbin/spctl",
+                                 args: ["--assess", "--verbose=4",
+                                        "--type", "execute", app.path])
+        lines.append(spctl.status == 0
+            ? "5. spctl --assess: OK (\(spctl.firstLine))"
+            : "5. spctl --assess: FAIL (exit \(spctl.status)) — \(spctl.firstLine)")
+
+        // 6. Notarization ticket stapled? `stapler validate`
+        //    returns "The validate action worked!" when the
+        //    notarization ticket is embedded in the bundle. If
+        //    it's NOT stapled, macOS has to phone Apple's
+        //    notarization service on every Sparkle XPC launch —
+        //    intermittent network or Apple-side issues then cause
+        //    sporadic 4005s.
+        let stapler = runShellTool(path: "/usr/bin/stapler",
+                                   args: ["validate", app.path])
+        lines.append(stapler.status == 0
+            ? "6. Notarization staple: OK"
+            : "6. Notarization staple: NOT STAPLED (exit \(stapler.status)) — Gatekeeper phones home on every install; intermittent failures cause 4005. Fix in release.yml's notarize step (add `xcrun stapler staple` after notarize succeeds).")
+
+        // 7. Sparkle's local cache state. After a failed install,
+        //    Sparkle can leave partial download / lock files in
+        //    ~/Library/Caches/Sparkle/ and ~/Library/Caches/
+        //    com.ariomoniri.QuickLookProtein/Sparkle/. Subsequent
+        //    installs that reuse the stale state then 4005.
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.ariomoniri.QuickLookProtein"
+        let cacheCandidates = [
+            fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Sparkle", isDirectory: true),
+            fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("\(bundleID)/Sparkle", isDirectory: true),
+        ]
+        let stale = cacheCandidates.filter { fm.fileExists(atPath: $0.path) }
+        lines.append(stale.isEmpty
+            ? "7. Sparkle cache: clean (no stale state)"
+            : "7. Sparkle cache: \(stale.count) state dir(s) present — click 'Clear Sparkle cache' if 4005 persists. Paths: \(stale.map { $0.path }.joined(separator: ", "))")
+
         let report = lines.joined(separator: "\n")
         diagnosticSelfTestReport = report
         Updater.logUpdateEvent("INFO", "Sparkle verifier:\n\(report)")
+    }
+
+    /// v1.7.96+ generic shell tool runner with stdout + stderr +
+    /// exit-status capture. We've grown enough one-off Process()
+    /// callers (xattr, codesign, spctl, stapler) that a shared
+    /// helper keeps them DRY.
+    private func runShellTool(path: String, args: [String]) -> (status: Int32, firstLine: String) {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: path)
+        task.arguments = args
+        let out = Pipe(); let err = Pipe()
+        task.standardOutput = out
+        task.standardError  = err
+        do { try task.run(); task.waitUntilExit() } catch {
+            return (-1, "ERROR launching \(path): \(error.localizedDescription)")
+        }
+        // Most diagnostic tools we care about write their headline
+        // to stderr (codesign, spctl). Fall through to stdout if
+        // stderr is empty.
+        let errStr = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let outStr = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let combined = errStr.isEmpty ? outStr : errStr
+        let firstLine = combined
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .first
+            .map(String.init) ?? ""
+        return (task.terminationStatus, firstLine)
+    }
+
+    /// v1.7.96+ Clear Sparkle's local cache state. Removes
+    /// ~/Library/Caches/Sparkle and ~/Library/Caches/<bundleID>/
+    /// Sparkle. Targets the failure mode where a previous failed
+    /// install leaves partial state that subsequent installs
+    /// reuse and fail on.
+    private func clearSparkleCache() {
+        let fm = FileManager.default
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.ariomoniri.QuickLookProtein"
+        let cacheDir = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let targets = [
+            cacheDir.appendingPathComponent("Sparkle", isDirectory: true),
+            cacheDir.appendingPathComponent("\(bundleID)/Sparkle", isDirectory: true),
+            cacheDir.appendingPathComponent(bundleID, isDirectory: true)
+                .appendingPathComponent("Sparkle", isDirectory: true),
+        ]
+        var removed: [String] = []
+        var failed: [String] = []
+        for t in targets {
+            guard fm.fileExists(atPath: t.path) else { continue }
+            do { try fm.removeItem(at: t); removed.append(t.lastPathComponent) }
+            catch { failed.append("\(t.path): \(error.localizedDescription)") }
+        }
+        let report: String
+        if removed.isEmpty && failed.isEmpty {
+            report = "Sparkle cache was already clean (nothing to remove)."
+        } else if failed.isEmpty {
+            report = "Cleared Sparkle cache:\n  \(removed.joined(separator: "\n  "))\n\nTry 'Check for Updates' again — if 4005 persists, the cause is upstream (notarization staple or signing requirement)."
+        } else {
+            report = "Removed \(removed.count); failed \(failed.count):\n\(failed.joined(separator: "\n"))"
+        }
+        diagnosticSelfTestReport = report
+        Updater.logUpdateEvent("INFO", "Cleared Sparkle cache: removed=\(removed) failed=\(failed)")
+        // Re-run the verifier so step 7 confirms the cleanup.
+        runSparkleVerifier()
     }
 
     /// v1.7.95+ one-click quarantine-flag clear. The user's

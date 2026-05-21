@@ -4,6 +4,22 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.96] — 2026-05-21
+
+### 🍎 macOS — Sparkle 4005 part 2: spctl + stapler + cache state
+
+After v1.7.95's quarantine-clear button fixed the obvious case, the user reported 4005 still firing with quarantine confirmed clean and every existing check OK. Sparkle constructs the 4005 NSError thin (no underlying error chain, no extra userInfo keys), so the next round of diagnostics has to come from outside the error object itself.
+
+Three new checks added to the Sparkle verifier:
+
+5. **`spctl --assess --verbose=4 --type execute`** — Gatekeeper's runtime assessment, stricter than `codesign --verify`. Validates the notarization ticket + signing chain against Apple's online database. A 4005 with everything else OK is often caused by spctl failing.
+6. **`xcrun stapler validate`** — checks whether the notarization ticket is *stapled* (embedded) into the bundle. When it isn't, macOS phones Apple on every Sparkle XPC launch; intermittent network or Apple-side issues then cause sporadic 4005s. release.yml already calls `xcrun stapler staple` on both the .app and the .dmg, but this verifies the install actually preserved it.
+7. **Stale Sparkle cache state** — checks for `~/Library/Caches/Sparkle/` and `~/Library/Caches/<bundleID>/Sparkle/`. After a failed install, Sparkle can leave partial download / lock files behind that subsequent installs reuse and fail on.
+
+New **"Clear Sparkle cache"** button next to "Clear quarantine flags" removes both cache dirs and re-runs the verifier so step 7 flips to "clean" inline. Together with the v1.7.95 quarantine clear, this is the second of three known root causes; spctl + stapler are the third.
+
+Plus a shared `runShellTool(path:args:)` helper to consolidate the four Process-spawning sites (xattr, codesign, spctl, stapler) into one well-tested code path.
+
 ## [1.7.95] — 2026-05-21
 
 ### 🍎 macOS — one-click fix for the Sparkle 4005 root cause
