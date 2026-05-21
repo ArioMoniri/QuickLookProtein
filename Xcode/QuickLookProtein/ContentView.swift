@@ -1647,14 +1647,34 @@ struct ContentView: View {
                         // codesign --verify + xattr probes on
                         // Sparkle.framework / Updater.app / Installer
                         // .xpc and surfaces the result inline.
-                        Button(action: runSparkleVerifier) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "sparkle")
-                                Text("Verify Sparkle components")
+                        HStack(spacing: 8) {
+                            Button(action: runSparkleVerifier) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "sparkle")
+                                    Text("Verify Sparkle components")
+                                }
                             }
+                            .buttonStyle(SecondaryPillButtonStyle())
+                            .help("Runs codesign --verify --deep --strict on Sparkle.framework, its Updater.app, and Installer.xpc; checks for com.apple.quarantine xattr; reports the underlying cause of 'An error occurred while launching the installer' (Sparkle code 4005).")
+
+                            // v1.7.95+ one-click quarantine clear.
+                            // Real users hit this every time they
+                            // do a DMG drag-install: macOS adds the
+                            // com.apple.quarantine xattr and
+                            // sometimes doesn't strip it on first
+                            // launch of a notarized app, which
+                            // blocks Sparkle's installer XPC
+                            // service from activating
+                            // (SUSparkleErrorDomain 4005).
+                            Button(action: clearQuarantineFlags) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "lock.shield")
+                                    Text("Clear quarantine flags")
+                                }
+                            }
+                            .buttonStyle(SecondaryPillButtonStyle())
+                            .help("Runs `xattr -dr com.apple.quarantine` on the installed app bundle. Fixes the most common cause of Sparkle's 'An error occurred while launching the installer' error (code 4005) when the bundle carries a quarantine flag from a previous DMG drag-install. Re-runs the verifier after clearing so you can confirm.")
                         }
-                        .buttonStyle(SecondaryPillButtonStyle())
-                        .help("Runs codesign --verify --deep --strict on Sparkle.framework, its Updater.app, and Installer.xpc; checks for com.apple.quarantine xattr; reports the underlying cause of 'An error occurred while launching the installer' (Sparkle code 4005).")
                         if let diag = diagnosticSelfTestReport {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Last result")
@@ -2116,6 +2136,45 @@ struct ContentView: View {
         let report = lines.joined(separator: "\n")
         diagnosticSelfTestReport = report
         Updater.logUpdateEvent("INFO", "Sparkle verifier:\n\(report)")
+    }
+
+    /// v1.7.95+ one-click quarantine-flag clear. The user's
+    /// recurring SUSparkleErrorDomain 4005 was traced (via the
+    /// v1.7.94 verifier) to com.apple.quarantine being present on
+    /// the .app bundle and Sparkle.framework — Gatekeeper blocks
+    /// Sparkle's installer XPC service from activating while the
+    /// framework is quarantined. We shell out to `xattr -dr` on
+    /// the main app's bundle URL (which strips recursively from
+    /// every nested file including the framework). After the
+    /// strip, we re-run runSparkleVerifier() so the user sees the
+    /// fix landed without needing to click anything else.
+    private func clearQuarantineFlags() {
+        let app = Bundle.main.bundleURL
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+        task.arguments = ["-dr", "com.apple.quarantine", app.path]
+        let err = Pipe()
+        task.standardError = err
+        var status: Int32 = -1
+        do {
+            try task.run()
+            task.waitUntilExit()
+            status = task.terminationStatus
+        } catch {
+            diagnosticSelfTestReport = "Clearing quarantine failed: \(error.localizedDescription)\n\nFall back to Terminal: xattr -dr com.apple.quarantine \(app.path)"
+            return
+        }
+        if status != 0 {
+            let stderr = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            diagnosticSelfTestReport = "xattr exit \(status). stderr:\n\(stderr)\n\nFall back to Terminal: xattr -dr com.apple.quarantine \(app.path)"
+            return
+        }
+        // Re-run the verifier so the user sees an immediate
+        // confirmation that the quarantine is gone (and signing
+        // is still OK — `xattr -dr` doesn't touch signatures, but
+        // running the verifier again makes the success visible).
+        Updater.logUpdateEvent("INFO", "Cleared com.apple.quarantine xattr on \(app.path)")
+        runSparkleVerifier()
     }
 
     /// True if the URL has the com.apple.quarantine extended

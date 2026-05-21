@@ -4,6 +4,23 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.95] — 2026-05-21
+
+### 🍎 macOS — one-click fix for the Sparkle 4005 root cause
+
+The v1.7.94 Sparkle verifier confirmed the recurring `SUSparkleErrorDomain code=4005` is **`com.apple.quarantine` xattr on the installed app bundle** (and therefore on `Sparkle.framework` inside it). macOS sometimes leaves the quarantine flag on a notarized app after a DMG drag-install — Gatekeeper then blocks Sparkle's installer XPC service from activating, and every auto-update attempt aborts with the canned "An error occurred while launching the installer" modal.
+
+The fix is `xattr -dr com.apple.quarantine /Applications/QuickLookProtein.app` in Terminal. Users shouldn't have to drop to the command line for this.
+
+v1.7.95 adds a **"Clear quarantine flags"** button next to "Verify Sparkle components" in Diagnostics → Self-test. It:
+
+1. Spawns `/usr/bin/xattr -dr com.apple.quarantine` against `Bundle.main.bundleURL` (recursive — clears nested files including `Sparkle.framework`).
+2. Logs the action + exit status to `updater.log`.
+3. Re-runs the Sparkle verifier automatically so step 2 ("Quarantine xattr") flips from PRESENT → OK in the inline result, confirming the fix.
+4. On failure (e.g. sandbox or ownership issue), falls back to printing the literal Terminal command the user can paste manually.
+
+After clearing, the next Sparkle update should install cleanly — no more 4005 modal.
+
 ## [1.7.94] — 2026-05-21
 
 ### 🍎 macOS — hunt down the recurring SUSparkleErrorDomain 4005 install failure
