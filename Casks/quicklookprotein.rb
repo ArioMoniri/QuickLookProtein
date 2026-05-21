@@ -20,8 +20,8 @@
 # for hashing here.
 
 cask "quicklookprotein" do
-  version "1.7.94"
-  sha256 "da3c2d3b33f28aeab812d1be52842224577a8bfd6dc581d79153d83237ed93dd"
+  version "1.7.95"
+  sha256 "52ce3602994c9800ed84a9a72d4b8e8ad2ac6a8955c31c5e062789f8ee2e6dac"
 
   url "https://github.com/ArioMoniri/QuickLookProtein/releases/download/v#{version}/QuickLookProtein-#{version}.dmg",
       verified: "github.com/ArioMoniri/QuickLookProtein/"
