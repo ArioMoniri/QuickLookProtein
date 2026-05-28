@@ -898,7 +898,11 @@ public partial class MainWindow : Window
                     if (root == null) continue;
                     foreach (var name in root.GetSubKeyNames())
                     {
-                        if (!name.Contains("QuickLook", StringComparison.OrdinalIgnoreCase)) continue;
+                        // string.Contains(string, StringComparison) is .NET
+                        // Core 2.1+ only; we target net472. IndexOf has
+                        // had the StringComparison overload since .NET
+                        // Framework 2.0, so route through that.
+                        if (name.IndexOf("QuickLook", StringComparison.OrdinalIgnoreCase) < 0) continue;
                         using var sk = root.OpenSubKey(name);
                         if (sk?.GetValue("InstallLocation") is string loc &&
                             !string.IsNullOrWhiteSpace(loc))

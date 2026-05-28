@@ -2474,6 +2474,10 @@ struct ContentView: View {
             lines.append("6. Open-at-Login: macOS 12 and earlier — uses legacy LSSharedFileList; toggle in System Settings → Users & Groups → Login Items.")
         }
 
+        let report = lines.joined(separator: "\n")
+        diagnosticSelfTestReport = report
+        Updater.logUpdateEvent("INFO", "Diagnostic self-test:\n\(report)")
+    }
 
     /// Middle card — original author + extender credits, repo link, and a tip
     /// row. Lighter visual weight than the updates card.
