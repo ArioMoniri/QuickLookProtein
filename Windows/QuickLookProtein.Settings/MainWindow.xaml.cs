@@ -181,7 +181,20 @@ public partial class MainWindow : Window
         // state.  Reads at load time so the checkbox is correct
         // even if QL-Win's own tray menu (or another tool) flipped
         // the registry between Settings-app sessions.
+        // v1.7.97+: when QuickLook is installed from the Microsoft
+        // Store, HKCU\Run is the wrong place to toggle startup
+        // (the Store version uses its app-manifest startup entry).
+        // Disable the checkbox + tooltip-explain rather than letting
+        // the user toggle it and hit a FileNotFoundException.
         LaunchAtStartupCheck.IsChecked = IsLaunchAtStartupEnabled();
+        if (FindQuickLookExe() == null && IsStoreQuickLookInstalled())
+        {
+            LaunchAtStartupCheck.IsEnabled = false;
+            LaunchAtStartupCheck.ToolTip =
+                "QuickLook was installed from the Microsoft Store and manages its own startup. " +
+                "Toggle it in Windows Settings → Apps → Startup. The Store version auto-starts " +
+                "by default — you don't need this checkbox.";
+        }
 
         // Updates card (1.7.77+). Show the current installed
         // version unconditionally; auto-check at launch is opt-in
@@ -831,6 +844,39 @@ public partial class MainWindow : Window
         return null;
     }
 
+    /// v1.7.97+ detect a Microsoft Store install of QuickLook.
+    /// The Store version lives under %ProgramFiles%\WindowsApps\
+    /// QL-Win.QuickLook_<ver>_<arch>__<publisher>\ and FindQuickLookExe
+    /// (which probes the legacy install paths) can't see it.
+    /// Used by the Launch-at-startup toggle so we can tell the
+    /// user "the Store app manages its own startup; toggle in
+    /// Settings → Apps → Startup" instead of erroring with
+    /// "QuickLook.exe not found".
+    private static bool IsStoreQuickLookInstalled()
+    {
+        try
+        {
+            var wapps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                                     "WindowsApps");
+            if (!Directory.Exists(wapps)) return false;
+            // Pattern: QL-Win.QuickLook_* — Get-AppxPackage would be
+            // cleaner but requires PowerShell. A simple directory
+            // probe with the standard pattern is enough here.
+            var matches = Directory.EnumerateDirectories(wapps, "*QuickLook*")
+                .Take(3)
+                .ToList();
+            return matches.Count > 0;
+        }
+        catch
+        {
+            // %ProgramFiles%\WindowsApps is normally NOT enumerable
+            // by non-admin users (the directory ACL hides it). If
+            // we can't enumerate, fall back to "process running"
+            // which we can always check.
+            return System.Diagnostics.Process.GetProcessesByName("QuickLook").Any();
+        }
+    }
+
     private static bool IsLaunchAtStartupEnabled()
     {
         try
@@ -847,8 +893,31 @@ public partial class MainWindow : Window
             ?? throw new InvalidOperationException("Could not open HKCU\\...\\Run for writing");
         if (enabled)
         {
-            var exe = FindQuickLookExe()
-                ?? throw new FileNotFoundException("QuickLook.exe not found in any standard install path; reinstall QuickLookProtein-Setup.exe.");
+            var exe = FindQuickLookExe();
+            if (exe == null)
+            {
+                // v1.7.97+ Store-version path. The Microsoft Store
+                // QuickLook is installed under WindowsApps and
+                // FindQuickLookExe can't see it (we deliberately
+                // don't probe there because non-admin users can't
+                // enumerate the directory anyway). The Store app
+                // also manages its own startup via the app manifest
+                // — the Windows Settings → Apps → Startup panel is
+                // the canonical place to toggle it, not HKCU\Run.
+                // We treat this as "already managed" rather than
+                // throwing FileNotFoundException.
+                if (IsStoreQuickLookInstalled())
+                {
+                    throw new InvalidOperationException(
+                        "QuickLook was installed from the Microsoft Store and manages " +
+                        "its own startup. Toggle it in Windows Settings → Apps → Startup " +
+                        "(search for 'QuickLook'). The Microsoft Store version already " +
+                        "auto-starts by default.");
+                }
+                throw new FileNotFoundException(
+                    "QuickLook.exe not found in any standard install path; reinstall " +
+                    "QuickLookProtein-Setup.exe, or install QuickLook from the Microsoft Store.");
+            }
             // Quote the path so paths with spaces work.
             key.SetValue(RunValue, "\"" + exe + "\"", RegistryValueKind.String);
         }

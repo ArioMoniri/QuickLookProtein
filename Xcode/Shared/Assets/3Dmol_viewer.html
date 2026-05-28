@@ -786,6 +786,44 @@
                                 if (name === 'cartoon')  s = { cartoon: ssColored
                                                                 ? { colorscheme: 'ssJmol' }
                                                                 : { color: 'spectrum' } };
+                                // v1.7.97+ Cartoon-on-CIF guard.
+                                // 3Dmol's CIF parser produces atoms
+                                // but doesn't always compute secondary
+                                // structure when the file lacks
+                                // `_struct_conf` / `_struct_sheet_range`
+                                // tables (common in mmCIF that wasn't
+                                // produced by the PDB itself). Cartoon
+                                // style on such a model renders zero
+                                // geometry — user reported "switching
+                                // to cartoon on a CIF protein shows
+                                // nothing". Detect this and fall back
+                                // to stick automatically so the user
+                                // sees the structure either way.
+                                if (name === 'cartoon') {
+                                    var polyAtoms = viewer.selectedAtoms(
+                                        { resn: ['ALA','ARG','ASN','ASP','CYS','GLN','GLU',
+                                                 'GLY','HIS','ILE','LEU','LYS','MET','PHE',
+                                                 'PRO','SER','THR','TRP','TYR','VAL','SEC',
+                                                 'PYL','MSE','HID','HIE','HIP'] }) || [];
+                                    if (polyAtoms.length === 0) {
+                                        console.warn('Cartoon: no protein residues detected; falling back to stick');
+                                        s = { stick: {} };
+                                    } else {
+                                        // We have polymer atoms; cartoon
+                                        // for them + stick for non-poly
+                                        // (ligands, ions, waters) so the
+                                        // user still sees those even
+                                        // when they're not amino acids.
+                                        viewer.setStyle({}, { stick: {} });
+                                        viewer.setStyle(
+                                            { resn: ['ALA','ARG','ASN','ASP','CYS','GLN','GLU',
+                                                     'GLY','HIS','ILE','LEU','LYS','MET','PHE',
+                                                     'PRO','SER','THR','TRP','TYR','VAL','SEC',
+                                                     'PYL','MSE','HID','HIE','HIP'] }, s);
+                                        viewer.render();
+                                        return;
+                                    }
+                                }
                                 viewer.setStyle({}, s);
                                 viewer.render();
                             }

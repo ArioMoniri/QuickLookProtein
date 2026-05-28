@@ -4,6 +4,34 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.97] — 2026-05-21
+
+### 🍎 + 🪟 CIF cartoon now actually renders
+
+User report: clicking **Cartoon** in the preview toolbar on a CIF protein file produces a blank canvas. Affects both macOS and Windows (same `3Dmol_viewer.html`).
+
+Root cause: 3Dmol.js's CIF parser produces atoms but doesn't always compute secondary structure when the source file lacks `_struct_conf` / `_struct_sheet_range` records (very common in non-PDB-deposited mmCIF — anything exported from a structure-prediction tool, an MD simulation, a software conversion, etc.). With no SS info, `viewer.setStyle({}, { cartoon: ... })` renders zero geometry → blank.
+
+`setStyleAll('cartoon')` in the toolbar now:
+
+1. Queries the viewer for residues matching the standard + common modified amino-acid list (ALA · ARG · …  · MSE · HID · HIE · HIP).
+2. If zero polymer atoms exist, falls back to stick automatically with a `console.warn`.
+3. If polymer atoms exist, applies cartoon to those and stick to everything else (ligands, ions, waters) — so the user always sees *something* even when the cartoon ribbon can't be drawn for non-protein residues.
+
+The Space-bar-preview load path already had a similar fallback (`if (styleType === 'cartoon' && !hasPolymer) styleType = 'stick'`); this just brings the toolbar button to parity.
+
+### 🪟 Windows — "Launch QuickLook at sign-in" handles Microsoft Store installs
+
+`FindQuickLookExe` probes `%LocalAppData%\Programs\QuickLook`, `%ProgramFiles%\QuickLook`, and `%ProgramFiles(x86)%\QuickLook` for the legacy installer paths. The Microsoft Store version of QuickLook lives at `%ProgramFiles%\WindowsApps\…QL-Win.QuickLook…\` (non-admin users can't even enumerate that directory) so the probe returns null, and the toggle throws `FileNotFoundException: QuickLook.exe not found in any standard install path`.
+
+v1.7.97:
+
+- New `IsStoreQuickLookInstalled()` probes for the WindowsApps directory entry, falling back to "QuickLook process is running" if the directory ACL hides the listing.
+- `SetLaunchAtStartup(true)` now throws a friendlier `InvalidOperationException` when the Store version is the only install: *"QuickLook was installed from the Microsoft Store and manages its own startup. Toggle it in Windows Settings → Apps → Startup."* (The Store version auto-starts by default — the checkbox is redundant.)
+- `LaunchAtStartupCheck` is **disabled at load time** with a tooltip explaining why, so the user never gets the chance to toggle it and hit the exception.
+
+On macOS, "Open at login" uses `SMAppService.mainApp` which auto-resolves from the bundle — no equivalent failure mode there.
+
 ## [1.7.96] — 2026-05-21
 
 ### 🍎 macOS — Sparkle 4005 part 2: spctl + stapler + cache state
