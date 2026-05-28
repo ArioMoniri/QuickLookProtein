@@ -6,6 +6,25 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.98</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.98</link>
+      <pubDate>Thu, 28 May 2026 04:15:14 +0000</pubDate>
+      <sparkle:version>1.7.98</sparkle:version>
+      <sparkle:shortVersionString>1.7.98</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🪟 Windows — &lt;code&gt;FindQuickLookExe&lt;/code&gt; no longer blind to custom install paths&lt;/h3&gt;
+&lt;p&gt;v1.7.97 added Store-version detection so Microsoft-Store-installed users get a friendlier message + a disabled toggle. But the same &lt;code&gt;FindQuickLookExe&lt;/code&gt; was also wrong for non-Store users with a non-default install location — portable installs, machines where the user pointed Inno Setup at a custom folder, admin installs that land in &lt;code&gt;Program Files&lt;/code&gt; instead of the per-user &lt;code&gt;LocalAppData\Programs&lt;/code&gt;. All still threw &amp;quot;QuickLook.exe not found in any standard install path&amp;quot;.&lt;/p&gt;
+&lt;p&gt;v1.7.98 expands the probe in four stages, returning the first hit:&lt;/p&gt;
+&lt;p&gt;1. &lt;strong&gt;Already-running QuickLook process&lt;/strong&gt; — most authoritative; if it&amp;#x27;s running we read &lt;code&gt;MainModule.FileName&lt;/code&gt; for the exact path regardless of install location.&lt;/p&gt;
+&lt;p&gt;2. &lt;strong&gt;Standard Inno paths&lt;/strong&gt; — the original 3 plus &lt;code&gt;%MyDocuments%\QuickLook&lt;/code&gt; (older portable installs).&lt;/p&gt;
+&lt;p&gt;3. &lt;strong&gt;Registry Uninstall keys&lt;/strong&gt; — &lt;code&gt;HKCU&lt;/code&gt; + &lt;code&gt;HKLM&lt;/code&gt; × native + &lt;code&gt;WOW6432Node&lt;/code&gt; views. Inno Setup writes &lt;code&gt;InstallLocation&lt;/code&gt; and &lt;code&gt;DisplayIcon&lt;/code&gt; here regardless of where the binary went, so this catches user-chosen custom dirs.&lt;/p&gt;
+&lt;p&gt;4. &lt;strong&gt;(Microsoft Store version) → friendlier error&lt;/strong&gt; — unchanged from v1.7.97.&lt;/p&gt;
+&lt;h3&gt;🍎 macOS — Open-at-Login status check in Diagnostics self-test&lt;/h3&gt;
+&lt;p&gt;New step 6 in the diagnostic self-test (Diagnostics → Self-test → &lt;strong&gt;Run diagnostic self-test&lt;/strong&gt;): probes &lt;code&gt;SMAppService.mainApp.status&lt;/code&gt; and reports the actual state — &lt;code&gt;enabled&lt;/code&gt;, &lt;code&gt;notRegistered&lt;/code&gt;, &lt;code&gt;requiresApproval&lt;/code&gt; (a known stalled state the Login Items panel surfaces), or &lt;code&gt;notFound&lt;/code&gt; (bundle not in &lt;code&gt;/Applications&lt;/code&gt; or not notarised — both prevent SMAppService from registering at all). Mac analogue of the Win &amp;quot;Launch at sign-in&amp;quot; toggle health check.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.98"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.98/QuickLookProtein-1.7.98.zip" sparkle:edSignature="R9KiKuL9aeit6yf5qejgnMfSK1hu6E4oQgMqSCSSX00HApsZbjuLIrzXjxkbGdHT5s+kW5PCBjinmYDDruAhBA==" length="4615354" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.97</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.97</link>
       <pubDate>Thu, 28 May 2026 03:49:04 +0000</pubDate>
