@@ -4,6 +4,23 @@ All notable changes to QuickLookProtein are recorded here. Format roughly follow
 [Keep a Changelog](https://keepachangelog.com); this project does not strictly
 adhere to SemVer because version numbers are driven by upstream releases.
 
+## [1.7.98] — 2026-05-28
+
+### 🪟 Windows — `FindQuickLookExe` no longer blind to custom install paths
+
+v1.7.97 added Store-version detection so Microsoft-Store-installed users get a friendlier message + a disabled toggle. But the same `FindQuickLookExe` was also wrong for non-Store users with a non-default install location — portable installs, machines where the user pointed Inno Setup at a custom folder, admin installs that land in `Program Files` instead of the per-user `LocalAppData\Programs`. All still threw "QuickLook.exe not found in any standard install path".
+
+v1.7.98 expands the probe in four stages, returning the first hit:
+
+1. **Already-running QuickLook process** — most authoritative; if it's running we read `MainModule.FileName` for the exact path regardless of install location.
+2. **Standard Inno paths** — the original 3 plus `%MyDocuments%\QuickLook` (older portable installs).
+3. **Registry Uninstall keys** — `HKCU` + `HKLM` × native + `WOW6432Node` views. Inno Setup writes `InstallLocation` and `DisplayIcon` here regardless of where the binary went, so this catches user-chosen custom dirs.
+4. **(Microsoft Store version) → friendlier error** — unchanged from v1.7.97.
+
+### 🍎 macOS — Open-at-Login status check in Diagnostics self-test
+
+New step 6 in the diagnostic self-test (Diagnostics → Self-test → **Run diagnostic self-test**): probes `SMAppService.mainApp.status` and reports the actual state — `enabled`, `notRegistered`, `requiresApproval` (a known stalled state the Login Items panel surfaces), or `notFound` (bundle not in `/Applications` or not notarised — both prevent SMAppService from registering at all). Mac analogue of the Win "Launch at sign-in" toggle health check.
+
 ## [1.7.97] — 2026-05-21
 
 ### 🍎 + 🪟 CIF cartoon now actually renders

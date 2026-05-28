@@ -4,6 +4,7 @@
 // persist on each interaction (matches the macOS UX).
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -829,9 +830,41 @@ public partial class MainWindow : Window
     private const string RunRoot  = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string RunValue = "QuickLook";
 
+    /// Find the QuickLook host executable across every install
+    /// path we've seen in the wild. Returns null only when the host
+    /// is genuinely missing (no install at all, or Store-only).
+    ///
+    /// v1.7.98+ probes (in order):
+    ///   1. Currently-running QuickLook.exe (most authoritative —
+    ///      if it's running we know the exact path, regardless of
+    ///      install location)
+    ///   2. The 3 standard Inno-installer paths
+    ///   3. HKCU + HKLM Uninstall-key InstallLocation (catches
+    ///      portable / atypical install dirs the user chose)
+    ///   4. ~/Documents/QuickLook (some older portable installs)
     private static string? FindQuickLookExe()
     {
-        var candidates = new[]
+        // 1. Already-running process — most reliable signal that
+        //    QL-Win is installed AND its exact path. A standard
+        //    user always has PROCESS_QUERY_LIMITED_INFORMATION for
+        //    their own processes; for cross-session/elevated ones
+        //    the MainModule read throws and we skip.
+        try
+        {
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName("QuickLook"))
+            {
+                try
+                {
+                    var mod = p.MainModule;
+                    if (mod?.FileName is string f && File.Exists(f)) return f;
+                }
+                catch { /* cross-session / elevated; skip */ }
+            }
+        }
+        catch { /* no running processes match; fall through */ }
+
+        // 2. Standard Inno-installer paths.
+        var candidates = new List<string>
         {
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                          "Programs", "QuickLook", "QuickLook.exe"),
@@ -839,8 +872,54 @@ public partial class MainWindow : Window
                          "QuickLook", "QuickLook.exe"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
                          "QuickLook", "QuickLook.exe"),
+            // 4. Older portable installs landed in ~/Documents.
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                         "QuickLook", "QuickLook.exe"),
         };
         foreach (var p in candidates) if (File.Exists(p)) return p;
+
+        // 3. Registry Uninstall keys. Inno Setup writes InstallLocation
+        //    here regardless of where the user pointed the install,
+        //    so this catches custom install dirs the path-list above
+        //    misses. Check HKCU + HKLM, native + WOW6432Node views.
+        var hives = new[] { Registry.CurrentUser, Registry.LocalMachine };
+        var uninstallSubkeys = new[]
+        {
+            @"Software\Microsoft\Windows\CurrentVersion\Uninstall",
+            @"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        };
+        foreach (var hive in hives)
+        {
+            foreach (var sub in uninstallSubkeys)
+            {
+                try
+                {
+                    using var root = hive.OpenSubKey(sub);
+                    if (root == null) continue;
+                    foreach (var name in root.GetSubKeyNames())
+                    {
+                        if (!name.Contains("QuickLook", StringComparison.OrdinalIgnoreCase)) continue;
+                        using var sk = root.OpenSubKey(name);
+                        if (sk?.GetValue("InstallLocation") is string loc &&
+                            !string.IsNullOrWhiteSpace(loc))
+                        {
+                            var probe = Path.Combine(loc, "QuickLook.exe");
+                            if (File.Exists(probe)) return probe;
+                        }
+                        // DisplayIcon often points at the exe with an
+                        // optional ",index" suffix Inno appends.
+                        if (sk?.GetValue("DisplayIcon") is string icon &&
+                            icon.IndexOf("QuickLook.exe", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            var path = icon.Split(',')[0].Trim('"');
+                            if (File.Exists(path)) return path;
+                        }
+                    }
+                }
+                catch { /* registry view inaccessible; try next */ }
+            }
+        }
+
         return null;
     }
 

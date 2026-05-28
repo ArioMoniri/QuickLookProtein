@@ -8,6 +8,7 @@
 import SwiftUI
 import WebKit
 import AppKit
+import ServiceManagement
 import UniformTypeIdentifiers
 
 /// Extensions we know 3Dmol can render — used by the drag-and-drop tile.
@@ -2444,10 +2445,35 @@ struct ContentView: View {
             lines.append("5. Sparkle EDDSA key: OK (\(edKey.prefix(12))…)")
         }
 
-        let report = lines.joined(separator: "\n")
-        diagnosticSelfTestReport = report
-        Updater.logUpdateEvent("INFO", "Diagnostic self-test:\n\(report)")
-    }
+        // 6. Open-at-Login registration status (v1.7.98+). Mac
+        //    analogue of the Win "Launch QuickLook at sign-in"
+        //    toggle. SMAppService.mainApp.status returns one of:
+        //      - .notRegistered  (user hasn't enabled it; fine)
+        //      - .enabled        (registered successfully)
+        //      - .requiresApproval (user has it but needs Login
+        //                          Items approval — known stalled
+        //                          state, surfaces in Settings)
+        //      - .notFound       (SMAppService can't find the bundle
+        //                          — bundle isn't notarized / not
+        //                          in /Applications)
+        if #available(macOS 13.0, *) {
+            let status = SMAppService.mainApp.status
+            switch status {
+            case .notRegistered:
+                lines.append("6. Open-at-Login: not registered (user hasn't enabled the toggle; expected default)")
+            case .enabled:
+                lines.append("6. Open-at-Login: OK (enabled)")
+            case .requiresApproval:
+                lines.append("6. Open-at-Login: REQUIRES APPROVAL — open System Settings → General → Login Items & Extensions and approve QuickLookProtein2.")
+            case .notFound:
+                lines.append("6. Open-at-Login: NOT FOUND — SMAppService can't see the bundle. The .app likely isn't in /Applications or wasn't notarized; both prevent SMAppService from registering.")
+            @unknown default:
+                lines.append("6. Open-at-Login: status=\(status.rawValue) (unrecognised SMAppService state)")
+            }
+        } else {
+            lines.append("6. Open-at-Login: macOS 12 and earlier — uses legacy LSSharedFileList; toggle in System Settings → Users & Groups → Login Items.")
+        }
+
 
     /// Middle card — original author + extender credits, repo link, and a tip
     /// row. Lighter visual weight than the updates card.
