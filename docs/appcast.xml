@@ -6,6 +6,33 @@
     <description>Auto-update feed for QuickLookProtein2 (Ariorad Moniri's signed, extended fork of Jethro Hemmann's original QuickLookProtein). Item titles below stay as "QuickLookProtein N.N.N" because Sparkle's update dialog displays them; the channel itself is rebranded.</description>
     <language>en</language>
     <item>
+      <title>QuickLookProtein2 1.7.97</title>
+      <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.97</link>
+      <pubDate>Thu, 28 May 2026 03:49:04 +0000</pubDate>
+      <sparkle:version>1.7.97</sparkle:version>
+      <sparkle:shortVersionString>1.7.97</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <description>&lt;h3&gt;🍎 + 🪟 CIF cartoon now actually renders&lt;/h3&gt;
+&lt;p&gt;User report: clicking &lt;strong&gt;Cartoon&lt;/strong&gt; in the preview toolbar on a CIF protein file produces a blank canvas. Affects both macOS and Windows (same &lt;code&gt;3Dmol_viewer.html&lt;/code&gt;).&lt;/p&gt;
+&lt;p&gt;Root cause: 3Dmol.js&amp;#x27;s CIF parser produces atoms but doesn&amp;#x27;t always compute secondary structure when the source file lacks &lt;code&gt;_struct_conf&lt;/code&gt; / &lt;code&gt;_struct_sheet_range&lt;/code&gt; records (very common in non-PDB-deposited mmCIF — anything exported from a structure-prediction tool, an MD simulation, a software conversion, etc.). With no SS info, &lt;code&gt;viewer.setStyle({}, { cartoon: ... })&lt;/code&gt; renders zero geometry → blank.&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;setStyleAll(&amp;#x27;cartoon&amp;#x27;)&lt;/code&gt; in the toolbar now:&lt;/p&gt;
+&lt;p&gt;1. Queries the viewer for residues matching the standard + common modified amino-acid list (ALA · ARG · …  · MSE · HID · HIE · HIP).&lt;/p&gt;
+&lt;p&gt;2. If zero polymer atoms exist, falls back to stick automatically with a &lt;code&gt;console.warn&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;3. If polymer atoms exist, applies cartoon to those and stick to everything else (ligands, ions, waters) — so the user always sees *something* even when the cartoon ribbon can&amp;#x27;t be drawn for non-protein residues.&lt;/p&gt;
+&lt;p&gt;The Space-bar-preview load path already had a similar fallback (&lt;code&gt;if (styleType === &amp;#x27;cartoon&amp;#x27; &amp;amp;&amp;amp; !hasPolymer) styleType = &amp;#x27;stick&amp;#x27;&lt;/code&gt;); this just brings the toolbar button to parity.&lt;/p&gt;
+&lt;h3&gt;🪟 Windows — &amp;quot;Launch QuickLook at sign-in&amp;quot; handles Microsoft Store installs&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;FindQuickLookExe&lt;/code&gt; probes &lt;code&gt;%LocalAppData%\Programs\QuickLook&lt;/code&gt;, &lt;code&gt;%ProgramFiles%\QuickLook&lt;/code&gt;, and &lt;code&gt;%ProgramFiles(x86)%\QuickLook&lt;/code&gt; for the legacy installer paths. The Microsoft Store version of QuickLook lives at &lt;code&gt;%ProgramFiles%\WindowsApps\…QL-Win.QuickLook…\&lt;/code&gt; (non-admin users can&amp;#x27;t even enumerate that directory) so the probe returns null, and the toggle throws &lt;code&gt;FileNotFoundException: QuickLook.exe not found in any standard install path&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;v1.7.97:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;New &lt;code&gt;IsStoreQuickLookInstalled()&lt;/code&gt; probes for the WindowsApps directory entry, falling back to &amp;quot;QuickLook process is running&amp;quot; if the directory ACL hides the listing.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;SetLaunchAtStartup(true)&lt;/code&gt; now throws a friendlier &lt;code&gt;InvalidOperationException&lt;/code&gt; when the Store version is the only install: *&amp;quot;QuickLook was installed from the Microsoft Store and manages its own startup. Toggle it in Windows Settings → Apps → Startup.&amp;quot;* (The Store version auto-starts by default — the checkbox is redundant.)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;LaunchAtStartupCheck&lt;/code&gt; is &lt;strong&gt;disabled at load time&lt;/strong&gt; with a tooltip explaining why, so the user never gets the chance to toggle it and hit the exception.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;On macOS, &amp;quot;Open at login&amp;quot; uses &lt;code&gt;SMAppService.mainApp&lt;/code&gt; which auto-resolves from the bundle — no equivalent failure mode there.&lt;/p&gt;
+&lt;p style="margin-top:1em;font-size:smaller;color:#888;"&gt;Full release on &lt;a href="https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.97"&gt;GitHub&lt;/a&gt;.&lt;/p&gt;</description>
+      <enclosure url="https://github.com/ArioMoniri/QuickLookProtein/releases/download/v1.7.97/QuickLookProtein-1.7.97.zip" sparkle:edSignature="5XaLaHQy6wEWBzhPZ5wOWFQfS0nLqTQ0TocINh7PXEbAHz5/+FZFn/6oI2+h2alGu5ylVcuqAGCSVUu/TzMqBQ==" length="4613952" type="application/octet-stream" />
+    </item>
+    <item>
       <title>QuickLookProtein2 1.7.96</title>
       <link>https://github.com/ArioMoniri/QuickLookProtein/releases/tag/v1.7.96</link>
       <pubDate>Thu, 21 May 2026 03:57:42 +0000</pubDate>
